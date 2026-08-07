@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>09 · DISTRIBUTED INFERENCE — LLM INFERENCE</title>
+<meta name="description" content="When the model does not fit, the interconnect becomes the memory bus — and it is much slower.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="09 · DISTRIBUTED INFERENCE — LLM INFERENCE">
+<meta property="og:description" content="When the model does not fit, the interconnect becomes the memory bus — and it is much slower.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/arcade.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20fill%3D%22%23000%22%2F%3E%3Cpath%20d%3D%22M16%2C16%20L29%2C9%20A15%2C15%200%201%200%2029%2C23%20Z%22%20fill%3D%22%23FFE800%22%2F%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="scorebar">
+  <a class="scorebar__home" href="../index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="var(--pac)" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
+  <span class="scorebar__item"><span class="scorebar__label">LEVEL</span><span class="scorebar__value scorebar__value--pac">09</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/11</span></span>
+  <span class="scorebar__spacer"></span>
+  <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
+</header>
+<div class="wrap">
+  <div class="shell">
+    <nav class="rail" aria-label="Module contents">
+  <p class="rail__head">ON THIS LEVEL</p>
+  <ul class="rail__list">
+    <li><a class="rail__link" href="#big-idea" data-kind="dot"><span class="rail__dot"></span><span>The big idea</span></a></li><li><a class="rail__link" href="#concept-0" data-kind="dot"><span class="rail__dot"></span><span>Tensor parallelism: split inside the layer</span></a></li><li><a class="rail__link" href="#concept-1" data-kind="dot"><span class="rail__dot"></span><span>Pipeline parallelism: split across layers</span></a></li><li><a class="rail__link" href="#concept-2" data-kind="dot"><span class="rail__dot"></span><span>What TP degree actually does to your numbers</span></a></li><li><a class="rail__link" href="#concept-3" data-kind="dot"><span class="rail__dot"></span><span>Mixture of experts: a bandwidth win and a capacity problem</span></a></li><li><a class="rail__link" href="#concept-4" data-kind="dot"><span class="rail__dot"></span><span>Prefill/decode disaggregation</span></a></li><li><a class="rail__link" href="#concept-5" data-kind="dot"><span class="rail__dot"></span><span>The interconnect as the real constraint</span></a></li><li><a class="rail__link" href="#math-lab" data-kind="dot"><span class="rail__dot"></span><span>Math by hand</span></a></li><li><a class="rail__link" href="#code-lab" data-kind="dot"><span class="rail__dot"></span><span>Code lab</span></a></li><li><a class="rail__link" href="#papers" data-kind="dot"><span class="rail__dot"></span><span>Papers</span></a></li><li><a class="rail__link" href="#pitfalls" data-kind="dot"><span class="rail__dot"></span><span>Pitfalls</span></a></li><li><a class="rail__link" href="#checkpoint" data-kind="power"><span class="rail__dot"></span><span>Checkpoint</span></a></li><li><a class="rail__link" href="#glossary" data-kind="dot"><span class="rail__dot"></span><span>Glossary</span></a></li>
+  </ul>
+  <div class="rail__nav">
+    <a class="rail__step" href="speculative-decoding.html">◀ 08 SPECULATIVE DECODING</a>
+    <a class="rail__step" href="../index.html">▲ ALL LEVELS</a>
+    <a class="rail__step" href="systems-and-frontier.html">10 SYSTEMS AND THE FRONTIER ▶</a>
+  </div>
+</nav>
+    <main id="main">
+
+      <div class="mod-head">
+        <p class="mod-head__level">LEVEL 09</p>
+        <h1 class="mod-head__title">DISTRIBUTED INFERENCE</h1>
+        <p class="mod-head__tag">When the model does not fit, the interconnect becomes the memory bus — and it is much slower.</p>
+        <div class="mod-head__meta">
+          <span>⏱ 7–9 hours</span>
+          <span>● 6 concepts</span>
+          <span>📄 6 papers</span>
+          <span>▸ needs: Module 2, Module 4, Module 5</span>
+        </div>
+      </div>
+
+      <section class="section ghost ghost--pinky" id="big-idea">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--pinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>PINKY · THE BIG IDEA</p>
+        <div class="prose"><p>A 70B model at fp16 is 141 GB of weights. No single GPU holds that. So you split it, and the moment you do, a new tier appears in the memory hierarchy: <strong>the interconnect</strong>.</p>
+<p>NVLink between H100s moves about 900 GB/s. HBM moves 3,350 GB/s. PCIe Gen5 moves about 64 GB/s. Splitting a model means that some of the data movement in every forward pass happens across a link that is 3.7× slower than memory at best, and 52× slower at worst. Every technique in this module is about controlling how much traffic crosses that link.</p>
+<p>There is a compensation, and it is the reason multi-GPU inference works at all: <strong>splitting a model across <code>N</code> GPUs also multiplies your aggregate memory bandwidth by <code>N</code>.</strong> Four H100s give you 13.4 TB/s of HBM. Since decode is bandwidth-bound, four GPUs can decode a model roughly four times faster than one could — if the communication does not eat the gain.</p>
+<p>So distributed inference is a trade between two effects that both scale with GPU count: more bandwidth (good, linear) versus more communication (bad, and dependent on topology). Getting it right means knowing which parallelism strategy puts the traffic where the fast links are.</p>
+<p>The module ends with the idea that follows most directly from everything in this course: <strong>prefill and decode are different workloads, so stop running them on the same machines.</strong></p></div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="concepts">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>PELLETS · CONCEPTS</p>
+        <article class="concept" id="concept-0">
+  <div class="concept__head">
+    <span class="concept__n">01</span>
+    <h3 class="concept__title">Tensor parallelism: split inside the layer</h3>
+  </div>
+  <div class="prose"><p>Tensor parallelism (Megatron-LM) splits the weight matrices themselves across GPUs. The arrangement is chosen so that communication happens as rarely as possible.</p>
+<p><strong>The MLP block.</strong> Two matmuls in sequence: <code>Y = GeLU(X @ A)</code>, then <code>Z = Y @ B</code>.</p>
+<p>Split <code>A</code> <strong>by columns</strong> across GPUs. Each GPU computes a slice of <code>Y</code>. Crucially, GeLU is elementwise, so each GPU can apply it to its own slice without needing anyone else's — <strong>no communication</strong>.</p>
+<p>Then split <code>B</code> <strong>by rows</strong>, matching the column split of <code>A</code>. Each GPU computes a partial <code>Z</code> using its slice of <code>Y</code> and its rows of <code>B</code>. The partials sum to the correct answer, so one <strong>all-reduce</strong> finishes the block.</p>
+<pre><code>GPU 0:  X @ A[:, :h/2]  -&gt; Y0 -&gt; GeLU -&gt; Y0 @ B[:h/2, :] -&gt; Z_partial_0
+GPU 1:  X @ A[:, h/2:]  -&gt; Y1 -&gt; GeLU -&gt; Y1 @ B[h/2:, :] -&gt; Z_partial_1
+                                                 all-reduce -&gt; Z</code></pre>
+<p>One all-reduce for two matmuls. Splitting the other way round would need communication between them.</p>
+<p><strong>The attention block</strong> splits naturally by head: give each GPU a subset of heads, let it compute those heads' attention independently, then all-reduce after the output projection. Also one all-reduce.</p>
+<p><strong>So: two all-reduces per transformer layer.</strong> For an 80-layer model that is 160 all-reduces per forward pass, on the critical path.</p>
+<p><strong>Communication volume.</strong> A ring all-reduce moves <code>2(N−1)/N</code> times the data per GPU. For an activation of shape <code>[batch, seq, d_model]</code> in fp16:</p>
+<pre><code>bytes per all-reduce = 2 * batch * seq * d_model * 2 * (N-1)/N</code></pre>
+<p>At decode (<code>seq = 1</code>), batch 32, <code>d_model = 8192</code>, TP=4:</p>
+<pre><code>2 * 32 * 1 * 8192 * 2 * 0.75 = 786,432 bytes = 0.79 MB per all-reduce
+x 160 all-reduces = 126 MB per token</code></pre>
+<p>Over NVLink at 900 GB/s that is 0.14 ms — against a decode step of a few milliseconds, so roughly 5% overhead. <strong>Over PCIe at 64 GB/s it is 1.97 ms</strong>, which can double your step time. This is the single most important practical fact in this module: <strong>TP belongs inside a node, on NVLink.</strong></p>
+<p><strong>The GQA ceiling.</strong> TP splits attention by head, and a KV head cannot be split across GPUs without replicating its cache. With 8 KV heads you can run TP-8 cleanly, one KV head per GPU. At TP-16 you must duplicate KV heads, so per-GPU cache stops shrinking as you add GPUs — you pay for hardware that adds bandwidth and compute but no cache capacity. <strong>The KV head count silently caps useful TP degree.</strong></p></div>
+  <pre class="ascii" aria-label="diagram">  MLP under TP-2: column-split then row-split, one all-reduce
+
+         X (replicated on both GPUs)
+         |                    |
+    A[:, :h/2]           A[:, h/2:]      &lt;- column-parallel
+         |                    |
+       GeLU                 GeLU         &lt;- elementwise, NO comms needed
+         |                    |
+    B[:h/2, :]           B[h/2:, :]      &lt;- row-parallel
+         |                    |
+      Z_part_0            Z_part_1
+         \__________ + __________/       &lt;- ONE all-reduce
+                     |
+                     Z</pre>
+  <p class="keypoint"><b>REMEMBER</b>Column-parallel then row-parallel matmuls let a layer be split with exactly one all-reduce at the end, and there are two such all-reduces per transformer layer.</p>
+</article>
+<article class="concept" id="concept-1">
+  <div class="concept__head">
+    <span class="concept__n">02</span>
+    <h3 class="concept__title">Pipeline parallelism: split across layers</h3>
+  </div>
+  <div class="prose"><p>Pipeline parallelism assigns different <em>layers</em> to different GPUs. With 80 layers on 4 GPUs, each holds 20 consecutive layers. Activations flow forward through the stages.</p>
+<p><strong>Communication is tiny.</strong> Between stages you send one activation tensor: <code>batch × seq × d_model × 2</code> bytes, once per stage boundary. At decode with batch 32 and <code>d_model = 8192</code> that is 0.52 MB per boundary, three boundaries — about 1.6 MB per token, versus 126 MB for TP-4. <strong>Roughly 80× less traffic.</strong></p>
+<p>That is why PP tolerates slow interconnects. Across nodes, over Ethernet or InfiniBand, PP works and TP does not.</p>
+<p><strong>The bubble is the cost.</strong> A single request must traverse all four stages sequentially. While it is in stage 2, stages 1, 3 and 4 have nothing to do. For one request in flight, utilization is <code>1/N</code>.</p>
+<p>The fix is to keep multiple microbatches in flight so every stage always has work:</p>
+<pre><code>time -&gt;
+stage 0:  [m1][m2][m3][m4][m5]...
+stage 1:      [m1][m2][m3][m4]...
+stage 2:          [m1][m2][m3]...
+stage 3:              [m1][m2]...
+          ^^^^^^^^^^^^ the fill bubble</code></pre>
+<p>Bubble fraction is <code>(N−1)/(M + N−1)</code> for <code>M</code> microbatches and <code>N</code> stages. With 4 stages and 32 microbatches: <code>3/35 = 8.6%</code>. Acceptable. With 4 microbatches: <code>3/7 = 43%</code>. Not.</p>
+<p><strong>In LLM serving the microbatches are your concurrent requests</strong>, so pipeline efficiency depends on having enough concurrency — which brings you back to KV cache capacity. Under light load a pipelined deployment is badly underutilized.</p>
+<p><strong>PP does not reduce single-request latency.</strong> A request still passes through every layer once; you have only distributed where they live. TP, by contrast, genuinely speeds up each layer because you have <code>N×</code> the bandwidth working on it. <strong>This is the key difference: TP improves latency, PP improves capacity.</strong></p>
+<p><strong>The standard combination</strong> follows directly:</p>
+<pre><code>TP within a node   (NVLink, 900 GB/s, high-volume all-reduces)
+PP across nodes    (InfiniBand/Ethernet, low-volume activation passing)</code></pre>
+<p>An 8-GPU node running TP-8, with PP across nodes. Sequence or context parallelism (splitting the sequence dimension, as in Ring Attention) is a third axis used for very long context, where even one sequence's activations and KV cache exceed a single GPU.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Pipelining sends only activations between stages, so it survives slow links — but a single request gets no latency benefit and creates a bubble.</p>
+</article>
+<article class="concept" id="concept-2">
+  <div class="concept__head">
+    <span class="concept__n">03</span>
+    <h3 class="concept__title">What TP degree actually does to your numbers</h3>
+  </div>
+  <div class="prose"><p>Work through TP for Llama-3-70B on H100s, 8k context, so the effects are concrete.</p>
+<p><strong>Weights per GPU:</strong> <code>141.2 / N</code> GB. <strong>KV cache per GPU:</strong> <code>320 KiB per token / N</code> — because each GPU holds only its own heads' K and V, provided <code>N ≤ n_kv_heads</code>. <strong>Aggregate bandwidth:</strong> <code>3.35 × N</code> TB/s.</p>
+<pre><code>TP   weights/GPU   KV/tok/GPU   agg BW      fits in 80GB?   TPOT floor
+ 1     141.2 GB      320 KiB    3.35 TB/s        NO             --
+ 2      70.6 GB      160 KiB    6.70 TB/s        yes         21.1 ms
+ 4      35.3 GB       80 KiB   13.40 TB/s        yes         10.5 ms
+ 8      17.7 GB       40 KiB   26.80 TB/s        yes          5.3 ms
+16       8.8 GB       40 KiB   53.60 TB/s        yes          2.6 ms</code></pre>
+<p>TPOT floor is <code>141.2 GB / aggregate bandwidth</code> — the weights are read once collectively per step.</p>
+<p>Three things to read out of this table.</p>
+<p><strong>TP improves latency roughly linearly.</strong> From TP-2 to TP-8, TPOT falls 4×. You are not just fitting the model, you are decoding it faster, because you added memory bandwidth.</p>
+<p><strong>KV cache per GPU stops shrinking at TP-8.</strong> Llama-3-70B has 8 KV heads. At TP-16 two GPUs share each KV head and must both hold its cache, so per-GPU KV stays at 40 KiB/token. You doubled the hardware and got no additional cache capacity — only bandwidth. That is the GQA ceiling biting.</p>
+<p><strong>Communication grows with TP degree.</strong> The all-reduce volume scales as <code>(N−1)/N</code>, approaching a constant, but the <em>number of participants</em> grows and ring all-reduce latency grows with hop count. Beyond a node, where you leave NVLink, the cost jumps discontinuously.</p>
+<p>Now the effect that surprises people: <strong>TP degree affects TTFT and throughput differently.</strong></p>
+<p><strong>TTFT improves with TP</strong> because prefill is compute-bound and you added compute. Communication during prefill is larger in absolute terms (activations are <code>seq</code> times bigger) but it is amortized over far more arithmetic, so the fraction of time spent communicating is <em>lower</em> during prefill than decode.</p>
+<p><strong>Throughput per GPU usually falls with TP.</strong> You are paying communication overhead on every layer and getting sub-linear scaling. Two independent TP-4 replicas will generally serve more total tokens per second than one TP-8 deployment — but each request will be slower.</p>
+<p>That is the real decision:</p>
+<pre><code>minimize latency        -&gt;  maximize TP (up to the KV head count / node boundary)
+maximize throughput/$   -&gt;  minimum TP that fits the model, then replicate</code></pre>
+<p>Most production deployments choose the smallest TP that fits the model with acceptable latency, then scale out with replicas.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>TP divides weight bytes and KV cache per GPU while multiplying aggregate bandwidth, so it improves both latency and capacity — until communication or KV head count stops it.</p>
+</article>
+<article class="concept" id="concept-3">
+  <div class="concept__head">
+    <span class="concept__n">04</span>
+    <h3 class="concept__title">Mixture of experts: a bandwidth win and a capacity problem</h3>
+  </div>
+  <div class="prose"><p>An MoE layer replaces the single MLP with <code>E</code> expert MLPs and a router that sends each token to the top <code>k</code> of them, typically <code>k = 2</code> out of 8 to 256 experts.</p>
+<p>The inference consequence follows straight from this course's thesis. <strong>You only read the weights of the experts you activate.</strong> A model with 8 experts and top-2 routing has roughly 4× the parameters of its dense equivalent but moves about the same bytes per token.</p>
+<p>For decode, which is memory-bound, this is close to free quality. Mixtral-8x7B has ~47B total parameters but activates ~13B per token: it decodes at roughly the speed of a 13B model while being substantially better than one. <strong>MoE is the most direct possible exploitation of the fact that bytes moved, not parameters held, is what costs you.</strong></p>
+<p>The problems are all about capacity and routing.</p>
+<p><strong>Every expert must be resident.</strong> You do not know in advance which experts a token will need, so all of them must be in memory somewhere. Mixtral-8x7B needs 94 GB at fp16 even though only 26 GB is read per token. <strong>MoE trades memory capacity for memory bandwidth</strong>, which is a good trade when capacity is what you have.</p>
+<p><strong>Expert parallelism</strong> distributes experts across GPUs, so each holds <code>E/N</code> of them. Now routing requires an <strong>all-to-all</strong>: send each token's hidden state to whichever GPUs hold its chosen experts, compute, send results back. Two all-to-alls per MoE layer, and all-to-all is the most demanding collective — every GPU talks to every other.</p>
+<p><strong>Load imbalance is the hard part.</strong> Routing is learned and data-dependent, so nothing guarantees even distribution. If 40% of tokens in a batch pick expert 3, the GPU holding expert 3 does 40% of the work while others idle. Since the layer cannot complete until every GPU finishes, <strong>the slowest GPU sets the pace for all of them.</strong></p>
+<p>Mitigations, none complete:</p>
+<ul><li><strong>Capacity factor.</strong> Cap tokens per expert; drop or reroute the overflow. Bounds the imbalance and costs quality on dropped tokens.</li><li><strong>Auxiliary load-balancing loss</strong> during training. Helps on average, not per batch.</li><li><strong>Expert replication.</strong> Duplicate hot experts across GPUs. Costs memory.</li><li><strong>Larger batches.</strong> Averaging over more tokens smooths the distribution — one case where batching helps for a reason unrelated to arithmetic intensity.</li></ul>
+<p><strong>Combining parallelism.</strong> Production MoE deployments typically use expert parallelism for the MoE layers and tensor parallelism for attention and the dense layers, which means switching communication patterns within each layer. This is genuinely intricate, and it is why MoE serving is harder than dense serving even though the arithmetic is friendlier.</p></div>
+  <pre class="ascii" aria-label="diagram">  DENSE 47B                    MoE 8x7B (top-2)
+  read all 94 GB per token     read ~26 GB per token
+  -&gt; 28 ms at 3.35 TB/s        -&gt; 7.8 ms at 3.35 TB/s
+
+  but both need 94 GB resident.
+  MoE trades CAPACITY for BANDWIDTH.
+
+  expert parallelism, 4 GPUs, 8 experts:
+    GPU0 [e0 e1]   GPU1 [e2 e3]   GPU2 [e4 e5]   GPU3 [e6 e7]
+              \        |        /        /
+               all-to-all: route tokens to their experts
+              /        |        \        \
+    if 40% of tokens want e3, GPU1 is the bottleneck for everyone</pre>
+  <p class="keypoint"><b>REMEMBER</b>MoE activates a fraction of its parameters per token, so it moves far fewer bytes than a dense model of the same size — but every expert must still be resident somewhere.</p>
+</article>
+<article class="concept" id="concept-4">
+  <div class="concept__head">
+    <span class="concept__n">05</span>
+    <h3 class="concept__title">Prefill/decode disaggregation</h3>
+  </div>
+  <div class="prose"><p>This is the conclusion the whole course has been building toward.</p>
+<p>Prefill is compute-bound, latency-critical at the request level, and benefits from high TP degree and large FLOP capacity. Decode is memory-bound, latency-critical per token, benefits from bandwidth and cache capacity, and wants large batches. Module 5 showed that co-locating them means one interferes with the other, and chunked prefill only mitigates it.</p>
+<p><strong>Disaggregation</strong> puts them on separate machine pools:</p>
+<pre><code>  request
+     |
+     v
+  [ PREFILL POOL ]        compute-optimized, high TP, small batches
+     |                    produces the prompt's KV cache
+     |  transfer KV
+     v
+  [ DECODE POOL ]         bandwidth-optimized, large batches, big KV budget
+     |
+     v
+  streamed tokens</code></pre>
+<p>What this buys:</p>
+<p><strong>No interference.</strong> A 100k-token prefill cannot stall anyone's token stream, because it is not on the same GPU.</p>
+<p><strong>Independent tuning.</strong> Each pool gets its own parallelism strategy, batch size and even hardware. Prefill wants FLOPs; decode wants bandwidth and capacity. You can buy different GPUs for each — an H200 or a large-memory part for decode, a compute-dense part for prefill.</p>
+<p><strong>Independent scaling.</strong> Traffic mix shifts. A day of long-document summarization is prefill-heavy; a day of chat is decode-heavy. Separate pools scale separately.</p>
+<p><strong>The cost is the KV transfer.</strong> After prefill you must move the prompt's entire KV cache to the decode pool. For Llama-3-70B with a 4k prompt that is <code>320 KiB × 4096 = 1.25 GiB</code>. Over InfiniBand at ~50 GB/s that is 25 ms; over NVLink where available, ~1.4 ms.</p>
+<p>Whether disaggregation wins depends on comparing that transfer against the interference it removes. DistServe's argument, and it is convincing, is that for most realistic workloads the transfer is cheaper — especially because it can be <strong>overlapped layer by layer</strong>: start sending layer 0's KV as soon as it is computed, rather than waiting for the whole prefill to finish. Done well, most of the transfer hides behind the remaining prefill compute.</p>
+<p>Splitwise reached similar conclusions independently, and Mooncake built a production system around a disaggregated KV store shared across the cluster — which also makes prefix caching global rather than per-node, a significant additional benefit.</p>
+<p><strong>When it is not worth it:</strong> short prompts (little to transfer, but also little interference), low load (no contention to eliminate), or a slow interconnect between pools. Like everything in this course, it is a trade you should compute rather than assume.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Two workloads with opposite bottlenecks and opposite ideal configurations should not share hardware; the cost is transferring the KV cache between pools.</p>
+</article>
+<article class="concept" id="concept-5">
+  <div class="concept__head">
+    <span class="concept__n">06</span>
+    <h3 class="concept__title">The interconnect as the real constraint</h3>
+  </div>
+  <div class="prose"><p>Collect the numbers, because every choice in this module reduces to them:</p>
+<table><thead><tr><th>link</th><th>bandwidth</th><th>relative to HBM</th></tr></thead><tbody><tr><td>HBM3 (on-package)</td><td>3,350 GB/s</td><td>1×</td></tr><tr><td>NVLink 4 (H100↔H100)</td><td>~900 GB/s</td><td>0.27×</td></tr><tr><td>NVSwitch (all-to-all in node)</td><td>~900 GB/s per GPU</td><td>0.27×</td></tr><tr><td>InfiniBand NDR 400G</td><td>~50 GB/s</td><td>0.015×</td></tr><tr><td>PCIe Gen5 x16</td><td>~64 GB/s</td><td>0.019×</td></tr><tr><td>100 GbE</td><td>~12 GB/s</td><td>0.004×</td></tr></tbody></table>
+<p><strong>NVLink is 3.7× slower than HBM. PCIe is 52× slower. Ethernet is 280× slower.</strong></p>
+<p>Now map the strategies onto them:</p>
+<table><thead><tr><th>strategy</th><th>traffic per layer</th><th>needs</th></tr></thead><tbody><tr><td>tensor parallel</td><td>2 all-reduces of the full activation</td><td>NVLink</td></tr><tr><td>pipeline parallel</td><td>1 activation pass per boundary</td><td>anything</td></tr><tr><td>expert parallel</td><td>2 all-to-alls</td><td>NVLink strongly preferred</td></tr><tr><td>sequence parallel</td><td>ring exchange of K/V blocks</td><td>NVLink</td></tr><tr><td>disaggregation</td><td>one KV transfer per request</td><td>InfiniBand acceptable</td></tr></tbody></table>
+<p>The design rule that falls out:</p>
+<pre><code>within a node (NVLink):    TP, EP, SP -- the chatty strategies
+across nodes (IB/Eth):     PP, disaggregation, replication -- the quiet ones</code></pre>
+<p>Violating it is the most common and most expensive mistake in multi-GPU deployment. Running TP-8 across two 4-GPU nodes connected by PCIe means every one of your 160 all-reduces per token crosses a link 52× slower than HBM. Deployments have been observed running slower on 8 GPUs than on 4 for exactly this reason.</p>
+<p>A few practical notes:</p>
+<p><strong>Check your topology before choosing TP degree.</strong> <code>nvidia-smi topo -m</code> tells you which GPUs have NVLink and which are behind PCIe switches. A &quot;4-GPU machine&quot; may be two NVLink pairs connected by PCIe, in which case TP-4 is a mistake and TP-2 with PP-2 is correct.</p>
+<p><strong>All-reduce cost is not purely bandwidth.</strong> Ring all-reduce has <code>2(N−1)</code> communication steps, so latency grows with participant count even at fixed volume. At decode, where messages are small (under a megabyte), you are often *latency*-bound on the collective rather than bandwidth-bound — which is why decode suffers proportionally more from high TP degree than prefill does.</p>
+<p><strong>Overlap what you can.</strong> Communication and computation can overlap if the schedule allows it. Fine-grained overlapping of all-reduce with the next matmul is standard in mature implementations and is worth a meaningful fraction of the communication cost.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Every parallelism decision is a decision about which link carries the traffic, and the links differ by more than 50x.</p>
+</article>
+      </section>
+
+      <section class="section ghost ghost--inky" id="math-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--inky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>INKY · MATH BY HAND</p>
+        <h2 class="section__title">Math by hand</h2>
+        <div class="prose"><p><strong>Llama-3-70B</strong>: 80 layers, <code>d_model = 8192</code>, 64 query heads, 8 KV heads, head_dim 128, 70.6 B parameters. H100 80GB nodes: NVLink 900 GB/s within a node, InfiniBand 50 GB/s between nodes, HBM 3.35 TB/s, dense BF16 989 TFLOP/s per GPU.</p>
+<p><strong>Part 1 — minimum GPU count.</strong> a) Weight bytes at fp16, fp8, and int4 (assume 4.5 bits effective). b) Minimum H100s to hold the weights alone at each precision. c) Now require room for 32 concurrent sequences at 8k context, plus 20 GB workspace total. How many GPUs at each precision?</p>
+<p><strong>Part 2 — what TP does.</strong> For TP ∈ {2, 4, 8, 16} at fp16: a) Weights per GPU. Does it fit in 80 GB? b) KV cache per token per GPU at 8k context. Careful past TP-8. c) Aggregate bandwidth and the TPOT floor. d) At which TP does the KV cache per GPU stop improving, and why?</p>
+<p><strong>Part 3 — communication cost.</strong> Decode, batch 32, <code>seq = 1</code>, <code>d_model = 8192</code>, fp16. Ring all-reduce moves <code>2 × (N−1)/N × bytes</code> per GPU. a) Bytes per all-reduce at TP-4 and TP-8. b) There are 2 all-reduces per layer, 80 layers. Total communication bytes per token. c) Time over NVLink at TP-4 and TP-8. d) Time over PCIe Gen5 (64 GB/s) at TP-4. e) Compare each against the TPOT floor from Part 2. Express communication as a percentage of step time. What is the conclusion?</p>
+<p><strong>Part 4 — prefill contrast.</strong> Same model, prefill of 2,048 tokens, batch 1, TP-8. a) Communication bytes per all-reduce, and total for the pass. b) Time over NVLink. c) Prefill compute: <code>2 × 70.6e9 × 2048</code> FLOP across 8 GPUs at 989 TFLOP/s each. d) Communication as a percentage of prefill time. Compare to your Part 3 answer and explain the difference.</p>
+<p><strong>Part 5 — disaggregation.</strong> A request has a 4,096-token prompt. Prefill on one pool, decode on another. a) KV cache bytes to transfer. b) Transfer time over InfiniBand at 50 GB/s, and over NVLink. c) If co-locating instead would cost every decoding sequence a 190 ms stall, and there are 40 sequences decoding, what is the total decode time lost to interference? d) Which is cheaper? What if the transfer overlaps with prefill compute?</p></div>
+        <details class="spoiler">
+          <summary>SHOW THE WORKED SOLUTION</summary>
+          <div class="spoiler__body prose"><p><strong>Part 1</strong></p>
+<p>a)</p>
+<pre><code>fp16:  70.6e9 x 2      = 141.2 GB
+fp8:   70.6e9 x 1      =  70.6 GB
+int4:  70.6e9 x 0.5625 =  39.7 GB    (4.5 bits = 0.5625 bytes)</code></pre>
+<p>b) At 80 GB per H100, usable ~76 GB after CUDA context and fragmentation:</p>
+<pre><code>fp16: 141.2 / 76 = 1.86  -&gt;  2 GPUs
+fp8:   70.6 / 76 = 0.93  -&gt;  1 GPU
+int4:  39.7 / 76 = 0.52  -&gt;  1 GPU</code></pre>
+<p>c) KV for 32 sequences at 8k:</p>
+<pre><code>327,680 B/token x 8192 x 32 = 85.9 GB</code></pre>
+<p>Total needed:</p>
+<pre><code>fp16: 141.2 + 85.9 + 20 = 247.1 GB  -&gt;  247.1/76 = 3.25  -&gt;  4 GPUs
+fp8:   70.6 + 85.9 + 20 = 176.5 GB  -&gt;  2.32          -&gt;  3 GPUs
+int4:  39.7 + 85.9 + 20 = 145.6 GB  -&gt;  1.92          -&gt;  2 GPUs</code></pre>
+<p>Note that at int4 the <strong>KV cache is more than twice the weights</strong> (85.9 vs 39.7 GB). Quantizing weights further would barely help; quantizing the KV cache would. Module 6's two-regime rule, in a capacity-planning context.</p>
+<p><strong>Part 2</strong></p>
+<pre><code>TP   weights/GPU   KV/token/GPU   agg BW      fits?   TPOT floor
+ 2     70.6 GB       160 KiB      6.70 TB/s   yes    141.2/6700  = 21.1 ms
+ 4     35.3 GB        80 KiB     13.40 TB/s   yes    141.2/13400 = 10.5 ms
+ 8     17.7 GB        40 KiB     26.80 TB/s   yes    141.2/26800 =  5.3 ms
+16      8.8 GB        40 KiB     53.60 TB/s   yes    141.2/53600 =  2.6 ms</code></pre>
+<p>d) <strong>KV per GPU stops improving at TP-8.</strong> The model has 8 KV heads and a KV head cannot be split across devices without replicating its cache. At TP-8 each GPU owns exactly one KV head (<code>2 × 80 × 1 × 128 × 2 = 40,960 B = 40 KiB</code>). At TP-16, two GPUs share each KV head and both must hold its cache, so per-GPU KV stays at 40 KiB. You doubled the hardware and gained bandwidth and compute but <strong>no additional cache capacity</strong> — which means no additional batch size, which means no additional throughput from that axis.</p>
+<p><strong>Part 3</strong></p>
+<p>a) Activation bytes: <code>batch × seq × d_model × 2 = 32 × 1 × 8192 × 2 = 524,288 B = 0.52 MB</code>.</p>
+<pre><code>TP-4: 2 x (3/4) x 524,288 = 786,432 B   = 0.79 MB
+TP-8: 2 x (7/8) x 524,288 = 917,504 B   = 0.92 MB</code></pre>
+<p>b) 2 all-reduces × 80 layers = 160 per token:</p>
+<pre><code>TP-4: 160 x 786,432   = 125.8 MB per token
+TP-8: 160 x 917,504   = 146.8 MB per token</code></pre>
+<p>c) Over NVLink at 900 GB/s:</p>
+<pre><code>TP-4: 0.1258 / 900 = 0.140 ms
+TP-8: 0.1468 / 900 = 0.163 ms</code></pre>
+<p>d) Over PCIe at 64 GB/s, TP-4: <code>0.1258 / 64 = 1.97 ms</code></p>
+<p>e) Against the TPOT floors:</p>
+<pre><code>TP-4, NVLink:  0.140 / 10.5 =  1.3%    negligible
+TP-8, NVLink:  0.163 /  5.3 =  3.1%    fine
+TP-4, PCIe:    1.97  / 10.5 = 18.8%    serious
+TP-8, PCIe:    2.29  /  5.3 = 43.2%    catastrophic</code></pre>
+<p><strong>Conclusion: tensor parallelism over NVLink costs a few percent; over PCIe it costs a fifth to nearly half your step time.</strong> And note the trend — the NVLink percentage <em>rises</em> with TP degree (1.3% → 3.1%) because communication grows slightly while step time falls. TP has diminishing returns even on fast links.</p>
+<p><em>(These are bandwidth-only estimates. At these small message sizes, collective <strong>latency</strong> — roughly <code>2(N−1)</code> hops of a few microseconds each — is often comparable to or larger than the transfer time, so real overheads are higher than the table suggests.)</em></p>
+<p><strong>Part 4</strong></p>
+<p>a) Activation is now <code>1 × 2048 × 8192 × 2 = 33.55 MB</code>.</p>
+<pre><code>per all-reduce, TP-8: 2 x (7/8) x 33.55 MB = 58.7 MB
+total: 160 x 58.7 MB = 9.39 GB</code></pre>
+<p>b) Over NVLink: <code>9.39 / 900 = 10.4 ms</code></p>
+<p>c) Prefill compute:</p>
+<pre><code>2 x 70.6e9 x 2048 = 2.892e14 FLOP = 289.2 TFLOP
+across 8 GPUs at 989 TFLOP/s: 8 x 989 = 7,912 TFLOP/s
+time = 289.2 / 7912 = 36.6 ms</code></pre>
+<p>d) <code>10.4 / (36.6 + 10.4) = 22.1%</code> of prefill time.</p>
+<p>Compare to TP-8 decode at 3.1%. **Prefill spends a much larger <em>fraction</em> on communication in absolute terms** — 10.4 ms versus 0.163 ms, a 64× larger absolute cost, because activations scale with sequence length.</p>
+<p>But the ratio tells a subtler story. Prefill communication is 22% of a 47 ms step; decode communication is 3% of a 5.3 ms step. Prefill moves vastly more bytes but has vastly more arithmetic to hide them behind — and crucially, prefill's large messages achieve near-peak link bandwidth, while decode's sub-megabyte messages are latency-dominated and get nowhere near it. So the honest summary is: <strong>prefill pays more in absolute communication and can overlap most of it; decode pays little in absolute terms but overlaps poorly.</strong> Good implementations overlap prefill's all-reduces with subsequent matmuls, cutting that 22% substantially.</p>
+<p><strong>Part 5</strong></p>
+<p>a) <code>327,680 B/token × 4096 = 1.342 GB</code></p>
+<p>b)</p>
+<pre><code>InfiniBand 50 GB/s: 1.342 / 50 = 26.8 ms
+NVLink 900 GB/s:    1.342 / 900 = 1.5 ms</code></pre>
+<p>c) Co-located interference: 40 sequences each stalled 190 ms:</p>
+<pre><code>40 x 190 ms = 7,600 ms = 7.6 seconds of aggregate decode time lost</code></pre>
+<p>Per-user, each of those 40 sees a 190 ms gap in their token stream — roughly 19 missed tokens at a 10 ms TPOT.</p>
+<p>d) <strong>Disaggregation is dramatically cheaper.</strong> 26.8 ms of transfer, paid once by one request, against 7.6 seconds of aggregate stall inflicted on 40 others. Two orders of magnitude.</p>
+<p>And with layer-by-layer overlapping, most of the 26.8 ms disappears: start streaming layer 0's KV as soon as it is computed, roughly 1/80th of the way into prefill. Since prefill for a 4k prompt takes tens of milliseconds and the transfer is 26.8 ms spread across it, the exposed cost is mostly the final layer's transfer — a few hundred microseconds.</p>
+<p>This is why DistServe, Splitwise and Mooncake all converged on disaggregation despite the obvious objection that moving gigabytes between machines sounds expensive. It is expensive. Interference is more expensive.</p></div>
+        </details>
+      </section>
+
+      <section class="section ghost ghost--clyde" id="code-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--clyde)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>CLYDE · CODE LAB</p>
+        <h2 class="section__title">Code lab</h2>
+        <div class="prose"><p>You almost certainly do not have a multi-GPU cluster to hand, so this lab is a <strong>planner</strong>: given a model, hardware, and a topology, it tells you which parallelism configuration to use and why, with all the arithmetic shown.</p>
+<p>Build it properly. This is the tool you would actually use before provisioning anything.</p></div>
+        <div class="prose" style="max-width:none"><pre><code class="lang-python">&quot;&quot;&quot;
+A distributed inference planner. Answers: how many GPUs, what parallelism,
+and where does the time go?
+
+    pip install numpy
+&quot;&quot;&quot;
+from dataclasses import dataclass
+from itertools import product
+
+GB = 10 ** 9
+GiB = 1024 ** 3
+
+
+@dataclass
+class GPU:
+    name: str
+    memory_gb: float
+    hbm_gbs: float
+    dense_tflops: float
+    per_node: int = 8
+    nvlink_gbs: float = 900.0
+    internode_gbs: float = 50.0      # InfiniBand NDR
+
+
+@dataclass
+class Model:
+    name: str
+    n_params: float
+    n_layers: int
+    d_model: int
+    n_heads: int
+    n_kv_heads: int
+    head_dim: int
+
+    def weight_bytes(self, dtype=2):
+        return self.n_params * dtype
+
+    def kv_per_token(self, dtype=2, tp=1):
+        &quot;&quot;&quot;Per GPU. A KV head cannot be split, so the divisor saturates at n_kv_heads.&quot;&quot;&quot;
+        heads_per_gpu = max(1, self.n_kv_heads // min(tp, self.n_kv_heads))
+        return 2 * self.n_layers * heads_per_gpu * self.head_dim * dtype
+
+
+H100 = GPU(&quot;H100 SXM&quot;, 80, 3350, 989)
+H200 = GPU(&quot;H200 SXM&quot;, 141, 4800, 989)
+
+L70B = Model(&quot;Llama-3-70B&quot;, 70.6e9, 80, 8192, 64, 8, 128)
+L8B = Model(&quot;Llama-3-8B&quot;, 8.03e9, 32, 4096, 32, 8, 128)
+
+
+def allreduce_bytes(batch, seq, d_model, tp, dtype=2):
+    &quot;&quot;&quot;Ring all-reduce: each GPU moves 2*(N-1)/N of the tensor.&quot;&quot;&quot;
+    if tp &lt;= 1:
+        return 0
+    return 2 * (tp - 1) / tp * batch * seq * d_model * dtype
+
+
+def plan(model, gpu, tp, pp=1, batch=32, seq=8192,
+         w_dtype=2, kv_dtype=2, workspace_gb=10, efficiency=0.75):
+    n_gpus = tp * pp
+    same_node = n_gpus &lt;= gpu.per_node
+    link = gpu.nvlink_gbs if same_node else gpu.internode_gbs
+
+    # --- memory ---
+    w_per_gpu = model.weight_bytes(w_dtype) / n_gpus
+    kv_per_gpu = model.kv_per_token(kv_dtype, tp) * seq * batch / pp
+    used = w_per_gpu + kv_per_gpu + workspace_gb * GB
+    fits = used &lt; gpu.memory_gb * GB * 0.95
+
+    # --- decode time ---
+    bytes_read = w_per_gpu + kv_per_gpu
+    mem_ms = bytes_read / (gpu.hbm_gbs * GB * efficiency) * 1000
+
+    # TP all-reduces: 2 per layer, on the layers this GPU holds
+    layers_here = model.n_layers / pp
+    comm_b = allreduce_bytes(batch, 1, model.d_model, tp) * 2 * layers_here
+    comm_ms = comm_b / (link * GB) * 1000 if tp &gt; 1 else 0.0
+
+    # PP: one activation hand-off per stage boundary
+    pp_b = batch * 1 * model.d_model * 2 * (pp - 1) if pp &gt; 1 else 0
+    pp_ms = pp_b / (link * GB) * 1000
+
+    tpot = mem_ms + comm_ms + pp_ms
+    return {
+        &quot;n_gpus&quot;: n_gpus, &quot;tp&quot;: tp, &quot;pp&quot;: pp, &quot;fits&quot;: fits, &quot;same_node&quot;: same_node,
+        &quot;w_gb&quot;: w_per_gpu / GB, &quot;kv_gb&quot;: kv_per_gpu / GB, &quot;used_gb&quot;: used / GB,
+        &quot;mem_ms&quot;: mem_ms, &quot;comm_ms&quot;: comm_ms + pp_ms, &quot;tpot_ms&quot;: tpot,
+        &quot;comm_pct&quot;: 100 * (comm_ms + pp_ms) / tpot if tpot else 0,
+        &quot;throughput&quot;: batch / (tpot / 1000) if tpot else 0,
+        &quot;tput_per_gpu&quot;: batch / (tpot / 1000) / n_gpus if tpot else 0,
+    }
+
+
+def min_gpus(model, gpu, batch, seq, w_dtype=2, kv_dtype=2, workspace_gb=10):
+    need = (model.weight_bytes(w_dtype)
+            + model.kv_per_token(kv_dtype, 1) * seq * batch
+            + workspace_gb * GB)
+    return int(-(-need // (gpu.memory_gb * GB * 0.95)))
+
+
+# ==========================================================================
+print(&quot;=== Part 1: minimum GPUs for Llama-3-70B, batch 32 @ 8k ===&quot;)
+print(f&quot;  {'precision':&lt;12} {'weights':&gt;10} {'kv':&gt;10} {'total':&gt;10} {'H100s':&gt;7}&quot;)
+for label, wd, kd in [(&quot;fp16/fp16&quot;, 2, 2), (&quot;fp8/fp16&quot;, 1, 2),
+                      (&quot;fp8/fp8&quot;, 1, 1), (&quot;int4/fp8&quot;, 0.5625, 1)]:
+    w = L70B.weight_bytes(wd) / GB
+    kv = L70B.kv_per_token(kd, 1) * 8192 * 32 / GB
+    n = min_gpus(L70B, H100, 32, 8192, wd, kd)
+    print(f&quot;  {label:&lt;12} {w:&gt;9.1f}G {kv:&gt;9.1f}G {w+kv+10:&gt;9.1f}G {n:&gt;7}&quot;)
+
+print(&quot;\n=== Part 2/3: what TP degree does (Llama-3-70B, batch 32 @ 8k, fp16) ===&quot;)
+print(f&quot;  {'TP':&gt;3} {'w/GPU':&gt;8} {'kv/GPU':&gt;8} {'kv/tok':&gt;8} {'mem ms':&gt;8} &quot;
+      f&quot;{'comm ms':&gt;8} {'TPOT':&gt;7} {'comm%':&gt;7} {'tok/s':&gt;8} {'/GPU':&gt;7}&quot;)
+for tp in (1, 2, 4, 8, 16):
+    r = plan(L70B, H100, tp=tp)
+    kvt = L70B.kv_per_token(2, tp) / 1024
+    flag = &quot;&quot; if r[&quot;fits&quot;] else &quot;  OOM&quot;
+    print(f&quot;  {tp:&gt;3} {r['w_gb']:&gt;7.1f}G {r['kv_gb']:&gt;7.1f}G {kvt:&gt;7.0f}K &quot;
+          f&quot;{r['mem_ms']:&gt;8.1f} {r['comm_ms']:&gt;8.2f} {r['tpot_ms']:&gt;7.1f} &quot;
+          f&quot;{r['comm_pct']:&gt;6.1f}% {r['throughput']:&gt;8.0f} {r['tput_per_gpu']:&gt;7.0f}{flag}&quot;)
+print(&quot;  note: kv/tok stops improving past TP-8 -- only 8 KV heads to split&quot;)
+
+print(&quot;\n=== the PCIe trap: same config, slow link ===&quot;)
+PCIE = GPU(&quot;H100 (PCIe-only)&quot;, 80, 3350, 989, per_node=8, nvlink_gbs=64.0)
+print(f&quot;  {'TP':&gt;3} {'NVLink TPOT':&gt;13} {'PCIe TPOT':&gt;11} {'penalty':&gt;9}&quot;)
+for tp in (2, 4, 8):
+    a = plan(L70B, H100, tp=tp)
+    b = plan(L70B, PCIE, tp=tp)
+    print(f&quot;  {tp:&gt;3} {a['tpot_ms']:&gt;12.1f}ms {b['tpot_ms']:&gt;10.1f}ms &quot;
+          f&quot;{b['tpot_ms']/a['tpot_ms']:&gt;8.2f}x&quot;)
+
+print(&quot;\n=== TP x PP search: minimize latency vs maximize throughput/GPU ===&quot;)
+print(f&quot;  {'TP':&gt;3} {'PP':&gt;3} {'GPUs':&gt;5} {'node?':&gt;6} {'TPOT':&gt;8} {'tok/s':&gt;8} {'/GPU':&gt;7}&quot;)
+rows = []
+for tp, pp in product((1, 2, 4, 8), (1, 2, 4)):
+    r = plan(L70B, H100, tp=tp, pp=pp)
+    if r[&quot;fits&quot;]:
+        rows.append(r)
+        print(f&quot;  {tp:&gt;3} {pp:&gt;3} {r['n_gpus']:&gt;5} &quot;
+              f&quot;{'yes' if r['same_node'] else 'NO':&gt;6} &quot;
+              f&quot;{r['tpot_ms']:&gt;7.1f}ms {r['throughput']:&gt;8.0f} {r['tput_per_gpu']:&gt;7.0f}&quot;)
+
+if rows:
+    best_lat = min(rows, key=lambda r: r[&quot;tpot_ms&quot;])
+    best_eff = max(rows, key=lambda r: r[&quot;tput_per_gpu&quot;])
+    print(f&quot;\n  lowest latency:      TP={best_lat['tp']} PP={best_lat['pp']} &quot;
+          f&quot;-&gt; {best_lat['tpot_ms']:.1f} ms/token&quot;)
+    print(f&quot;  best throughput/GPU: TP={best_eff['tp']} PP={best_eff['pp']} &quot;
+          f&quot;-&gt; {best_eff['tput_per_gpu']:.0f} tok/s/GPU&quot;)
+    print(&quot;  -&gt; these are different configurations. Pick based on your SLO.&quot;)
+
+print(&quot;\n=== Part 5: disaggregation vs interference ===&quot;)
+for prompt in (1024, 4096, 16384, 65536):
+    kv = L70B.kv_per_token(2, 1) * prompt
+    ib = kv / (50 * GB) * 1000
+    nv = kv / (900 * GB) * 1000
+    # interference: a blocking prefill stalls every decoding sequence
+    prefill_ms = 2 * L70B.n_params * prompt / (989e12 * 8 * 0.75) * 1000
+    stalled = 40
+    print(f&quot;  prompt {prompt:&gt;6}: KV {kv/GB:&gt;6.2f} GB | transfer IB {ib:&gt;6.1f}ms &quot;
+          f&quot;NVLink {nv:&gt;5.1f}ms | co-located stall {prefill_ms:&gt;6.1f}ms &quot;
+          f&quot;x {stalled} seqs = {prefill_ms*stalled/1000:&gt;6.2f}s lost&quot;)
+
+# --- TODO for you ---
+#   1. Add expert parallelism: E experts, top-k routing, all-to-all cost, and a
+#      load-imbalance factor. Model Mixtral-8x7B and find the best EP degree.
+#   2. Add collective LATENCY (2*(N-1) hops at ~3 us) on top of bandwidth. At
+#      decode the messages are small -- does latency dominate? At what TP?
+#   3. Model overlapping: assume a fraction f of communication hides behind
+#      compute. How large must f be for TP-8 over PCIe to be viable?
+</code></pre></div>
+        <div class="prose"><h3>What you should see</h3><p>The precision table shows int4 weights needing only 2 H100s while fp16 needs 4 — and makes visible that at int4 the KV cache (85.9 GB) is more than twice the weights (39.7 GB), so further weight quantization is the wrong lever.</p>
+<p>The TP table reproduces the math lab: TPOT falling roughly linearly from TP-2 to TP-8, communication staying at a few percent over NVLink, and — the key line — <code>kv/tok</code> stopping at 40 KiB past TP-8 because there are only 8 KV heads to distribute. Note also that <code>tok/s per GPU</code> <strong>falls</strong> as TP rises: you buy latency with efficiency.</p>
+<p>The PCIe comparison is the one to internalize. Expect penalties in the range of <strong>1.2× at TP-2 to 1.5–1.8× at TP-8</strong> on these bandwidth-only estimates — and reality is worse, because small-message collectives are latency-bound and this model ignores latency entirely.</p>
+<p>The TP×PP search should show that lowest latency and best throughput-per-GPU are <strong>different configurations</strong> — typically high TP for latency, low TP with replication for efficiency. That divergence is the central planning decision in multi-GPU serving.</p>
+<p>The disaggregation table shows transfer cost growing linearly with prompt length while interference cost grows linearly too — but multiplied by the number of stalled sequences. At 40 concurrent decoders, interference exceeds transfer by roughly two orders of magnitude at every prompt length.</p></div>
+        <div class="prose"><h3>Stretch</h3><p>Add collective latency (TODO 2). Model each all-reduce as <code>2(N−1) × 3 µs + bytes/bandwidth</code> and re-run the TP table. You should find that at decode, where messages are under a megabyte, <strong>latency dominates bandwidth</strong> at TP-8 and above — 14 hops × 3 µs = 42 µs against 0.92 MB / 900 GB/s ≈ 1 µs of transfer. That completely changes the picture and explains why real TP scaling is worse than bandwidth arithmetic predicts, and why techniques that reduce the <em>number</em> of collectives matter more than those that reduce their size.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pac" id="papers">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>THE KEY · PAPERS</p>
+        <h2 class="section__title">Papers, with a reading frame</h2>
+        <div class="papers">
+          <article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/1909.08053" target="_blank" rel="noopener">Megatron-LM: Training Multi-Billion Parameter Language Models Using Model Parallelism</a></h3>
+            <p class="paper__by">Shoeybi et al., 2019</p>
+            <p class="paper__why">The origin of the column-parallel/row-parallel tensor-parallel scheme every framework uses. Written for training, but the forward pass is identical.</p>
+            <div class="paper__frame"><p><strong>Section 3</strong> is the whole thing. Understand precisely why splitting the first MLP matrix by columns and the second by rows means the nonlinearity needs no communication — that choice is the entire contribution, and it is one paragraph. Note the two all-reduces per layer and carry that number forward.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2211.05102" target="_blank" rel="noopener">Efficiently Scaling Transformer Inference</a></h3>
+            <p class="paper__by">Pope et al., 2022</p>
+            <p class="paper__why">The definitive treatment of how partitioning strategy interacts with the prefill/decode split, with an explicit communication cost model.</p>
+            <div class="paper__frame"><p><strong>Section 3</strong> is now readable with the background you have. Their partitioning notation takes effort but is worth learning — it expresses exactly which tensor dimension lives on which device. <strong>Section 3.3</strong> on the different optimal strategies for prefill versus decode is the payload of this module, derived rigorously.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2401.09670" target="_blank" rel="noopener">DistServe: Disaggregating Prefill and Decoding for Goodput-optimized LLM Serving</a></h3>
+            <p class="paper__by">Zhong et al., OSDI 2024</p>
+            <p class="paper__why">The clearest argument that the two phases should run on separate hardware, with the placement algorithm to do it.</p>
+            <div class="paper__frame"><p>Read <strong>Section 3</strong> for the interference quantification and <strong>Sections 4–5</strong> for the placement algorithm and KV transfer. Pay attention to the argument that transfer cost is overlappable layer-by-layer — that is what makes the whole approach viable and it is easy to miss. Read alongside Sarathi-Serve from Module 5: same problem, opposite conclusion.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2311.18677" target="_blank" rel="noopener">Splitwise: Efficient Generative LLM Inference Using Phase Splitting</a></h3>
+            <p class="paper__by">Patel et al., ISCA 2024</p>
+            <p class="paper__why">Independent arrival at disaggregation, with a stronger focus on using *different hardware* for each pool — which is the argument that most changes procurement decisions.</p>
+            <div class="paper__frame"><p>Read the characterization in Section 3: their measurements of how differently the two phases use the GPU are the empirical backing for everything in this module. The cluster-design section is worth reading if you ever influence hardware purchasing.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2401.04088" target="_blank" rel="noopener">Mixtral of Experts</a></h3>
+            <p class="paper__by">Jiang et al., 2024</p>
+            <p class="paper__why">A production sparse MoE with a clear account of the inference trade: 47B parameters resident, ~13B active per token.</p>
+            <div class="paper__frame"><p>Read Section 2 for the architecture and routing. The number to extract is the ratio of total to active parameters, and what that means for the memory-capacity versus memory-bandwidth trade. The load-balancing discussion is brief; supplement with the DeepSeek-V3 report for a more detailed treatment of expert parallelism at scale.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2310.01889" target="_blank" rel="noopener">Ring Attention with Blockwise Transformers for Near-Infinite Context</a></h3>
+            <p class="paper__by">Liu, Zaharia &amp; Abbeel, 2023</p>
+            <p class="paper__why">Sequence/context parallelism: distribute the sequence dimension across devices, passing K/V blocks around a ring while computing. The third parallelism axis.</p>
+            <div class="paper__frame"><p>Read Section 3. The key trick is overlapping the ring communication with blockwise attention computation so the transfer is hidden. Relevant when a single sequence is too long for one GPU — the regime long-context serving is heading toward.</p></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--blinky" id="pitfalls">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--blinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>BLINKY · PITFALLS</p>
+        <h2 class="section__title">What people get wrong</h2>
+        <div class="pitfall">
+          <p class="pitfall__wrong"><span>Running tensor parallelism across nodes to use more GPUs.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>TP does 160 all-reduces per token for an 80-layer model. Over NVLink that costs a few percent; over InfiniBand or PCIe it can double or triple your step time. Deployments have been measured running <em>slower</em> on 8 GPUs than on 4 for exactly this reason. Check the topology with <code>nvidia-smi topo -m</code> before choosing TP degree, and use pipeline parallelism or replication to cross node boundaries.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>More GPUs always means more throughput.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>Throughput per GPU generally falls as TP degree rises, because communication overhead is paid on every layer and scaling is sub-linear. Two TP-4 replicas usually beat one TP-8 deployment on total tokens per second, while being slower per request. And past the KV head count, extra GPUs add bandwidth but no cache capacity, so they buy no additional batch size at all.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Estimating communication cost from bandwidth alone.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>At decode the messages are under a megabyte, so ring all-reduce latency — <code>2(N−1)</code> hops at a few microseconds each — often exceeds the transfer time by an order of magnitude. A bandwidth-only model will tell you TP-8 costs 3% when it actually costs 15%. Model latency explicitly, and prefer strategies that reduce the number of collectives rather than their size.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>MoE models are cheap to serve because they only activate a few experts.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>They are cheap in <em>bandwidth</em> and expensive in <em>capacity</em>. Every expert must be resident because routing is data-dependent, so Mixtral-8x7B needs 94 GB of memory to read 26 GB per token. You also inherit all-to-all communication and load imbalance, where one overloaded expert's GPU sets the pace for every other. Cheaper per token, harder to deploy.</p></div></div>
+        </div>
+      </section>
+
+      <section class="section" id="checkpoint">
+        <div class="wall checkpoint">
+          <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>POWER PELLET · CHECKPOINT</p>
+          <p class="checkpoint__claim">Given a model, a GPU count and a network topology, you can choose a parallelism
+strategy and justify it with numbers — and you can explain what TP degree does to TTFT versus what
+it does to throughput.</p>
+          <details class="qa">
+            <summary>Why is tensor parallelism within a node and pipeline parallelism across nodes?</summary>
+            <div class="qa__a prose"><p>Because they generate wildly different amounts of traffic. TP does two all-reduces of the full activation per layer — 160 collectives per token for an 80-layer model, around 126 MB per token at batch 32 with TP-4. That needs NVLink at 900 GB/s, where it costs about 1% of step time; over PCIe at 64 GB/s it costs 19% and over Ethernet it is hopeless. PP sends one activation tensor per stage boundary — about 1.6 MB per token, roughly 80× less — so it tolerates InfiniBand or Ethernet comfortably. Put the chatty strategy on the fast link and the quiet one on the slow link. Violating this is the most expensive common mistake in multi-GPU deployment: TP-8 across two nodes on PCIe can be slower than TP-4 on one.</p></div>
+          </details>
+<details class="qa">
+            <summary>What does increasing TP degree do to TTFT, and what does it do to throughput per GPU?</summary>
+            <div class="qa__a prose"><p>TTFT improves, roughly linearly at first, because prefill is compute-bound and you added compute — and because prefill's large messages achieve near-peak link bandwidth and can be overlapped with subsequent matmuls. Throughput per GPU <em>falls</em>, because you pay communication overhead on every layer and scaling is sub-linear. Two independent TP-4 replicas will generally serve more total tokens per second than one TP-8 deployment, while each individual request is slower. So the rule is: maximize TP if you are optimizing latency, use the minimum TP that fits the model and then replicate if you are optimizing cost per token.</p></div>
+          </details>
+<details class="qa">
+            <summary>Why does a model with 8 KV heads cap useful tensor parallelism at TP-8?</summary>
+            <div class="qa__a prose"><p>TP splits attention by head, and a KV head cannot be split across two GPUs without replicating its cache on both. At TP-8 each GPU owns exactly one KV head, so per-GPU KV cache is 1/8th of the total — the maximum possible reduction. At TP-16, two GPUs share each KV head and both must store its cache, so per-GPU KV stays flat at 40 KiB/token for Llama-3-70B. You added hardware that brings bandwidth and compute but no additional cache capacity, and since cache capacity is what caps batch size, that axis of scaling has stopped paying. It is a real constraint on large-model deployment and one reason KV head counts are chosen with parallelism in mind.</p></div>
+          </details>
+<details class="qa">
+            <summary>Why is MoE good for inference bandwidth but awkward for memory capacity?</summary>
+            <div class="qa__a prose"><p>Because you only read the weights of the experts a token actually activates. Mixtral-8x7B holds ~47B parameters but activates ~13B per token, so it moves roughly the bytes of a 13B model while having the quality of something much larger. Since decode is memory-bandwidth bound, that is close to free quality. The catch is that routing is data-dependent and unknown in advance, so <strong>every</strong> expert must be resident somewhere — 94 GB at fp16 even though only 26 GB is read per token. MoE trades memory capacity for memory bandwidth. Expert parallelism spreads the experts across GPUs but introduces all-to-all communication and load imbalance: if 40% of tokens route to one expert, that GPU sets the pace for every other.</p></div>
+          </details>
+<details class="qa">
+            <summary>A 4k-token prefill would stall 40 decoding sequences for 190 ms. Disaggregating requires transferring 1.34 GB over InfiniBand. Which is cheaper?</summary>
+            <div class="qa__a prose"><p>Disaggregation, by roughly two orders of magnitude. The transfer is <code>1.34 GB / 50 GB/s = 26.8 ms</code>, paid once by the one request being moved. Co-location inflicts a 190 ms stall on each of 40 decoding sequences — 7.6 seconds of aggregate lost decode time, and a visible 190 ms gap in 40 users' token streams. And the transfer can be overlapped layer by layer: start streaming layer 0's KV as soon as it is computed rather than waiting for prefill to finish, which hides most of the 26.8 ms behind the remaining prefill compute. This asymmetry is why DistServe, Splitwise and Mooncake all converged on disaggregation despite the objection that moving gigabytes between machines sounds expensive.</p></div>
+          </details>
+<details class="qa">
+            <summary>Your bandwidth arithmetic says TP-8 should cost 3% overhead, but you measure 15%. What did you forget?</summary>
+            <div class="qa__a prose"><p>Collective latency. A ring all-reduce takes <code>2(N−1)</code> communication steps — 14 hops at TP-8 — each with a few microseconds of fixed cost regardless of message size. At decode the messages are small: 0.92 MB at batch 32, which is about 1 µs of actual transfer at 900 GB/s against roughly 42 µs of hop latency. <strong>You are latency-bound, not bandwidth-bound</strong>, and a bandwidth-only model understates the cost by an order of magnitude. This is why decode suffers disproportionately from high TP degree while prefill — whose messages are hundreds of times larger — does not, and why reducing the <em>number</em> of collectives matters more than reducing their size. Other candidates: no computation/communication overlap, and kernel launch overhead on the collectives themselves.</p></div>
+          </details>
+          <p style="margin-top:var(--s7)">
+            <button class="done-toggle" type="button" data-complete="9" aria-pressed="false">
+              MARK LEVEL 09 CLEARED
+            </button>
+          </p>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="glossary">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>GLOSSARY</p>
+        <h2 class="section__title">Glossary</h2>
+        <div class="gloss">
+          <div class="gloss__row"><div class="gloss__term">tensor parallelism (TP)</div><div class="gloss__def">Splitting weight matrices within a layer across GPUs. Two all-reduces per transformer layer. Needs NVLink.</div></div><div class="gloss__row"><div class="gloss__term">pipeline parallelism (PP)</div><div class="gloss__def">Assigning different layers to different GPUs. One activation hand-off per stage boundary. Tolerates slow links.</div></div><div class="gloss__row"><div class="gloss__term">expert parallelism (EP)</div><div class="gloss__def">Distributing MoE experts across GPUs. Requires all-to-all routing and suffers from load imbalance.</div></div><div class="gloss__row"><div class="gloss__term">sequence / context parallelism</div><div class="gloss__def">Splitting the sequence dimension across devices, as in Ring Attention. Used when one sequence exceeds a single GPU.</div></div><div class="gloss__row"><div class="gloss__term">column-parallel / row-parallel</div><div class="gloss__def">Megatron's arrangement: split the first matmul by columns and the second by rows, so the nonlinearity between them needs no communication.</div></div><div class="gloss__row"><div class="gloss__term">all-reduce</div><div class="gloss__def">Collective that sums a tensor across all GPUs and returns the result to all. Ring implementation moves 2(N-1)/N of the data per GPU.</div></div><div class="gloss__row"><div class="gloss__term">pipeline bubble</div><div class="gloss__def">Idle stage time while the pipeline fills and drains. Fraction is (N-1)/(M+N-1) for M microbatches and N stages.</div></div><div class="gloss__row"><div class="gloss__term">capacity factor</div><div class="gloss__def">A cap on tokens routed to any single MoE expert, bounding load imbalance at the cost of dropping or rerouting overflow.</div></div><div class="gloss__row"><div class="gloss__term">disaggregation</div><div class="gloss__def">Running prefill and decode on separate machine pools, transferring the KV cache between them.</div></div><div class="gloss__row"><div class="gloss__term">NVLink</div><div class="gloss__def">High-bandwidth GPU-to-GPU interconnect, ~900 GB/s on H100. Roughly 14x faster than PCIe Gen5.</div></div>
+        </div>
+      </section>
+
+      <nav class="pagenav">
+        <a href="speculative-decoding.html" data-nav="prev"><span>◀ PREVIOUS LEVEL</span>08 SPECULATIVE DECODING</a>
+        <a href="systems-and-frontier.html" data-nav="next" style="text-align:right"><span>NEXT LEVEL ▶</span>10 SYSTEMS AND THE FRONTIER</a>
+      </nav>
+
+    </main>
+  </div>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <p class="foot__h">LEVELS</p>
+        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">&nbsp;</p>
+        <ul><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">REFERENCE</p>
+        <ul>
+          <li><a href="../reference/timeline.html">Timeline</a></li>
+          <li><a href="../reference/hardware.html">GPU spec table</a></li>
+          <li><a href="../reference/engines.html">Serving engines</a></li>
+          <li><a href="../reference/frontier.html">Open problems</a></li>
+          <li><a href="../reference/glossary.html">Glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="foot__h">SOURCE</p>
+        <ul>
+          <li><a href="https://github.com/tushar-amrit-6/inference">GitHub repository</a></li>
+          <li><a href="../reference/how-to-use.html">How to work through this</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
+    do the arithmetic yourself.</p>
+  </div>
+</footer>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

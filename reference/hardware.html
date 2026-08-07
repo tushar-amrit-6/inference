@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HARDWARE TABLE — LLM INFERENCE</title>
+<meta name="description" content="Bandwidth, dense FLOPs, and the ridge point for the accelerators you will actually meet. Keep this open from Level 04 onward.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="HARDWARE TABLE — LLM INFERENCE">
+<meta property="og:description" content="Bandwidth, dense FLOPs, and the ridge point for the accelerators you will actually meet. Keep this open from Level 04 onward.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/arcade.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20fill%3D%22%23000%22%2F%3E%3Cpath%20d%3D%22M16%2C16%20L29%2C9%20A15%2C15%200%201%200%2029%2C23%20Z%22%20fill%3D%22%23FFE800%22%2F%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="scorebar">
+  <a class="scorebar__home" href="../index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="var(--pac)" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
+  
+  <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/11</span></span>
+  <span class="scorebar__spacer"></span>
+  <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
+</header>
+<div class="wrap wrap--narrow">
+  <main id="main">
+    <div class="mod-head">
+      <p class="mod-head__level">REFERENCE</p>
+      <h1 class="mod-head__title">HARDWARE TABLE</h1>
+      <p class="mod-head__tag">Bandwidth, dense FLOPs, and the ridge point for the accelerators you will actually meet. Keep this open from Level 04 onward.</p>
+    </div>
+    <section class="section"><div class="prose" style="max-width:none"><h3>How to read this table</h3>
+<p>Two columns matter more than the rest.</p>
+<p><strong>Bandwidth</strong> sets your decode speed. Time per token at batch 1 is approximately <code>weight_bytes / bandwidth</code>, and nothing else in the spec sheet enters that calculation.</p>
+<p><strong>Ridge point</strong> is <code>dense FLOP/s ÷ bandwidth</code> — the arithmetic intensity at which the machine stops being memory-bound. Since decode intensity equals your batch size, the ridge point <em>is</em> the batch size you would need to saturate the machine's arithmetic. A lower ridge is easier to saturate, and therefore better for decode.</p>
+<p>All compute figures below are <strong>dense</strong> BF16. Vendors usually headline the 2:4 structured sparsity number, which is double and does not apply to production LLMs.</p>
+<h3>Datacenter GPUs</h3>
+<table><thead><tr><th>GPU</th><th>memory</th><th>bandwidth</th><th>dense BF16</th><th>dense FP8</th><th>ridge point</th></tr></thead><tbody><tr><td>A100 40GB SXM</td><td>40 GB HBM2e</td><td>1.56 TB/s</td><td>312 TFLOP/s</td><td>—</td><td>200</td></tr><tr><td>A100 80GB SXM</td><td>80 GB HBM2e</td><td>2.04 TB/s</td><td>312 TFLOP/s</td><td>—</td><td><strong>153</strong></td></tr><tr><td>H100 SXM</td><td>80 GB HBM3</td><td>3.35 TB/s</td><td>989 TFLOP/s</td><td>1979 TFLOP/s</td><td><strong>295</strong></td></tr><tr><td>H100 PCIe</td><td>80 GB HBM3</td><td>2.0 TB/s</td><td>756 TFLOP/s</td><td>1513 TFLOP/s</td><td>378</td></tr><tr><td>H200 SXM</td><td>141 GB HBM3e</td><td>4.8 TB/s</td><td>989 TFLOP/s</td><td>1979 TFLOP/s</td><td><strong>206</strong></td></tr><tr><td>B200</td><td>192 GB HBM3e</td><td>~8 TB/s</td><td>~2.25 PFLOP/s</td><td>~4.5 PFLOP/s</td><td>~281</td></tr><tr><td>L40S</td><td>48 GB GDDR6</td><td>0.86 TB/s</td><td>362 TFLOP/s</td><td>733 TFLOP/s</td><td>419</td></tr><tr><td>AMD MI300X</td><td>192 GB HBM3</td><td>5.3 TB/s</td><td>~1.31 PFLOP/s</td><td>~2.61 PFLOP/s</td><td>~247</td></tr></tbody></table>
+<h3>Consumer</h3>
+<table><thead><tr><th>GPU</th><th>memory</th><th>bandwidth</th><th>dense BF16</th><th>ridge point</th></tr></thead><tbody><tr><td>RTX 4090</td><td>24 GB GDDR6X</td><td>1.01 TB/s</td><td>165 TFLOP/s</td><td>164</td></tr><tr><td>RTX 3090</td><td>24 GB GDDR6X</td><td>0.94 TB/s</td><td>71 TFLOP/s</td><td>76</td></tr></tbody></table>
+<blockquote><p><strong>Verify before you rely on these.</strong> Vendors quote compute under varying assumptions and revise specifications between silicon revisions. Blackwell and MI300X figures in particular should be checked against a current datasheet — they are given here as working estimates, not authoritative values. Bandwidth figures are the most stable and the most important.</p></blockquote>
+<h3>The trend that explains the whole field</h3>
+<table><thead><tr><th></th><th>A100 (2020)</th><th>H100 (2022)</th><th>H200 (2023)</th><th>B200 (2024)</th></tr></thead><tbody><tr><td>bandwidth</td><td>2.04 TB/s</td><td>3.35 TB/s</td><td>4.8 TB/s</td><td>~8 TB/s</td></tr><tr><td>dense BF16</td><td>312 TF/s</td><td>989 TF/s</td><td>989 TF/s</td><td>~2250 TF/s</td></tr><tr><td>ridge point</td><td>153</td><td>295</td><td>206</td><td>~281</td></tr></tbody></table>
+<p>Between the A100 and the H100, compute grew <strong>3.2×</strong> while bandwidth grew <strong>1.6×</strong>. The ridge point nearly doubled, meaning it takes twice the batch size to keep the machine busy. This is the memory wall, and it has been widening for a decade — which is why an entire subfield exists to work around it.</p>
+<p>The H200 is the interesting counterexample: identical compute to the H100 with 43% more bandwidth, which pushes the ridge back <em>down</em> to 206. It is a part designed for decode.</p>
+<h3>Memory hierarchy (H100, approximate)</h3>
+<p>The roofline above concerns HBM traffic. Inside the chip there are faster tiers, and exploiting them is what Level 07 is about.</p>
+<table><thead><tr><th>level</th><th>capacity</th><th>bandwidth</th><th>latency</th></tr></thead><tbody><tr><td>registers</td><td>256 KB per SM</td><td>~100 TB/s</td><td>~1 cycle</td></tr><tr><td>shared memory / L1</td><td>228 KB per SM</td><td>~20 TB/s</td><td>~30 cycles</td></tr><tr><td>L2 cache</td><td>50 MB</td><td>~10 TB/s</td><td>~200 cycles</td></tr><tr><td>HBM3</td><td>80 GB</td><td>3.35 TB/s</td><td>~500 cycles</td></tr><tr><td>NVLink to peer GPU</td><td>—</td><td>900 GB/s</td><td>~2 µs</td></tr><tr><td>PCIe Gen5 x16</td><td>—</td><td>~64 GB/s</td><td>~10 µs</td></tr><tr><td>host DRAM</td><td>TBs</td><td>~200 GB/s</td><td>~1 µs</td></tr></tbody></table>
+<p>Shared memory is roughly <strong>6× the bandwidth of HBM</strong> and about 16× lower latency. FlashAttention is, in one sentence, the observation that if you can keep a tile of the computation in that tier you never pay for the N×N matrix at all.</p>
+<p>Note also the NVLink-to-PCIe gap: <strong>14×</strong>. Tensor parallelism does two all-reduces per layer, so running TP across a PCIe link rather than NVLink is usually a mistake.</p>
+<h3>Quick calculations</h3>
+<pre><code>TPOT_floor  = weight_bytes / bandwidth
+max_batch   = (memory - weights - workspace) / (kv_per_token * seq_len)
+ridge       = dense_flops / bandwidth
+saturated?  = max_batch &gt; ridge          # almost always &quot;no&quot;</code></pre>
+<pre><code>kv_per_token = 2 * n_layers * n_kv_heads * head_dim * dtype_bytes
+
+  Llama-3-8B  fp16:  2 x 32 x 8 x 128 x 2 = 131,072 B = 128 KiB
+  Llama-3-70B fp16:  2 x 80 x 8 x 128 x 2 = 327,680 B = 320 KiB</code></pre></div></section>
+  </main>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <p class="foot__h">LEVELS</p>
+        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">&nbsp;</p>
+        <ul><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">REFERENCE</p>
+        <ul>
+          <li><a href="../reference/timeline.html">Timeline</a></li>
+          <li><a href="../reference/hardware.html">GPU spec table</a></li>
+          <li><a href="../reference/engines.html">Serving engines</a></li>
+          <li><a href="../reference/frontier.html">Open problems</a></li>
+          <li><a href="../reference/glossary.html">Glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="foot__h">SOURCE</p>
+        <ul>
+          <li><a href="https://github.com/tushar-amrit-6/inference">GitHub repository</a></li>
+          <li><a href="../reference/how-to-use.html">How to work through this</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
+    do the arithmetic yourself.</p>
+  </div>
+</footer>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

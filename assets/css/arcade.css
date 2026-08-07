@@ -1,0 +1,579 @@
+/* ==========================================================================
+   LLM INFERENCE — arcade cabinet stylesheet
+   Palette is the Namco 1980 Pac-Man hardware palette. Pellets are #FFB897
+   (peach), not white — that is the actual ROM color, and it is the detail
+   everybody gets wrong.
+   ========================================================================== */
+
+/* --- tokens --------------------------------------------------------------- */
+:root {
+  /* surfaces */
+  --void:        #000000;   /* the cabinet. non-negotiable. */
+  --phosphor:    #08080F;   /* panel ground: near-black with a blue cast     */
+  --phosphor-2:  #0E0E1B;   /* raised panel                                  */
+  --phosphor-3:  #14142A;   /* code blocks, table stripes                    */
+
+  /* maze */
+  --maze:        #2121DE;   /* the wall blue                                 */
+  --maze-lit:    #4A4AFF;
+  --maze-dim:    #191970;
+
+  /* pac + pellets */
+  --pac:         #FFE800;
+  --pac-deep:    #FFB800;
+  --pellet:      #FFB897;
+
+  /* ghosts */
+  --blinky:      #FF0000;   --blinky-text: #FF6B6B;
+  --pinky:       #FFB8FF;
+  --inky:        #00FFFF;
+  --clyde:       #FFB852;
+  --frightened:  #2121DE;
+
+  /* text */
+  --ink:         #E9E4DA;   /* warm off-white. pure #FFF on #000 glares.     */
+  --ink-dim:     #9A94A8;
+  --ink-faint:   #635E75;
+
+  /* type */
+  --display: "Press Start 2P", "Courier New", monospace;
+  --body:    "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono:    "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* sprite grid — everything is a multiple of 8, like an 8px tile */
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+  --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px; --s9: 96px;
+
+  --measure: 68ch;
+  --rail: 260px;
+  --topbar: 52px;
+}
+
+/* --- reset ---------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}
+body {
+  margin: 0;
+  background: var(--void);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.75;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+img, svg { max-width: 100%; }
+a { color: var(--pac); text-decoration-color: color-mix(in srgb, var(--pac) 40%, transparent); text-underline-offset: 3px; }
+a:hover { color: #fff; text-decoration-color: currentColor; }
+
+:focus-visible {
+  outline: 3px solid var(--pac);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+::selection { background: var(--pac); color: var(--void); }
+
+.skip {
+  position: absolute; left: -9999px; top: 0; z-index: 100;
+  background: var(--pac); color: var(--void); padding: var(--s3) var(--s5);
+  font-family: var(--display); font-size: 11px;
+}
+.skip:focus { left: var(--s4); top: var(--s4); }
+
+/* --- pixel type helpers ---------------------------------------------------- */
+.px { font-family: var(--display); line-height: 1.7; letter-spacing: .02em; }
+.px-10 { font-size: 10px; } .px-12 { font-size: 12px; }
+.px-16 { font-size: clamp(13px, 2.2vw, 16px); }
+.px-24 { font-size: clamp(16px, 4vw, 24px); }
+.px-32 { font-size: clamp(20px, 6vw, 34px); }
+
+.eyebrow {
+  font-family: var(--display); font-size: 10px; letter-spacing: .12em;
+  color: var(--ink-faint); text-transform: uppercase;
+}
+
+/* --- score bar ------------------------------------------------------------- */
+.scorebar {
+  position: sticky; top: 0; z-index: 40;
+  height: var(--topbar);
+  display: flex; align-items: center; gap: var(--s5);
+  padding: 0 var(--s5);
+  background: var(--void);
+  border-bottom: 2px solid var(--maze);
+  font-family: var(--display); font-size: 10px;
+  overflow-x: auto; scrollbar-width: none;
+}
+.scorebar::-webkit-scrollbar { display: none; }
+.scorebar__item { display: flex; align-items: baseline; gap: var(--s2); white-space: nowrap; }
+.scorebar__label { color: var(--ink-faint); letter-spacing: .1em; }
+.scorebar__value { color: var(--ink); font-variant-numeric: tabular-nums; }
+.scorebar__value--pac { color: var(--pac); }
+.scorebar__home { display: flex; align-items: center; gap: var(--s2); color: var(--pac); text-decoration: none; letter-spacing: .06em; white-space: nowrap; flex: none; }
+.scorebar__home:hover { color: #fff; }
+.scorebar__spacer { margin-left: auto; }
+.scorebar__lives { display: flex; gap: var(--s1); align-items: center; }
+
+/* --- layout ---------------------------------------------------------------- */
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 var(--s5); }
+.wrap--narrow { max-width: 860px; }
+
+.shell { display: grid; grid-template-columns: var(--rail) minmax(0, 1fr); gap: var(--s8); }
+/* grid items default to min-width:auto, which lets a wide child inflate the
+   whole column past the viewport. Without this the rail blows out the layout
+   at every breakpoint below 940px. */
+.shell > * { min-width: 0; }
+@media (max-width: 940px) { .shell { grid-template-columns: minmax(0, 1fr); gap: var(--s5); } }
+
+/* --- panels ---------------------------------------------------------------- */
+/* Real maze walls are drawn as two parallel blue lines with black between.
+   Reserved for the two moments that earn it: the maze frame and the
+   checkpoint. Everything else gets a single quiet edge. */
+.wall {
+  border: 2px solid var(--maze);
+  border-radius: 12px;
+  box-shadow: 0 0 0 3px var(--void), 0 0 0 5px var(--maze);
+}
+
+.panel {
+  background: var(--phosphor);
+  border: 1px solid color-mix(in srgb, var(--maze) 55%, transparent);
+  border-radius: 10px;
+  padding: var(--s5) var(--s6);
+}
+@media (max-width: 620px) { .panel { padding: var(--s5) var(--s4); } }
+
+/* ghost-coded sections. the color IS the wayfinding — learn it once, scan
+   any module page. */
+.ghost { position: relative; padding-left: var(--s6); }
+.ghost::before {
+  content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: 4px;
+  border-radius: 4px; background: var(--edge, var(--maze));
+}
+.ghost--pinky  { --edge: var(--pinky); }
+.ghost--inky   { --edge: var(--inky); }
+.ghost--clyde  { --edge: var(--clyde); }
+.ghost--blinky { --edge: var(--blinky); }
+.ghost--pac    { --edge: var(--pac); }
+.ghost--pellet { --edge: var(--pellet); }
+@media (max-width: 620px) { .ghost { padding-left: var(--s5); } }
+
+.ghost__tag {
+  display: inline-flex; align-items: center; gap: var(--s2);
+  font-family: var(--display); font-size: 10px; letter-spacing: .1em;
+  color: var(--edge, var(--maze));
+  margin: 0 0 var(--s3);
+}
+.ghost__tag svg { flex: none; }
+
+/* --- prose ----------------------------------------------------------------- */
+/* The measure lives on the text elements, not the container, so code blocks
+   and tables can use the full column width instead of being squeezed into
+   68ch. NOTE: `.prose p { margin: 0 }` would out-specify the stack rule below
+   (0,1,1 beats 0,1,0) and silently kill all paragraph spacing -- so block
+   margins are reset on `.prose > *` at equal specificity instead. */
+.prose { max-width: none; }
+.prose > p,
+.prose > ul,
+.prose > ol,
+.prose > blockquote,
+.prose > h2, .prose > h3, .prose > h4 { max-width: var(--measure); }
+
+.prose > * { margin: 0; }
+.prose > * + * { margin-top: 1.15em; }
+
+.prose h2, .prose h3, .prose h4 {
+  font-family: var(--display); line-height: 1.6; color: var(--ink);
+}
+.prose > h2, .prose > h3, .prose > h4 { margin-top: 2em; margin-bottom: .9em; }
+.prose h2 { font-size: 15px; color: var(--pac); }
+.prose h3 { font-size: 13px; }
+.prose h4 { font-size: 11px; color: var(--ink-dim); letter-spacing: .06em; }
+.prose strong { color: #fff; font-weight: 600; }
+.prose em { color: var(--pellet); font-style: italic; }
+.prose ul, .prose ol { margin: 0; padding-left: 1.4em; }
+.prose li + li { margin-top: .5em; }
+.prose li::marker { color: var(--pellet); }
+.prose hr { border: 0; border-top: 1px dashed var(--maze); margin: var(--s7) 0; }
+.prose blockquote {
+  margin: 0; padding: var(--s3) var(--s5);
+  border-left: 4px solid var(--clyde);
+  background: var(--phosphor-2); border-radius: 0 8px 8px 0;
+  color: var(--ink-dim);
+}
+.prose blockquote p { margin: 0; }
+
+/* inline code + formula blocks: the mono face carries all the numbers */
+.prose code {
+  font-family: var(--mono); font-size: .88em;
+  background: var(--phosphor-3); color: var(--pellet);
+  padding: .12em .4em; border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--maze) 40%, transparent);
+}
+.prose pre {
+  margin: 0; overflow-x: auto;
+  background: var(--phosphor-3);
+  border: 1px solid color-mix(in srgb, var(--maze) 60%, transparent);
+  border-left: 4px solid var(--maze);
+  border-radius: 8px;
+  padding: var(--s4) var(--s5);
+  font-size: 14px; line-height: 1.65;
+}
+.prose pre code {
+  background: none; border: 0; padding: 0; color: var(--ink);
+  font-size: inherit;
+}
+
+/* ascii diagrams get room to breathe and never wrap */
+.ascii {
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.45;
+  white-space: pre; overflow-x: auto;
+  color: var(--inky);
+  background: var(--phosphor-3);
+  border: 1px dashed color-mix(in srgb, var(--inky) 40%, transparent);
+  border-radius: 8px; padding: var(--s4);
+  margin: 0;
+}
+
+/* tables — hardware specs and comparisons live here */
+.prose table, .table {
+  width: 100%; border-collapse: collapse; font-size: 15px;
+  font-family: var(--mono);
+  display: block; overflow-x: auto; white-space: nowrap;
+}
+.prose thead th, .table thead th {
+  font-family: var(--display); font-size: 9px; letter-spacing: .08em;
+  color: var(--pac); text-align: left; text-transform: uppercase;
+  padding: var(--s3) var(--s4); border-bottom: 2px solid var(--maze);
+}
+.prose tbody td, .table tbody td {
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid color-mix(in srgb, var(--maze) 35%, transparent);
+  vertical-align: top;
+}
+.prose tbody tr:nth-child(even), .table tbody tr:nth-child(even) { background: color-mix(in srgb, var(--maze) 8%, transparent); }
+
+/* --- buttons --------------------------------------------------------------- */
+.btn {
+  display: inline-flex; align-items: center; gap: var(--s3);
+  font-family: var(--display); font-size: 11px; letter-spacing: .06em;
+  padding: var(--s4) var(--s5);
+  background: var(--pac); color: var(--void);
+  border: 0; border-radius: 8px; cursor: pointer;
+  text-decoration: none;
+  box-shadow: 0 4px 0 var(--pac-deep);
+  transition: transform .08s ease, box-shadow .08s ease, background .15s ease;
+}
+.btn:hover { background: #fff; color: var(--void); transform: translateY(2px); box-shadow: 0 2px 0 var(--pac-deep); }
+.btn:active { transform: translateY(4px); box-shadow: none; }
+.btn--ghost {
+  background: transparent; color: var(--pac);
+  border: 2px solid var(--maze); box-shadow: none;
+}
+.btn--ghost:hover { background: var(--maze); color: #fff; transform: none; }
+
+/* --- hero ------------------------------------------------------------------ */
+.hero { padding: var(--s9) 0 var(--s8); position: relative; }
+.hero__kicker { color: var(--inky); margin: 0 0 var(--s5); }
+.hero__title {
+  font-family: var(--display); margin: 0 0 var(--s5);
+  font-size: clamp(24px, 6.5vw, 52px); line-height: 1.25; color: var(--pac);
+  text-shadow: 0 0 24px color-mix(in srgb, var(--pac) 35%, transparent);
+}
+.hero__thesis {
+  font-size: clamp(19px, 2.6vw, 25px); line-height: 1.55;
+  color: #fff; max-width: 24ch; margin: 0 0 var(--s5);
+  font-weight: 300;
+}
+.hero__thesis b { color: var(--pac); font-weight: 600; }
+.hero__body { max-width: 60ch; color: var(--ink-dim); margin: 0 0 var(--s7); }
+.hero__body strong { color: var(--ink); font-weight: 600; }
+.hero__cta { display: flex; flex-wrap: wrap; gap: var(--s4); align-items: center; }
+
+.hero__grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: var(--s9); align-items: start; }
+@media (max-width: 1040px) { .hero__grid { grid-template-columns: 1fr; gap: var(--s8); } }
+
+/* the thesis, stated as a measurement rather than a claim */
+.gauge { padding: var(--s6); background: var(--phosphor); margin-top: var(--s7); }
+.gauge__h { font-family: var(--display); font-size: 11px; color: var(--pac); letter-spacing: .08em; margin: 0 0 var(--s2); }
+.gauge__sub { font-family: var(--mono); font-size: 12.5px; color: var(--ink-faint); margin: 0 0 var(--s6); }
+.gauge__row { display: grid; grid-template-columns: 1fr; gap: 6px; margin-bottom: var(--s5); }
+.gauge__label { font-family: var(--display); font-size: 8.5px; color: var(--ink-dim); letter-spacing: .1em; }
+/* dim track border, so a nearly-empty bar does not read as a full one */
+.gauge__bar { display: block; height: 14px; background: var(--phosphor-3); border: 1px solid var(--maze-dim); border-radius: 3px; overflow: hidden; }
+.gauge__bar i {
+  display: block; height: 100%; background: var(--pac);
+  /* pellet-track fill: reads as a row of dots being eaten, not a progress bar */
+  background-image: repeating-linear-gradient(90deg, var(--pac) 0 6px, var(--pac-deep) 6px 9px);
+}
+.gauge__bar i.gauge__thin { min-width: 3px; background: var(--inky); background-image: none; }
+.gauge__val { font-family: var(--mono); font-size: 12.5px; color: var(--ink); }
+.gauge__foot { margin: var(--s5) 0 0; font-size: 14px; line-height: 1.6; color: var(--ink-dim); }
+.gauge__foot b { color: var(--pac); font-weight: 600; }
+
+/* the one blink on the whole site. it earns it. */
+.coin { font-family: var(--display); font-size: 10px; color: var(--pellet); }
+@media (prefers-reduced-motion: no-preference) {
+  .coin { animation: blink 1.1s steps(1, end) infinite; }
+}
+@keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: .15; } }
+
+/* --- the maze -------------------------------------------------------------- */
+.maze-frame { padding: var(--s6); background: var(--void); }
+@media (max-width: 620px) { .maze-frame { padding: var(--s4); } }
+.maze { display: block; width: 100%; height: auto; touch-action: manipulation; }
+
+.maze__wall  { fill: none; stroke: var(--maze); stroke-width: 2.2; }
+.maze__pellet { fill: var(--pellet); }
+.maze__pellet--eaten { fill: color-mix(in srgb, var(--pellet) 16%, transparent); }
+.maze__power { fill: var(--pac); }
+
+.node { cursor: pointer; }
+.node__disc {
+  fill: var(--phosphor-2);
+  stroke: var(--maze-lit); stroke-width: 2.5;
+  transition: fill .15s ease, stroke .15s ease;
+}
+.node__num {
+  font-family: var(--display); font-size: 11px; fill: var(--ink);
+  text-anchor: middle; dominant-baseline: central; pointer-events: none;
+  transition: fill .15s ease;
+}
+.node:hover .node__disc,
+.node:focus-visible .node__disc { fill: var(--pac); stroke: var(--pac); }
+.node:hover .node__num,
+.node:focus-visible .node__num { fill: var(--void); }
+.node[data-done="1"] .node__disc { fill: var(--maze); stroke: var(--pac); }
+.node[data-done="1"] .node__num { fill: var(--pac); }
+.node:focus { outline: none; }
+.node:focus-visible .node__disc { stroke-width: 4; }
+
+.node__label {
+  font-family: var(--display); font-size: 6.4px; fill: var(--ink-dim);
+  text-anchor: middle; pointer-events: none; letter-spacing: .04em;
+}
+.node:hover .node__label { fill: var(--pac); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .pac-sprite { animation: chomp .38s steps(2, end) infinite; transform-origin: center; }
+}
+@keyframes chomp { 0% { opacity: 1; } 50% { opacity: 1; } }
+
+.maze-legend {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+  gap: var(--s4); margin-top: var(--s6); padding: 0; list-style: none;
+}
+.maze-legend li {
+  display: flex; gap: var(--s3); align-items: flex-start;
+  font-size: 14px; color: var(--ink-dim); line-height: 1.5;
+}
+.maze-legend b {
+  display: block; font-family: var(--display); font-size: 9px;
+  letter-spacing: .08em; color: var(--key, var(--ink)); margin-bottom: 3px;
+}
+.maze-legend svg { flex: none; margin-top: 2px; }
+
+/* --- level select list ----------------------------------------------------- */
+.levels { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s3); }
+.level {
+  display: grid; grid-template-columns: 54px minmax(0,1fr) auto;
+  align-items: center; gap: var(--s4);
+  padding: var(--s4) var(--s5);
+  background: var(--phosphor);
+  border: 1px solid color-mix(in srgb, var(--maze) 45%, transparent);
+  border-left: 4px solid var(--maze);
+  border-radius: 8px;
+  color: inherit; text-decoration: none;
+  transition: border-color .14s ease, background .14s ease, transform .14s ease;
+}
+.level:hover, .level:focus-visible {
+  background: var(--phosphor-2);
+  border-left-color: var(--pac); border-color: var(--maze-lit);
+  transform: translateX(4px);
+}
+.level__num {
+  font-family: var(--display); font-size: 20px; color: var(--maze-lit);
+  text-align: center; font-variant-numeric: tabular-nums;
+}
+.level:hover .level__num { color: var(--pac); }
+/* both are spans inside a span, so they need to be told to stack */
+.level__title { display: block; font-family: var(--display); font-size: 12px; color: var(--ink); line-height: 1.5; }
+.level:hover .level__title { color: var(--pac); }
+.level__tag { display: block; font-size: 14.5px; color: var(--ink-dim); margin-top: 7px; line-height: 1.55; max-width: 78ch; }
+.level__meta { font-family: var(--mono); font-size: 12px; color: var(--ink-faint); text-align: right; white-space: nowrap; }
+.level[data-done="1"] .level__num { color: var(--pac); }
+.level[data-done="1"] { border-left-color: var(--pac); }
+@media (max-width: 620px) {
+  .level { grid-template-columns: 42px minmax(0,1fr); }
+  .level__meta { grid-column: 2; text-align: left; }
+}
+
+/* --- rail (module sidebar) -------------------------------------------------- */
+.rail { position: sticky; top: calc(var(--topbar) + var(--s5)); align-self: start; max-height: calc(100vh - var(--topbar) - var(--s7)); overflow-y: auto; padding-right: var(--s2); }
+.rail__head { font-family: var(--display); font-size: 10px; color: var(--ink-faint); letter-spacing: .1em; margin: 0 0 var(--s4); }
+.rail__list { list-style: none; margin: 0 0 var(--s6); padding: 0; }
+.rail__link {
+  display: grid; grid-template-columns: 16px 1fr; gap: var(--s3); align-items: center;
+  padding: 7px var(--s2); border-radius: 6px;
+  font-size: 13.5px; color: var(--ink-dim); text-decoration: none; line-height: 1.4;
+}
+.rail__link:hover { background: var(--phosphor-2); color: var(--ink); }
+.rail__link[aria-current="true"] { color: var(--pac); background: color-mix(in srgb, var(--maze) 30%, transparent); }
+.rail__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pellet); opacity: .45; justify-self: center; transition: opacity .2s ease, transform .2s ease; }
+.rail__link[aria-current="true"] .rail__dot { opacity: 0; transform: scale(.4); }
+.rail__link[data-kind="power"] .rail__dot { width: 13px; height: 13px; background: var(--pac); }
+
+.rail__nav { display: grid; gap: var(--s2); border-top: 1px solid var(--maze-dim); padding-top: var(--s4); }
+.rail__step { font-family: var(--display); font-size: 9px; color: var(--ink-dim); text-decoration: none; padding: var(--s2) 0; line-height: 1.9; }
+.rail__step:hover { color: var(--pac); }
+
+@media (max-width: 940px) {
+  .rail { position: static; max-height: none; border-bottom: 1px solid var(--maze-dim); padding-bottom: var(--s5); }
+  .rail__list { display: flex; flex-wrap: wrap; gap: var(--s2); margin-bottom: var(--s4); }
+  .rail__link { grid-template-columns: 12px auto; background: var(--phosphor); border: 1px solid var(--maze-dim); font-size: 12.5px; }
+}
+
+/* --- module page ------------------------------------------------------------ */
+.mod-head { padding: var(--s8) 0 var(--s6); border-bottom: 1px dashed var(--maze); margin-bottom: var(--s7); }
+.mod-head__level { font-family: var(--display); font-size: 11px; color: var(--inky); letter-spacing: .12em; margin: 0 0 var(--s4); }
+.mod-head__title { font-family: var(--display); font-size: clamp(19px, 4.4vw, 34px); line-height: 1.3; color: var(--pac); margin: 0 0 var(--s5); }
+.mod-head__tag { font-size: 20px; line-height: 1.55; color: var(--ink); max-width: 46ch; margin: 0 0 var(--s5); font-weight: 300; }
+.mod-head__meta { display: flex; flex-wrap: wrap; gap: var(--s5); font-family: var(--mono); font-size: 13px; color: var(--ink-faint); }
+
+.section { margin-bottom: var(--s9); scroll-margin-top: calc(var(--topbar) + var(--s5)); }
+.section__title { font-family: var(--display); font-size: 15px; color: var(--ink); margin: 0 0 var(--s5); line-height: 1.5; }
+
+.concept { margin-bottom: var(--s8); scroll-margin-top: calc(var(--topbar) + var(--s5)); }
+.concept__head { display: flex; align-items: baseline; gap: var(--s3); margin: 0 0 var(--s4); }
+.concept__n { font-family: var(--display); font-size: 12px; color: var(--pellet); flex: none; }
+.concept__title { font-family: var(--display); font-size: 14px; line-height: 1.5; color: var(--ink); margin: 0; }
+
+.keypoint {
+  margin: var(--s5) 0 0; padding: var(--s4) var(--s5);
+  background: color-mix(in srgb, var(--maze) 18%, transparent);
+  border: 1px solid var(--maze); border-radius: 8px;
+  font-size: 16px; color: #fff; line-height: 1.6;
+}
+.keypoint b { font-family: var(--display); font-size: 9px; color: var(--pac); letter-spacing: .1em; display: block; margin-bottom: 6px; }
+
+/* spoiler: worked solutions stay hidden until asked for */
+details.spoiler {
+  margin-top: var(--s5);
+  border: 1px solid var(--maze); border-radius: 8px;
+  background: var(--phosphor-2); overflow: hidden;
+}
+details.spoiler > summary {
+  cursor: pointer; list-style: none; padding: var(--s4) var(--s5);
+  font-family: var(--display); font-size: 10px; color: var(--pac); letter-spacing: .08em;
+  display: flex; align-items: center; gap: var(--s3);
+}
+details.spoiler > summary::-webkit-details-marker { display: none; }
+details.spoiler > summary::before { content: "▶"; font-size: 9px; color: var(--pellet); }
+details.spoiler[open] > summary::before { content: "▼"; }
+details.spoiler > summary:hover { background: color-mix(in srgb, var(--maze) 25%, transparent); }
+details.spoiler .spoiler__body { padding: 0 var(--s5) var(--s5); border-top: 1px solid var(--maze-dim); padding-top: var(--s5); }
+
+/* papers */
+.papers { display: grid; gap: var(--s4); }
+.paper {
+  padding: var(--s5); background: var(--phosphor);
+  border: 1px solid color-mix(in srgb, var(--maze) 45%, transparent);
+  border-radius: 8px;
+}
+.paper__title { font-family: var(--display); font-size: 12px; line-height: 1.55; margin: 0 0 var(--s2); }
+.paper__title a { color: var(--pac); text-decoration: none; }
+.paper__title a:hover { color: #fff; text-decoration: underline; }
+.paper__by { font-family: var(--mono); font-size: 13px; color: var(--ink-faint); margin: 0 0 var(--s4); }
+.paper__why { margin: 0 0 var(--s4); color: var(--ink); font-size: 15.5px; }
+.paper__frame { font-size: 15px; color: var(--ink-dim); }
+.paper__frame > * + * { margin-top: .8em; }
+.paper__frame p { margin: 0; }
+
+/* checkpoint — the power pellet. gets the double wall. */
+.checkpoint { padding: var(--s7) var(--s6); background: var(--phosphor); }
+@media (max-width: 620px) { .checkpoint { padding: var(--s6) var(--s4); } }
+.checkpoint__claim { font-size: 19px; line-height: 1.6; color: #fff; max-width: 52ch; margin: 0 0 var(--s7); font-weight: 300; }
+.qa { border-top: 1px solid var(--maze-dim); }
+.qa > summary {
+  cursor: pointer; list-style: none; padding: var(--s4) 0;
+  display: flex; gap: var(--s4); align-items: flex-start;
+  font-size: 16.5px; color: var(--ink); line-height: 1.55;
+}
+.qa > summary::-webkit-details-marker { display: none; }
+.qa > summary::before {
+  content: ""; flex: none; width: 12px; height: 12px; margin-top: 8px;
+  border-radius: 50%; background: var(--pac);
+  transition: transform .18s ease, background .18s ease;
+}
+.qa[open] > summary::before { background: var(--frightened); transform: scale(1.25); }
+.qa > summary:hover { color: var(--pac); }
+.qa__a { padding: 0 0 var(--s5) var(--s7); color: var(--ink-dim); font-size: 15.5px; }
+.qa__a > * + * { margin-top: .8em; }
+.qa__a p { margin: 0; }
+
+/* pitfalls — blinky is chasing you */
+.pitfall { padding: var(--s5); border-radius: 8px; background: var(--phosphor); border: 1px solid color-mix(in srgb, var(--blinky) 35%, transparent); }
+.pitfall + .pitfall { margin-top: var(--s4); }
+.pitfall__wrong { display: flex; gap: var(--s3); align-items: flex-start; font-size: 16px; color: var(--blinky-text); margin: 0 0 var(--s3); line-height: 1.55; }
+.pitfall__wrong::before { content: "✗"; font-family: var(--mono); font-weight: 700; flex: none; }
+.pitfall__right { display: flex; gap: var(--s3); align-items: flex-start; color: var(--ink); margin: 0; font-size: 15.5px; }
+.pitfall__right::before { content: "✓"; font-family: var(--mono); font-weight: 700; color: var(--inky); flex: none; }
+
+/* glossary */
+.gloss { display: grid; gap: var(--s3); }
+.gloss__row { display: grid; grid-template-columns: minmax(140px, 220px) 1fr; gap: var(--s5); padding: var(--s3) 0; border-bottom: 1px solid color-mix(in srgb, var(--maze) 30%, transparent); }
+.gloss__term { font-family: var(--mono); font-size: 15px; color: var(--pac); font-weight: 600; }
+.gloss__def { font-size: 15.5px; color: var(--ink-dim); }
+@media (max-width: 620px) { .gloss__row { grid-template-columns: 1fr; gap: var(--s1); } }
+
+/* --- timeline --------------------------------------------------------------- */
+.tl { list-style: none; margin: 0; padding: 0 0 0 var(--s6); position: relative; }
+.tl::before { content: ""; position: absolute; left: 5px; top: 8px; bottom: 8px; width: 2px; background: repeating-linear-gradient(to bottom, var(--pellet) 0 3px, transparent 3px 12px); }
+.tl__item { position: relative; padding-bottom: var(--s7); }
+.tl__item::before { content: ""; position: absolute; left: calc(-1 * var(--s6) + 1px); top: 9px; width: 10px; height: 10px; border-radius: 50%; background: var(--pac); box-shadow: 0 0 0 4px var(--void); }
+.tl__date { font-family: var(--display); font-size: 10px; color: var(--inky); letter-spacing: .08em; }
+.tl__name { font-family: var(--display); font-size: 13px; color: var(--pac); margin: var(--s2) 0 var(--s3); line-height: 1.5; }
+.tl__name a { color: inherit; text-decoration: none; }
+.tl__name a:hover { text-decoration: underline; color: #fff; }
+.tl__what { margin: 0 0 var(--s3); color: var(--ink); max-width: var(--measure); }
+.tl__why { margin: 0; color: var(--ink-dim); font-size: 15.5px; max-width: var(--measure); border-left: 2px solid var(--maze); padding-left: var(--s4); }
+
+/* --- footer ----------------------------------------------------------------- */
+.foot { border-top: 2px solid var(--maze); margin-top: var(--s9); padding: var(--s7) 0 var(--s8); }
+.foot__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--s6); }
+.foot__h { font-family: var(--display); font-size: 9.5px; color: var(--ink-faint); letter-spacing: .1em; margin: 0 0 var(--s4); }
+.foot ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
+.foot a { color: var(--ink-dim); text-decoration: none; font-size: 14.5px; }
+.foot a:hover { color: var(--pac); }
+.foot__note { margin: var(--s7) 0 0; font-size: 13.5px; color: var(--ink-faint); max-width: 62ch; }
+
+/* --- misc ------------------------------------------------------------------- */
+.stack-lg > * + * { margin-top: var(--s7); }
+.stack-md > * + * { margin-top: var(--s5); }
+.stack-sm > * + * { margin-top: var(--s3); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.center { text-align: center; }
+.dim { color: var(--ink-dim); }
+
+.pagenav { display: flex; justify-content: space-between; gap: var(--s4); flex-wrap: wrap; margin-top: var(--s8); padding-top: var(--s6); border-top: 1px dashed var(--maze); }
+.pagenav a { font-family: var(--display); font-size: 10.5px; text-decoration: none; color: var(--ink-dim); line-height: 1.6; max-width: 45%; }
+.pagenav a:hover { color: var(--pac); }
+.pagenav a span { display: block; color: var(--ink-faint); font-size: 8.5px; margin-bottom: 5px; letter-spacing: .1em; }
+
+.done-toggle {
+  display: inline-flex; align-items: center; gap: var(--s3); cursor: pointer;
+  font-family: var(--display); font-size: 10px; letter-spacing: .06em;
+  padding: var(--s4) var(--s5); border-radius: 8px;
+  background: transparent; color: var(--ink-dim);
+  border: 2px solid var(--maze);
+  transition: all .15s ease;
+}
+.done-toggle:hover { border-color: var(--pac); color: var(--pac); }
+.done-toggle[aria-pressed="true"] { background: var(--pac); color: var(--void); border-color: var(--pac); }

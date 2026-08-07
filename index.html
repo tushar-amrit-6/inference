@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM INFERENCE — From scratch, one token at a time</title>
+<meta name="description" content="A self-paced course on how LLM inference works and why it is hard. Eleven levels, from the transformer forward pass to distributed serving, organized around one idea: decoding is memory-bound.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="LLM INFERENCE — From scratch, one token at a time">
+<meta property="og:description" content="A self-paced course on how LLM inference works and why it is hard. Eleven levels, from the transformer forward pass to distributed serving, organized around one idea: decoding is memory-bound.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/arcade.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20fill%3D%22%23000%22%2F%3E%3Cpath%20d%3D%22M16%2C16%20L29%2C9%20A15%2C15%200%201%200%2029%2C23%20Z%22%20fill%3D%22%23FFE800%22%2F%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="scorebar">
+  <a class="scorebar__home" href="index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="var(--pac)" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
+  
+  <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/11</span></span>
+  <span class="scorebar__spacer"></span>
+  <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
+</header>
+<div class="wrap">
+  <main id="main">
+
+    <section class="hero">
+      <div class="hero__grid">
+        <div>
+          <p class="eyebrow hero__kicker">A COURSE IN ELEVEN LEVELS</p>
+          <h1 class="hero__title">LLM<br>INFERENCE</h1>
+          <p class="hero__thesis">Pac-Man is <b>memory-bound</b>. One pellet per move, however fast he runs.</p>
+          <p class="hero__body">So is your GPU. Generating a single token means reading
+          <strong>every weight in the model</strong> out of memory — 15 GB for an 8B model — to do
+          about 16 GFLOP of arithmetic with them. On an H100 that is roughly
+          <strong>0.4% of the machine's arithmetic capability</strong>; the other 99.6% of the time
+          it is sitting still, waiting on the memory bus.</p>
+          <p class="hero__body">Batching, quantization, GQA, PagedAttention, FlashAttention,
+          speculative decoding — every technique in this course is an answer to one question:
+          <strong>how do we do more useful work per byte moved from memory?</strong> Hold that in
+          view and the field stops looking like a pile of tricks.</p>
+          <div class="hero__cta">
+            <a class="btn" href="modules/transformer-fundamentals.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="var(--pac)" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> START AT LEVEL 00</a>
+            <a class="btn btn--ghost" href="reference/how-to-use.html">HOW TO WORK THROUGH IT</a>
+            <span class="coin" data-resume hidden></span>
+          </div>
+        </div>
+
+        <aside class="gauge wall" aria-label="Where the time goes in one decode step">
+          <p class="gauge__h">ONE DECODE STEP</p>
+          <p class="gauge__sub">Llama-3-8B · fp16 · batch 1 · H100</p>
+          <div class="gauge__row">
+            <span class="gauge__label">MEMORY BUS</span>
+            <span class="gauge__bar"><i style="width:100%"></i></span>
+            <span class="gauge__val">4.48 ms</span>
+          </div>
+          <div class="gauge__row">
+            <span class="gauge__label">TENSOR CORES</span>
+            <span class="gauge__bar"><i class="gauge__thin" style="width:0.4%"></i></span>
+            <span class="gauge__val">0.02 ms</span>
+          </div>
+          <p class="gauge__foot">15.0 GB moved, to do 16.1 GFLOP. The arithmetic is finished in
+          <b>0.4%</b> of the time the bytes take. Everything here is about closing that gap.</p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section">
+      <p class="eyebrow" style="margin-bottom:var(--s5)">THE MAZE · PICK A LEVEL</p>
+      <div class="wall maze-frame">
+        <svg class="maze" viewBox="0 0 708 516" role="group" aria-label="Course map: 11 modules laid out as a Pac-Man maze" xmlns="http://www.w3.org/2000/svg"><rect class="maze__wall" x="34" y="34" width="640" height="448" rx="14"/><rect class="maze__wall" x="87.1" y="119.1" width="21.8" height="85.8" rx="10.9"/><rect class="maze__wall" x="151.1" y="119.1" width="149.8" height="21.8" rx="10.9"/><rect class="maze__wall" x="343.1" y="119.1" width="21.8" height="85.8" rx="10.9"/><rect class="maze__wall" x="407.1" y="119.1" width="149.8" height="21.8" rx="10.9"/><rect class="maze__wall" x="599.1" y="119.1" width="21.8" height="85.8" rx="10.9"/><rect class="maze__wall" x="151.1" y="183.1" width="149.8" height="21.8" rx="10.9"/><rect class="maze__wall" x="407.1" y="183.1" width="149.8" height="21.8" rx="10.9"/><rect class="maze__wall" x="87.1" y="247.1" width="21.8" height="85.8" rx="10.9"/><rect class="maze__wall" x="151.1" y="247.1" width="149.8" height="21.8" rx="10.9"/><rect class="maze__wall" x="343.1" y="247.1" width="21.8" height="85.8" rx="10.9"/><rect class="maze__wall" x="407.1" y="247.1" width="149.8" height="21.8" rx="10.9"/><rect class="maze__wall" x="599.1" y="247.1" width="21.8" height="85.8" rx="10.9"/><rect class="maze__wall" x="151.1" y="311.1" width="149.8" height="21.8" rx="10.9"/><rect class="maze__wall" x="407.1" y="311.1" width="149.8" height="21.8" rx="10.9"/><rect class="maze__wall" x="87.1" y="375.1" width="85.8" height="21.8" rx="10.9"/><rect class="maze__wall" x="215.1" y="375.1" width="277.8" height="85.8" rx="11.0"/><rect class="maze__wall" x="535.1" y="375.1" width="85.8" height="21.8" rx="10.9"/><circle class="maze__pellet" data-pellet="1-1" cx="66" cy="66" r="2.7"/><circle class="maze__pellet" data-pellet="1-2" cx="98" cy="66" r="2.7"/><circle class="maze__pellet" data-pellet="1-3" cx="130" cy="66" r="2.7"/><circle class="maze__pellet" data-pellet="1-4" cx="162" cy="66" r="2.7"/><circle class="maze__pellet" data-pellet="1-5" cx="194" cy="66" r="2.7"/><circle class="maze__pellet" data-pellet="1-6" cx="226" cy="66" r="2.7"/><circle class="maze__pellet" data-pellet="1-7" cx="258" cy="66" r="2.7"/><circle class="maze__pellet" data-pellet="1-8" cx="290" cy="66" r="2.7"/><circle class="maze__pellet" data-pellet="1-9" cx="322" cy="66" r="2.7"/><circle class="maze__pellet" data-pellet="1-10" cx="354" cy="66" r="2.7"/><circle class="maze__pellet" data-pellet="1-11" cx="386" cy="66" r="2.7"/><circle class="maze__pellet" data-pellet="1-12" cx="418" cy="66" r="2.7"/><circle class="maze__pellet" data-pellet="1-13" cx="450" cy="66" r="2.7"/><circle class="maze__pellet" data-pellet="1-14" cx="482" cy="66" r="2.7"/><circle class="maze__pellet" data-pellet="1-15" cx="514" cy="66" r="2.7"/><circle class="maze__pellet" data-pellet="1-16" cx="546" cy="66" r="2.7"/><circle class="maze__pellet" data-pellet="1-17" cx="578" cy="66" r="2.7"/><circle class="maze__pellet" data-pellet="1-18" cx="610" cy="66" r="2.7"/><circle class="maze__pellet" data-pellet="1-19" cx="642" cy="66" r="2.7"/><circle class="maze__pellet" data-pellet="2-1" cx="66" cy="98" r="2.7"/><circle class="maze__pellet" data-pellet="2-3" cx="130" cy="98" r="2.7"/><circle class="maze__pellet" data-pellet="2-4" cx="162" cy="98" r="2.7"/><circle class="maze__pellet" data-pellet="2-5" cx="194" cy="98" r="2.7"/><circle class="maze__pellet" data-pellet="2-6" cx="226" cy="98" r="2.7"/><circle class="maze__pellet" data-pellet="2-7" cx="258" cy="98" r="2.7"/><circle class="maze__pellet" data-pellet="2-8" cx="290" cy="98" r="2.7"/><circle class="maze__pellet" data-pellet="2-9" cx="322" cy="98" r="2.7"/><circle class="maze__pellet" data-pellet="2-11" cx="386" cy="98" r="2.7"/><circle class="maze__pellet" data-pellet="2-12" cx="418" cy="98" r="2.7"/><circle class="maze__pellet" data-pellet="2-13" cx="450" cy="98" r="2.7"/><circle class="maze__pellet" data-pellet="2-14" cx="482" cy="98" r="2.7"/><circle class="maze__pellet" data-pellet="2-15" cx="514" cy="98" r="2.7"/><circle class="maze__pellet" data-pellet="2-16" cx="546" cy="98" r="2.7"/><circle class="maze__pellet" data-pellet="2-17" cx="578" cy="98" r="2.7"/><circle class="maze__pellet" data-pellet="2-19" cx="642" cy="98" r="2.7"/><circle class="maze__pellet" data-pellet="3-1" cx="66" cy="130" r="2.7"/><circle class="maze__pellet" data-pellet="3-3" cx="130" cy="130" r="2.7"/><circle class="maze__pellet" data-pellet="3-9" cx="322" cy="130" r="2.7"/><circle class="maze__pellet" data-pellet="3-11" cx="386" cy="130" r="2.7"/><circle class="maze__pellet" data-pellet="3-17" cx="578" cy="130" r="2.7"/><circle class="maze__pellet" data-pellet="3-19" cx="642" cy="130" r="2.7"/><circle class="maze__pellet" data-pellet="4-1" cx="66" cy="162" r="2.7"/><circle class="maze__pellet" data-pellet="4-3" cx="130" cy="162" r="2.7"/><circle class="maze__pellet" data-pellet="4-4" cx="162" cy="162" r="2.7"/><circle class="maze__pellet" data-pellet="4-5" cx="194" cy="162" r="2.7"/><circle class="maze__pellet" data-pellet="4-6" cx="226" cy="162" r="2.7"/><circle class="maze__pellet" data-pellet="4-7" cx="258" cy="162" r="2.7"/><circle class="maze__pellet" data-pellet="4-8" cx="290" cy="162" r="2.7"/><circle class="maze__pellet" data-pellet="4-9" cx="322" cy="162" r="2.7"/><circle class="maze__pellet" data-pellet="4-11" cx="386" cy="162" r="2.7"/><circle class="maze__pellet" data-pellet="4-12" cx="418" cy="162" r="2.7"/><circle class="maze__pellet" data-pellet="4-13" cx="450" cy="162" r="2.7"/><circle class="maze__pellet" data-pellet="4-14" cx="482" cy="162" r="2.7"/><circle class="maze__pellet" data-pellet="4-15" cx="514" cy="162" r="2.7"/><circle class="maze__pellet" data-pellet="4-16" cx="546" cy="162" r="2.7"/><circle class="maze__pellet" data-pellet="4-17" cx="578" cy="162" r="2.7"/><circle class="maze__pellet" data-pellet="4-19" cx="642" cy="162" r="2.7"/><circle class="maze__pellet" data-pellet="5-1" cx="66" cy="194" r="2.7"/><circle class="maze__pellet" data-pellet="5-3" cx="130" cy="194" r="2.7"/><circle class="maze__pellet" data-pellet="5-9" cx="322" cy="194" r="2.7"/><circle class="maze__pellet" data-pellet="5-11" cx="386" cy="194" r="2.7"/><circle class="maze__pellet" data-pellet="5-17" cx="578" cy="194" r="2.7"/><circle class="maze__pellet" data-pellet="5-19" cx="642" cy="194" r="2.7"/><circle class="maze__pellet" data-pellet="6-1" cx="66" cy="226" r="2.7"/><circle class="maze__pellet" data-pellet="6-3" cx="130" cy="226" r="2.7"/><circle class="maze__pellet" data-pellet="6-4" cx="162" cy="226" r="2.7"/><circle class="maze__pellet" data-pellet="6-5" cx="194" cy="226" r="2.7"/><circle class="maze__pellet" data-pellet="6-6" cx="226" cy="226" r="2.7"/><circle class="maze__pellet" data-pellet="6-7" cx="258" cy="226" r="2.7"/><circle class="maze__pellet" data-pellet="6-8" cx="290" cy="226" r="2.7"/><circle class="maze__pellet" data-pellet="6-9" cx="322" cy="226" r="2.7"/><circle class="maze__pellet" data-pellet="6-11" cx="386" cy="226" r="2.7"/><circle class="maze__pellet" data-pellet="6-12" cx="418" cy="226" r="2.7"/><circle class="maze__pellet" data-pellet="6-13" cx="450" cy="226" r="2.7"/><circle class="maze__pellet" data-pellet="6-14" cx="482" cy="226" r="2.7"/><circle class="maze__pellet" data-pellet="6-15" cx="514" cy="226" r="2.7"/><circle class="maze__pellet" data-pellet="6-16" cx="546" cy="226" r="2.7"/><circle class="maze__pellet" data-pellet="6-17" cx="578" cy="226" r="2.7"/><circle class="maze__pellet" data-pellet="6-19" cx="642" cy="226" r="2.7"/><circle class="maze__pellet" data-pellet="7-1" cx="66" cy="258" r="2.7"/><circle class="maze__pellet" data-pellet="7-3" cx="130" cy="258" r="2.7"/><circle class="maze__pellet" data-pellet="7-9" cx="322" cy="258" r="2.7"/><circle class="maze__pellet" data-pellet="7-11" cx="386" cy="258" r="2.7"/><circle class="maze__pellet" data-pellet="7-17" cx="578" cy="258" r="2.7"/><circle class="maze__pellet" data-pellet="7-19" cx="642" cy="258" r="2.7"/><circle class="maze__pellet" data-pellet="8-1" cx="66" cy="290" r="2.7"/><circle class="maze__pellet" data-pellet="8-3" cx="130" cy="290" r="2.7"/><circle class="maze__pellet" data-pellet="8-4" cx="162" cy="290" r="2.7"/><circle class="maze__pellet" data-pellet="8-5" cx="194" cy="290" r="2.7"/><circle class="maze__pellet" data-pellet="8-6" cx="226" cy="290" r="2.7"/><circle class="maze__pellet" data-pellet="8-7" cx="258" cy="290" r="2.7"/><circle class="maze__pellet" data-pellet="8-8" cx="290" cy="290" r="2.7"/><circle class="maze__pellet" data-pellet="8-9" cx="322" cy="290" r="2.7"/><circle class="maze__pellet" data-pellet="8-11" cx="386" cy="290" r="2.7"/><circle class="maze__pellet" data-pellet="8-12" cx="418" cy="290" r="2.7"/><circle class="maze__pellet" data-pellet="8-13" cx="450" cy="290" r="2.7"/><circle class="maze__pellet" data-pellet="8-14" cx="482" cy="290" r="2.7"/><circle class="maze__pellet" data-pellet="8-15" cx="514" cy="290" r="2.7"/><circle class="maze__pellet" data-pellet="8-16" cx="546" cy="290" r="2.7"/><circle class="maze__pellet" data-pellet="8-17" cx="578" cy="290" r="2.7"/><circle class="maze__pellet" data-pellet="8-19" cx="642" cy="290" r="2.7"/><circle class="maze__pellet" data-pellet="9-1" cx="66" cy="322" r="2.7"/><circle class="maze__pellet" data-pellet="9-3" cx="130" cy="322" r="2.7"/><circle class="maze__pellet" data-pellet="9-9" cx="322" cy="322" r="2.7"/><circle class="maze__pellet" data-pellet="9-11" cx="386" cy="322" r="2.7"/><circle class="maze__pellet" data-pellet="9-17" cx="578" cy="322" r="2.7"/><circle class="maze__pellet" data-pellet="9-19" cx="642" cy="322" r="2.7"/><circle class="maze__pellet" data-pellet="10-1" cx="66" cy="354" r="2.7"/><circle class="maze__pellet" data-pellet="10-3" cx="130" cy="354" r="2.7"/><circle class="maze__pellet" data-pellet="10-4" cx="162" cy="354" r="2.7"/><circle class="maze__pellet" data-pellet="10-5" cx="194" cy="354" r="2.7"/><circle class="maze__pellet" data-pellet="10-6" cx="226" cy="354" r="2.7"/><circle class="maze__pellet" data-pellet="10-7" cx="258" cy="354" r="2.7"/><circle class="maze__pellet" data-pellet="10-8" cx="290" cy="354" r="2.7"/><circle class="maze__pellet" data-pellet="10-9" cx="322" cy="354" r="2.7"/><circle class="maze__pellet" data-pellet="10-11" cx="386" cy="354" r="2.7"/><circle class="maze__pellet" data-pellet="10-12" cx="418" cy="354" r="2.7"/><circle class="maze__pellet" data-pellet="10-13" cx="450" cy="354" r="2.7"/><circle class="maze__pellet" data-pellet="10-14" cx="482" cy="354" r="2.7"/><circle class="maze__pellet" data-pellet="10-15" cx="514" cy="354" r="2.7"/><circle class="maze__pellet" data-pellet="10-16" cx="546" cy="354" r="2.7"/><circle class="maze__pellet" data-pellet="10-17" cx="578" cy="354" r="2.7"/><circle class="maze__pellet" data-pellet="10-19" cx="642" cy="354" r="2.7"/><circle class="maze__pellet" data-pellet="11-1" cx="66" cy="386" r="2.7"/><circle class="maze__pellet" data-pellet="11-5" cx="194" cy="386" r="2.7"/><circle class="maze__pellet" data-pellet="11-15" cx="514" cy="386" r="2.7"/><circle class="maze__pellet" data-pellet="11-19" cx="642" cy="386" r="2.7"/><circle class="maze__pellet" data-pellet="12-1" cx="66" cy="418" r="2.7"/><circle class="maze__pellet" data-pellet="12-2" cx="98" cy="418" r="2.7"/><circle class="maze__pellet" data-pellet="12-3" cx="130" cy="418" r="2.7"/><circle class="maze__pellet" data-pellet="12-4" cx="162" cy="418" r="2.7"/><circle class="maze__pellet" data-pellet="12-5" cx="194" cy="418" r="2.7"/><circle class="maze__pellet" data-pellet="12-15" cx="514" cy="418" r="2.7"/><circle class="maze__pellet" data-pellet="12-16" cx="546" cy="418" r="2.7"/><circle class="maze__pellet" data-pellet="12-17" cx="578" cy="418" r="2.7"/><circle class="maze__pellet" data-pellet="12-18" cx="610" cy="418" r="2.7"/><circle class="maze__pellet" data-pellet="12-19" cx="642" cy="418" r="2.7"/><circle class="maze__pellet" data-pellet="13-1" cx="66" cy="450" r="2.7"/><circle class="maze__power" cx="98" cy="450" r="6.5"/><circle class="maze__pellet" data-pellet="13-3" cx="130" cy="450" r="2.7"/><circle class="maze__pellet" data-pellet="13-5" cx="194" cy="450" r="2.7"/><circle class="maze__pellet" data-pellet="13-15" cx="514" cy="450" r="2.7"/><circle class="maze__pellet" data-pellet="13-17" cx="578" cy="450" r="2.7"/><circle class="maze__power" cx="610" cy="450" r="6.5"/><circle class="maze__pellet" data-pellet="13-19" cx="642" cy="450" r="2.7"/><g><path d="M301.92,437.17 V428.00 A10.08,10.08 0 0 1 322.08,428.00 L322.08,437.17 L317.04,433.50 L312.00,437.17 L306.96,433.50 Z" fill="var(--blinky)"/><ellipse cx="308.79" cy="427.08" rx="2.84" ry="3.57" fill="#fff"/><circle cx="309.71" cy="428.00" r="1.56" fill="#1414A0"/><ellipse cx="315.21" cy="427.08" rx="2.84" ry="3.57" fill="#fff"/><circle cx="316.13" cy="428.00" r="1.56" fill="#1414A0"/></g><g><path d="M329.92,437.17 V428.00 A10.08,10.08 0 0 1 350.08,428.00 L350.08,437.17 L345.04,433.50 L340.00,437.17 L334.96,433.50 Z" fill="var(--pinky)"/><ellipse cx="336.79" cy="427.08" rx="2.84" ry="3.57" fill="#fff"/><circle cx="337.71" cy="428.00" r="1.56" fill="#1414A0"/><ellipse cx="343.21" cy="427.08" rx="2.84" ry="3.57" fill="#fff"/><circle cx="344.13" cy="428.00" r="1.56" fill="#1414A0"/></g><g><path d="M357.92,437.17 V428.00 A10.08,10.08 0 0 1 378.08,428.00 L378.08,437.17 L373.04,433.50 L368.00,437.17 L362.96,433.50 Z" fill="var(--inky)"/><ellipse cx="364.79" cy="427.08" rx="2.84" ry="3.57" fill="#fff"/><circle cx="365.71" cy="428.00" r="1.56" fill="#1414A0"/><ellipse cx="371.21" cy="427.08" rx="2.84" ry="3.57" fill="#fff"/><circle cx="372.13" cy="428.00" r="1.56" fill="#1414A0"/></g><g><path d="M385.92,437.17 V428.00 A10.08,10.08 0 0 1 406.08,428.00 L406.08,437.17 L401.04,433.50 L396.00,437.17 L390.96,433.50 Z" fill="var(--clyde)"/><ellipse cx="392.79" cy="427.08" rx="2.84" ry="3.57" fill="#fff"/><circle cx="393.71" cy="428.00" r="1.56" fill="#1414A0"/><ellipse cx="399.21" cy="427.08" rx="2.84" ry="3.57" fill="#fff"/><circle cx="400.13" cy="428.00" r="1.56" fill="#1414A0"/></g><path class="pac-sprite" fill="var(--pac)" d="M514,66 L523.53,60.5 A11,11 0 1 0 523.53,71.5 Z"/><a class="node" href="modules/transformer-fundamentals.html" data-node="0" data-title="TRANSFORMER FUNDAMENTALS" aria-label="Module 0: TRANSFORMER FUNDAMENTALS"><title>Module 0 — TRANSFORMER FUNDAMENTALS</title><circle class="node__disc" cx="98" cy="98" r="14.5"/><text class="node__num" x="98" y="98.5">0</text></a><a class="node" href="modules/autoregressive-loop.html" data-node="1" data-title="THE AUTOREGRESSIVE LOOP" aria-label="Module 1: THE AUTOREGRESSIVE LOOP"><title>Module 1 — THE AUTOREGRESSIVE LOOP</title><circle class="node__disc" cx="354" cy="98" r="14.5"/><text class="node__num" x="354" y="98.5">1</text></a><a class="node" href="modules/kv-cache.html" data-node="2" data-title="THE KV CACHE" aria-label="Module 2: THE KV CACHE"><title>Module 2 — THE KV CACHE</title><circle class="node__disc" cx="610" cy="98" r="14.5"/><text class="node__num" x="610" y="98.5">2</text></a><a class="node" href="modules/decoding-and-sampling.html" data-node="3" data-title="DECODING AND SAMPLING" aria-label="Module 3: DECODING AND SAMPLING"><title>Module 3 — DECODING AND SAMPLING</title><circle class="node__disc" cx="98" cy="226" r="14.5"/><text class="node__num" x="98" y="226.5">3</text></a><a class="node" href="modules/roofline.html" data-node="4" data-title="METRICS AND THE ROOFLINE" aria-label="Module 4: METRICS AND THE ROOFLINE"><title>Module 4 — METRICS AND THE ROOFLINE</title><circle class="node__disc" cx="354" cy="226" r="14.5"/><text class="node__num" x="354" y="226.5">4</text></a><a class="node" href="modules/batching.html" data-node="5" data-title="BATCHING" aria-label="Module 5: BATCHING"><title>Module 5 — BATCHING</title><circle class="node__disc" cx="610" cy="226" r="14.5"/><text class="node__num" x="610" y="226.5">5</text></a><a class="node" href="modules/memory-optimization.html" data-node="6" data-title="MEMORY OPTIMIZATION" aria-label="Module 6: MEMORY OPTIMIZATION"><title>Module 6 — MEMORY OPTIMIZATION</title><circle class="node__disc" cx="98" cy="354" r="14.5"/><text class="node__num" x="98" y="354.5">6</text></a><a class="node" href="modules/attention-kernels.html" data-node="7" data-title="ATTENTION KERNELS" aria-label="Module 7: ATTENTION KERNELS"><title>Module 7 — ATTENTION KERNELS</title><circle class="node__disc" cx="354" cy="354" r="14.5"/><text class="node__num" x="354" y="354.5">7</text></a><a class="node" href="modules/speculative-decoding.html" data-node="8" data-title="SPECULATIVE DECODING" aria-label="Module 8: SPECULATIVE DECODING"><title>Module 8 — SPECULATIVE DECODING</title><circle class="node__disc" cx="610" cy="354" r="14.5"/><text class="node__num" x="610" y="354.5">8</text></a><a class="node" href="modules/distributed-inference.html" data-node="9" data-title="DISTRIBUTED INFERENCE" aria-label="Module 9: DISTRIBUTED INFERENCE"><title>Module 9 — DISTRIBUTED INFERENCE</title><circle class="node__disc" cx="162" cy="450" r="14.5"/><text class="node__num" x="162" y="450.5">9</text></a><a class="node" href="modules/systems-and-frontier.html" data-node="10" data-title="SYSTEMS AND THE FRONTIER" aria-label="Module 10: SYSTEMS AND THE FRONTIER"><title>Module 10 — SYSTEMS AND THE FRONTIER</title><circle class="node__disc" cx="546" cy="450" r="14.5"/><text class="node__num" x="546" y="450.5">10</text></a></svg>
+      </div>
+      <p class="center" style="margin-top:var(--s4);min-height:2.4em">
+        <span class="px px-10" data-maze-readout style="color:var(--pac)">HOVER A NODE TO SEE THE LEVEL</span>
+      </p>
+
+      <ul class="maze-legend">
+        <li><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--pinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg><span><b style="--key:var(--pinky)">PINKY</b>The big idea — He targets four tiles ahead of you.</span></li><li><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg><span><b style="--key:var(--pellet)">PELLETS</b>Concepts — Eaten one at a time.</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--inky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg><span><b style="--key:var(--inky)">INKY</b>Math by hand — His target is computed, not chased.</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--clyde)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg><span><b style="--key:var(--clyde)">CLYDE</b>Code lab — Chases, then retreats to his corner.</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--blinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg><span><b style="--key:var(--blinky)">BLINKY</b>Pitfalls — He comes straight at you.</span></li><li><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg><span><b style="--key:var(--pac)">POWER PELLET</b>Checkpoint — Eat it and the ghosts turn blue.</span></li>
+      </ul>
+      <p class="dim" style="margin-top:var(--s5);font-size:14.5px;max-width:70ch">
+        The colours are the navigation. Every level uses the same six, so once you know that pink
+        means "the big idea" and red means "here is what people get wrong", you can scan any page
+        without reading it.
+      </p>
+    </section>
+
+    <section class="section">
+      <p class="eyebrow" style="margin-bottom:var(--s5)">LEVEL SELECT</p>
+      <ol class="levels">
+        <li><a class="level" href="modules/transformer-fundamentals.html" data-level="0">
+          <span class="level__num">00</span>
+          <span>
+            <span class="level__title">TRANSFORMER FUNDAMENTALS</span>
+            <span class="level__tag">You cannot reason about inference without a mechanical picture of the forward pass.</span>
+          </span>
+          <span class="level__meta">8–12 hours<br>8 concepts</span>
+        </a></li><li><a class="level" href="modules/autoregressive-loop.html" data-level="1">
+          <span class="level__num">01</span>
+          <span>
+            <span class="level__title">THE AUTOREGRESSIVE LOOP</span>
+            <span class="level__tag">Prefill and decode are not two phases of one job. They are two different jobs.</span>
+          </span>
+          <span class="level__meta">4–6 hours<br>6 concepts</span>
+        </a></li><li><a class="level" href="modules/kv-cache.html" data-level="2">
+          <span class="level__num">02</span>
+          <span>
+            <span class="level__title">THE KV CACHE</span>
+            <span class="level__tag">The single most important object in inference. Everything downstream is memory management.</span>
+          </span>
+          <span class="level__meta">6–8 hours<br>6 concepts</span>
+        </a></li><li><a class="level" href="modules/decoding-and-sampling.html" data-level="3">
+          <span class="level__num">03</span>
+          <span>
+            <span class="level__title">DECODING AND SAMPLING</span>
+            <span class="level__tag">The model gives you a distribution. Turning it into a token is a separate design problem.</span>
+          </span>
+          <span class="level__meta">5–7 hours<br>7 concepts</span>
+        </a></li><li><a class="level" href="modules/roofline.html" data-level="4">
+          <span class="level__num">04</span>
+          <span>
+            <span class="level__title">METRICS AND THE ROOFLINE</span>
+            <span class="level__tag">The analytical core. Everything after this module is applied roofline reasoning.</span>
+          </span>
+          <span class="level__meta">8–10 hours<br>6 concepts</span>
+        </a></li><li><a class="level" href="modules/batching.html" data-level="5">
+          <span class="level__num">05</span>
+          <span>
+            <span class="level__title">BATCHING</span>
+            <span class="level__tag">The largest throughput lever in serving, and the scheduling problem it creates.</span>
+          </span>
+          <span class="level__meta">5–7 hours<br>6 concepts</span>
+        </a></li><li><a class="level" href="modules/memory-optimization.html" data-level="6">
+          <span class="level__num">06</span>
+          <span>
+            <span class="level__title">MEMORY OPTIMIZATION</span>
+            <span class="level__tag">Paging, prefix reuse, architectural KV reduction, and quantization — four attacks on the same denominator.</span>
+          </span>
+          <span class="level__meta">8–10 hours<br>6 concepts</span>
+        </a></li><li><a class="level" href="modules/attention-kernels.html" data-level="7">
+          <span class="level__num">07</span>
+          <span>
+            <span class="level__title">ATTENTION KERNELS</span>
+            <span class="level__tag">Attention performance is decided by the memory hierarchy, not the FLOP count.</span>
+          </span>
+          <span class="level__meta">7–9 hours<br>6 concepts</span>
+        </a></li><li><a class="level" href="modules/speculative-decoding.html" data-level="8">
+          <span class="level__num">08</span>
+          <span>
+            <span class="level__title">SPECULATIVE DECODING</span>
+            <span class="level__tag">Buy back the compute that memory-bound decoding leaves on the floor — and provably change nothing.</span>
+          </span>
+          <span class="level__meta">6–8 hours<br>5 concepts</span>
+        </a></li><li><a class="level" href="modules/distributed-inference.html" data-level="9">
+          <span class="level__num">09</span>
+          <span>
+            <span class="level__title">DISTRIBUTED INFERENCE</span>
+            <span class="level__tag">When the model does not fit, the interconnect becomes the memory bus — and it is much slower.</span>
+          </span>
+          <span class="level__meta">7–9 hours<br>6 concepts</span>
+        </a></li><li><a class="level" href="modules/systems-and-frontier.html" data-level="10">
+          <span class="level__num">10</span>
+          <span>
+            <span class="level__title">SYSTEMS AND THE FRONTIER</span>
+            <span class="level__tag">How the engines differ, how to benchmark without lying to yourself, and what is still unsolved.</span>
+          </span>
+          <span class="level__meta">6–8 hours<br>6 concepts</span>
+        </a></li>
+      </ol>
+    </section>
+
+    <section class="section">
+      <p class="eyebrow" style="margin-bottom:var(--s5)">REFERENCE · ALWAYS OPEN IN A SECOND TAB</p>
+      <ol class="levels">
+        <li><a class="level" href="reference/hardware.html">
+          <span class="level__num">GPU</span>
+          <span><span class="level__title">HARDWARE TABLE</span>
+          <span class="level__tag">Bandwidth, dense FLOPs and ridge points for the accelerators you will actually meet. You need this from Level 04 onward.</span></span>
+          <span class="level__meta">reference</span></a></li>
+        <li><a class="level" href="reference/timeline.html">
+          <span class="level__num">📅</span>
+          <span><span class="level__title">TIMELINE</span>
+          <span class="level__tag">The papers and systems that changed how inference is done, 2017 to now, each tied back to the bandwidth thesis.</span></span>
+          <span class="level__meta">reference</span></a></li>
+        <li><a class="level" href="reference/engines.html">
+          <span class="level__num">⚙</span>
+          <span><span class="level__title">SERVING ENGINES</span>
+          <span class="level__tag">vLLM, SGLang, TensorRT-LLM, llama.cpp — what each one optimizes for and what it gives up.</span></span>
+          <span class="level__meta">reference</span></a></li>
+        <li><a class="level" href="reference/frontier.html">
+          <span class="level__num">?</span>
+          <span><span class="level__title">OPEN PROBLEMS</span>
+          <span class="level__tag">What is genuinely unsolved. Read this last, or read it first to know where you are heading.</span></span>
+          <span class="level__meta">reference</span></a></li>
+        <li><a class="level" href="reference/glossary.html">
+          <span class="level__num">A–Z</span>
+          <span><span class="level__title">GLOSSARY</span>
+          <span class="level__tag">Every term defined across all eleven levels, in one place.</span></span>
+          <span class="level__meta">reference</span></a></li>
+      </ol>
+    </section>
+
+  </main>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <p class="foot__h">LEVELS</p>
+        <ul><li><a href="modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="modules/batching.html">05 · BATCHING</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">&nbsp;</p>
+        <ul><li><a href="modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">REFERENCE</p>
+        <ul>
+          <li><a href="reference/timeline.html">Timeline</a></li>
+          <li><a href="reference/hardware.html">GPU spec table</a></li>
+          <li><a href="reference/engines.html">Serving engines</a></li>
+          <li><a href="reference/frontier.html">Open problems</a></li>
+          <li><a href="reference/glossary.html">Glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="foot__h">SOURCE</p>
+        <ul>
+          <li><a href="https://github.com/tushar-amrit-6/inference">GitHub repository</a></li>
+          <li><a href="reference/how-to-use.html">How to work through this</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
+    do the arithmetic yourself.</p>
+  </div>
+</footer>
+<script src="assets/js/app.js" defer></script>
+</body>
+</html>

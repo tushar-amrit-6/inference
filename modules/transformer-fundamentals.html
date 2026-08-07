@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>00 · TRANSFORMER FUNDAMENTALS — LLM INFERENCE</title>
+<meta name="description" content="You cannot reason about inference without a mechanical picture of the forward pass.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="00 · TRANSFORMER FUNDAMENTALS — LLM INFERENCE">
+<meta property="og:description" content="You cannot reason about inference without a mechanical picture of the forward pass.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/arcade.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20fill%3D%22%23000%22%2F%3E%3Cpath%20d%3D%22M16%2C16%20L29%2C9%20A15%2C15%200%201%200%2029%2C23%20Z%22%20fill%3D%22%23FFE800%22%2F%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="scorebar">
+  <a class="scorebar__home" href="../index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="var(--pac)" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
+  <span class="scorebar__item"><span class="scorebar__label">LEVEL</span><span class="scorebar__value scorebar__value--pac">00</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/11</span></span>
+  <span class="scorebar__spacer"></span>
+  <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
+</header>
+<div class="wrap">
+  <div class="shell">
+    <nav class="rail" aria-label="Module contents">
+  <p class="rail__head">ON THIS LEVEL</p>
+  <ul class="rail__list">
+    <li><a class="rail__link" href="#big-idea" data-kind="dot"><span class="rail__dot"></span><span>The big idea</span></a></li><li><a class="rail__link" href="#concept-0" data-kind="dot"><span class="rail__dot"></span><span>Tokens, embeddings, and the residual stream</span></a></li><li><a class="rail__link" href="#concept-1" data-kind="dot"><span class="rail__dot"></span><span>Attention: Q, K, V and what a score actually means</span></a></li><li><a class="rail__link" href="#concept-2" data-kind="dot"><span class="rail__dot"></span><span>Causal masking, and why it makes cached generation legal</span></a></li><li><a class="rail__link" href="#concept-3" data-kind="dot"><span class="rail__dot"></span><span>Multi-head attention, and every shape in the block</span></a></li><li><a class="rail__link" href="#concept-4" data-kind="dot"><span class="rail__dot"></span><span>The MLP block: two thirds of the weights</span></a></li><li><a class="rail__link" href="#concept-5" data-kind="dot"><span class="rail__dot"></span><span>Normalization and the pre-norm residual stream</span></a></li><li><a class="rail__link" href="#concept-6" data-kind="dot"><span class="rail__dot"></span><span>RoPE: position without a position vector</span></a></li><li><a class="rail__link" href="#concept-7" data-kind="dot"><span class="rail__dot"></span><span>The LM head, and the training/inference split</span></a></li><li><a class="rail__link" href="#math-lab" data-kind="dot"><span class="rail__dot"></span><span>Math by hand</span></a></li><li><a class="rail__link" href="#code-lab" data-kind="dot"><span class="rail__dot"></span><span>Code lab</span></a></li><li><a class="rail__link" href="#papers" data-kind="dot"><span class="rail__dot"></span><span>Papers</span></a></li><li><a class="rail__link" href="#pitfalls" data-kind="dot"><span class="rail__dot"></span><span>Pitfalls</span></a></li><li><a class="rail__link" href="#checkpoint" data-kind="power"><span class="rail__dot"></span><span>Checkpoint</span></a></li><li><a class="rail__link" href="#glossary" data-kind="dot"><span class="rail__dot"></span><span>Glossary</span></a></li>
+  </ul>
+  <div class="rail__nav">
+    
+    <a class="rail__step" href="../index.html">▲ ALL LEVELS</a>
+    <a class="rail__step" href="autoregressive-loop.html">01 THE AUTOREGRESSIVE LOOP ▶</a>
+  </div>
+</nav>
+    <main id="main">
+
+      <div class="mod-head">
+        <p class="mod-head__level">LEVEL 00</p>
+        <h1 class="mod-head__title">TRANSFORMER FUNDAMENTALS</h1>
+        <p class="mod-head__tag">You cannot reason about inference without a mechanical picture of the forward pass.</p>
+        <div class="mod-head__meta">
+          <span>⏱ 8–12 hours</span>
+          <span>● 8 concepts</span>
+          <span>📄 5 papers</span>
+          <span>▸ needs: Python and NumPy, Matrix multiplication, What a softmax is</span>
+        </div>
+      </div>
+
+      <section class="section ghost ghost--pinky" id="big-idea">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--pinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>PINKY · THE BIG IDEA</p>
+        <div class="prose"><p>Everything in this course is downstream of one question: <strong>what has to happen in memory for a model to produce one token?</strong> You cannot answer that until you can trace a tensor through a transformer layer and say its shape at every arrow.</p>
+<p>So Module 0 is not a transformers tutorial with an inference flavour. It is a shape-counting exercise. By the end you should be able to look at a config file — <code>n_layers</code>, <code>d_model</code>, <code>n_heads</code>, <code>n_kv_heads</code>, <code>vocab_size</code> — and derive, on paper, how many parameters the model has, how many bytes that is on disk, and which of those bytes must be re-read for every single token generated.</p>
+<p>The last part is the punchline. A transformer's weights are used <em>once</em> per forward pass. There is no reuse. When you generate one token you stream all 16 GB of a Llama-3-8B off the memory bus to do about 16 GFLOPs of arithmetic with them. Hold that ratio in your head — 16 GB moved, 16 GFLOP done — because the rest of the course is a sustained assault on it.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="concepts">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>PELLETS · CONCEPTS</p>
+        <article class="concept" id="concept-0">
+  <div class="concept__head">
+    <span class="concept__n">01</span>
+    <h3 class="concept__title">Tokens, embeddings, and the residual stream</h3>
+  </div>
+  <div class="prose"><p>Text becomes integers before it becomes anything else. A tokenizer (BPE for most modern models) maps a string to a list of integers in <code>[0, vocab_size)</code>. Llama 3 uses a 128,256-entry vocabulary; GPT-2 used 50,257. Nothing about this step is learned during pretraining — the merges were fit once on a corpus and frozen.</p>
+<p>Those integers index into an embedding table of shape <code>[vocab_size, d_model]</code>. For Llama-3-8B that is <code>[128256, 4096]</code> = 525 million parameters, just to turn integers into vectors. The lookup produces a tensor of shape <code>[batch, seq, d_model]</code>.</p>
+<p>That tensor is the <strong>residual stream</strong>, and it is the single most useful mental object in the architecture. Its width never changes. Every block in the network reads the stream, computes something, and <em>adds</em> the result back:</p>
+<pre><code>x = x + attention(norm(x))
+x = x + mlp(norm(x))</code></pre>
+<p>Note the <code>+</code>. Layers do not transform the stream, they <em>contribute</em> to it. This is why you can delete a layer from a trained transformer and often get degraded-but-coherent output: you removed one contribution from a sum of 32, not a link in a chain.</p>
+<p>For inference, the shape <code>[batch, seq, d_model]</code> is where your intuition should live. During <strong>prefill</strong> <code>seq</code> is the whole prompt — maybe 2,000. During <strong>decode</strong> <code>seq</code> is 1. Same weights, same code path, wildly different arithmetic. That gap is the entire subject of Module 4.</p>
+<p>A &quot;hidden state&quot; is just one slice of this stream: a single <code>d_model</code>-length vector at one position, at one layer. When people say a model &quot;represents&quot; something, they mean a direction in this 4096-dimensional space.</p></div>
+  <pre class="ascii" aria-label="diagram">  token ids  [B, S]
+      |
+      v  embedding lookup  [128256, 4096]
+  ┌─────────────────────────────────────────┐
+  │  RESIDUAL STREAM      [B, S, 4096]      │  &lt;-- width never changes
+  └─────────────────────────────────────────┘
+      |         ^                |         ^
+      v         |                v         |
+   norm-&gt;attn --+             norm-&gt;mlp ---+     (x32 layers)
+      |
+      v  final norm + lm_head  [4096, 128256]
+   logits  [B, S, 128256]</pre>
+  <p class="keypoint"><b>REMEMBER</b>The residual stream is a fixed-width bus of shape [batch, seq, d_model] that every layer reads from and writes back into.</p>
+</article>
+<article class="concept" id="concept-1">
+  <div class="concept__head">
+    <span class="concept__n">02</span>
+    <h3 class="concept__title">Attention: Q, K, V and what a score actually means</h3>
+  </div>
+  <div class="prose"><p>Every position produces three vectors from its residual-stream slice, via three learned projections:</p>
+<pre><code>Q = x @ W_q     &quot;what am I looking for?&quot;
+K = x @ W_k     &quot;what do I offer?&quot;
+V = x @ W_v     &quot;what do I pass on if selected?&quot;</code></pre>
+<p>The computation is four steps, and the shapes matter more than the formula:</p>
+<pre><code>scores  = Q @ K.T                    [S, S]     every query vs every key
+scores  = scores / sqrt(head_dim)    [S, S]     keep logits out of softmax saturation
+scores  = scores + causal_mask       [S, S]     -inf above the diagonal
+weights = softmax(scores, dim=-1)    [S, S]     each ROW sums to 1
+out     = weights @ V                [S, d_h]   weighted average of value vectors</code></pre>
+<p>Read row <code>i</code> of <code>weights</code>: it is a probability distribution over positions <code>0..i</code> saying how much position <code>i</code> cares about each earlier position. The output at <code>i</code> is that distribution applied to the value vectors. Attention is <em>retrieval by soft lookup</em> — dot-product similarity picks what to read, and V is what gets read.</p>
+<p>The <code>1/sqrt(head_dim)</code> is not cosmetic. If Q and K entries are roughly unit-variance and independent, their dot product over <code>head_dim=128</code> terms has variance ~128, standard deviation ~11.3. Feed logits of that magnitude into a softmax and you get a near-one-hot distribution with vanishing gradients. Dividing by <code>sqrt(128) = 11.31</code> puts the variance back at 1.</p>
+<p>The inference-critical observation is asymmetry. <strong>Q comes only from the current token. K and V come from every token so far.</strong> When you generate token 501, you need a fresh Q for position 501, but you need the same K and V for positions 0–500 that you computed on the previous step. They have not changed and they never will — this is precisely the fact that Module 2 exploits.</p></div>
+  <pre class="ascii" aria-label="diagram">  Q [S, 128] · K^T [128, S]  -&gt;  scores [S, S]
+
+        k0   k1   k2   k3
+   q0 [ ·  |-inf|-inf|-inf]     row 0 sees only position 0
+   q1 [ ·  | ·  |-inf|-inf]
+   q2 [ ·  | ·  | ·  |-inf]     softmax over each row
+   q3 [ ·  | ·  | ·  | ·  ]     row 3 sees everything
+
+   then  weights [S,S] @ V [S,128] -&gt; out [S,128]</pre>
+  <p class="keypoint"><b>REMEMBER</b>Attention is a weighted average of value vectors, where the weights come from the dot product of one query against every key.</p>
+</article>
+<article class="concept" id="concept-2">
+  <div class="concept__head">
+    <span class="concept__n">03</span>
+    <h3 class="concept__title">Causal masking, and why it makes cached generation legal</h3>
+  </div>
+  <div class="prose"><p>The causal mask sets <code>scores[i][j] = -inf</code> for all <code>j &gt; i</code>, so <code>softmax</code> gives those entries exactly zero weight. Implementations add a matrix of <code>0</code> and <code>-inf</code> (or <code>-1e9</code>) rather than slicing, because a dense add is faster on a GPU than irregular indexing.</p>
+<p>The training reason for this is the obvious one: it lets you compute the loss for all <code>S</code> positions in a single forward pass without any position cheating by looking at its own answer. That is <strong>teacher forcing</strong>, and it is why training is so much more hardware-efficient than generation.</p>
+<p>The inference reason is the one people skip, and it is the load-bearing fact of this entire course. Causality means the representation of token <code>i</code> <strong>cannot be influenced by anything that comes after it</strong>. So when you append token 501 to the sequence:</p>
+<ul><li>the K and V vectors for positions 0–500 are bit-for-bit identical to what they were before;</li><li>the <em>only</em> new work is computing K, V, and Q for position 501;</li><li>everything else can be read from storage.</li></ul>
+<p>Without causality this would be false. In a bidirectional encoder like BERT, adding a token at the end changes the representation of every earlier token, so there is nothing to cache. That is the real reason decoder-only models won for generation: not that they are more expressive, but that the causal constraint turns an O(n²) recomputation into an O(n) append.</p>
+<p>Worth being precise about what is <em>not</em> cached. Q is not cached, because the query for a position is used once, at the step where that position is the newest token, and then never again. Attention outputs are not cached either. Only K and V — hence &quot;KV cache&quot; and not &quot;QKV cache.&quot;</p></div>
+  <pre class="ascii" aria-label="diagram">  step 500                          step 501
+  ┌────────────────────────┐        ┌────────────────────────┬───┐
+  │ K,V for tokens 0..500  │   -&gt;   │ K,V for tokens 0..500  │new│
+  └────────────────────────┘        └────────────────────────┴───┘
+       already computed                  UNCHANGED           only
+                                                             this
+                                                             is new</pre>
+  <p class="keypoint"><b>REMEMBER</b>Because position i can never attend to position j &gt; i, the K and V of past tokens are frozen forever — which is what makes a cache correct rather than merely convenient.</p>
+</article>
+<article class="concept" id="concept-3">
+  <div class="concept__head">
+    <span class="concept__n">04</span>
+    <h3 class="concept__title">Multi-head attention, and every shape in the block</h3>
+  </div>
+  <div class="prose"><p>One attention pattern per layer is too few — a token usually needs to track several relationships at once. So the <code>d_model</code> vector is split into <code>n_heads</code> independent <code>head_dim</code>-sized subspaces, attention runs in each, and the results are concatenated.</p>
+<p>The efficiency point that trips people up: heads are <em>not</em> implemented as a loop. The projection <code>W_q</code> is a single <code>[4096, 4096]</code> matrix. You do one matmul, then <code>reshape</code> and <code>transpose</code> the result into <code>[B, n_heads, S, head_dim]</code>. The heads only exist as a view.</p>
+<p>Here is the full trace for <strong>Llama-3-8B</strong> (<code>d_model=4096</code>, <code>n_heads=32</code>, <code>n_kv_heads=8</code>, <code>head_dim=128</code>, <code>ffn=14336</code>), with batch <code>B</code> and sequence <code>S</code>:</p>
+<table><thead><tr><th>step</th><th>operation</th><th>output shape</th></tr></thead><tbody><tr><td>input</td><td>residual stream</td><td><code>[B, S, 4096]</code></td></tr><tr><td>q_proj</td><td><code>@ [4096, 4096]</code></td><td><code>[B, S, 4096]</code></td></tr><tr><td>k_proj</td><td><code>@ [4096, 1024]</code></td><td><code>[B, S, 1024]</code></td></tr><tr><td>v_proj</td><td><code>@ [4096, 1024]</code></td><td><code>[B, S, 1024]</code></td></tr><tr><td>reshape Q</td><td></td><td><code>[B, 32, S, 128]</code></td></tr><tr><td>reshape K,V</td><td></td><td><code>[B, 8, S, 128]</code></td></tr><tr><td>repeat K,V</td><td>each kv head serves 4 q heads</td><td><code>[B, 32, S, 128]</code></td></tr><tr><td>scores</td><td><code>Q @ K.T</code></td><td><code>[B, 32, S, S]</code></td></tr><tr><td>weights</td><td>softmax</td><td><code>[B, 32, S, S]</code></td></tr><tr><td>context</td><td><code>@ V</code></td><td><code>[B, 32, S, 128]</code></td></tr><tr><td>merge</td><td>transpose + reshape</td><td><code>[B, S, 4096]</code></td></tr><tr><td>o_proj</td><td><code>@ [4096, 4096]</code></td><td><code>[B, S, 4096]</code></td></tr></tbody></table>
+<p>Notice <code>k_proj</code> and <code>v_proj</code> output <strong>1024</strong>, not 4096. That is grouped-query attention: 8 KV heads instead of 32, each shared by 4 query heads. It shrinks the KV cache by 4× on this model and is the single most consequential architectural decision for inference cost. Module 6 covers what it trades away.</p>
+<p>Notice also <code>[B, 32, S, S]</code>. At <code>S = 8192</code> and <code>B = 1</code> in fp16 that one intermediate is <code>32 × 8192 × 8192 × 2 = 4.3 GB</code> — for a single layer, for a single sequence. Never materialising that matrix is what FlashAttention is for (Module 7).</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Heads are a reshape, not a loop: one [4096, 4096] matmul produces all 32 heads at once.</p>
+</article>
+<article class="concept" id="concept-4">
+  <div class="concept__head">
+    <span class="concept__n">05</span>
+    <h3 class="concept__title">The MLP block: two thirds of the weights</h3>
+  </div>
+  <div class="prose"><p>After attention, each position independently passes through a feed-forward network. &quot;Independently&quot; is exact — there is no mixing across positions here, which makes it trivially parallel and, at decode time, a plain matrix-vector product.</p>
+<p>The classic transformer used <code>W_2 @ relu(W_1 @ x)</code> with an expansion factor of 4. Llama-family models use <strong>SwiGLU</strong>, which has three matrices instead of two:</p>
+<pre><code>gate = x @ W_gate        [B, S, 14336]
+up   = x @ W_up          [B, S, 14336]
+h    = silu(gate) * up   [B, S, 14336]     elementwise
+out  = h @ W_down        [B, S, 4096]</code></pre>
+<p>where <code>silu(z) = z * sigmoid(z)</code>. The <code>gate</code> branch acts as a learned, input-dependent filter on the <code>up</code> branch. Because there are three matrices, the hidden width is chosen smaller than 4× to keep the parameter count comparable — 14336 here, which is 3.5× <code>d_model</code>.</p>
+<p>Now count parameters per layer for Llama-3-8B:</p>
+<pre><code>attention:  W_q  4096 x 4096  = 16,777,216
+            W_k  4096 x 1024  =  4,194,304
+            W_v  4096 x 1024  =  4,194,304
+            W_o  4096 x 4096  = 16,777,216
+                               ------------
+                                41,943,040
+
+mlp:        W_gate 4096 x 14336 = 58,720,256
+            W_up   4096 x 14336 = 58,720,256
+            W_down 14336 x 4096 = 58,720,256
+                                 ------------
+                                 176,160,768</code></pre>
+<p>The MLP is <strong>4.2× the attention block</strong>. Across 32 layers: 1.34 B attention parameters, 5.64 B MLP parameters. Add the 525 M embedding and 525 M unembedding and you get 8.03 B — the &quot;8B&quot; on the label.</p>
+<p>For inference this ranking matters. People assume attention dominates because it is the interesting part and because of the O(S²) term. At decode time with a modest context, it does not: you move 176 MB of MLP weights per layer versus 42 MB of attention weights, and the attention arithmetic touches a KV cache that is usually far smaller than either.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>The MLP holds roughly twice the parameters of the attention block, so at decode time it dominates the bytes you move.</p>
+</article>
+<article class="concept" id="concept-5">
+  <div class="concept__head">
+    <span class="concept__n">06</span>
+    <h3 class="concept__title">Normalization and the pre-norm residual stream</h3>
+  </div>
+  <div class="prose"><p>The original transformer put LayerNorm <em>after</em> each block: <code>x = norm(x + attn(x))</code>. This is <strong>post-norm</strong>, and it is hard to train deep — the residual path is interrupted by a normalization at every layer, so gradients get rescaled 2L times on the way back.</p>
+<p>Every modern LLM uses <strong>pre-norm</strong>: <code>x = x + attn(norm(x))</code>. The normalization is applied to the <em>input</em> of the block; the residual stream itself is never touched. There is now an unbroken identity path from the final layer to the embedding, which is why 80-layer models train at all. A single final norm is applied before the LM head.</p>
+<p>Most current models also replace LayerNorm with <strong>RMSNorm</strong>:</p>
+<pre><code>LayerNorm:  y = g * (x - mean(x)) / sqrt(var(x) + eps) + b
+RMSNorm:    y = g * x / sqrt(mean(x^2) + eps)</code></pre>
+<p>RMSNorm drops the mean subtraction and the bias. It works about as well and is measurably cheaper — one pass over the vector instead of two, and one fewer parameter tensor.</p>
+<p>Why an inference course cares: normalization layers are <strong>memory-bound with essentially zero arithmetic intensity</strong>. An RMSNorm over a <code>[1, 4096]</code> decode vector reads 4096 values, does a handful of FLOPs each, and writes 4096 values back. If you launch it as its own kernel you pay a full round trip to HBM for nothing. This is the canonical case for <strong>kernel fusion</strong> — folding the norm into the matmul that follows it so the data never leaves on-chip memory. Modules 4 and 7 return to this. A transformer at decode time is a long chain of these tiny bandwidth-bound operations glued between big matmuls, and the glue is not free.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Modern models normalize the input to each block, never the residual stream itself, which keeps a clean gradient path from output to input.</p>
+</article>
+<article class="concept" id="concept-6">
+  <div class="concept__head">
+    <span class="concept__n">07</span>
+    <h3 class="concept__title">RoPE: position without a position vector</h3>
+  </div>
+  <div class="prose"><p>Attention as defined is permutation-invariant — shuffle the tokens and the scores follow them unchanged. Position has to be injected explicitly.</p>
+<p>The original approach added a learned or sinusoidal position vector to the embedding. Almost every current model instead uses <strong>RoPE</strong> (Rotary Position Embedding), which does something cleverer: it <em>rotates</em> Q and K, in-place, by an angle that depends on position.</p>
+<p>Split each <code>head_dim=128</code> vector into 64 pairs of coordinates. Treat each pair as a point in 2D and rotate it by <code>m * theta_i</code>, where <code>m</code> is the absolute position and <code>theta_i = base^(-2i/head_dim)</code> with <code>base</code> typically 10000 (Llama 3 uses 500000 to extend context). Low-index pairs rotate fast, high-index pairs rotate slowly — a positional code across many frequencies.</p>
+<p>The property that makes it work falls out of rotation algebra: for a rotation <code>R</code>,</p>
+<pre><code>(R_m q) · (R_n k) = q · R_(n-m) k</code></pre>
+<p>The score between positions <code>m</code> and <code>n</code> depends only on <code>n - m</code>. You get <strong>relative</strong> position from an operation applied using <strong>absolute</strong> position. No extra parameters, nothing added to the residual stream.</p>
+<p>Three inference consequences:</p>
+<ol><li><strong>RoPE is applied to Q and K before they are cached.</strong> The cache stores rotated keys. Get the position index wrong on a cache hit and you silently corrupt the attention pattern — a classic prefix-caching bug (Module 6).</li><li><strong>V is not rotated.</strong> Only Q and K participate in the dot product that needs position.</li><li><strong>Context extension is a RoPE trick.</strong> Methods like position interpolation and YaRN rescale the frequencies so a model trained at 8k can attend over 128k. This is why long-context support often arrives without full retraining — and why long-context <em>quality</em> frequently lags long-context <em>capability</em>.</li></ol></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>RoPE rotates Q and K by an angle proportional to absolute position, so their dot product depends only on relative distance.</p>
+</article>
+<article class="concept" id="concept-7">
+  <div class="concept__head">
+    <span class="concept__n">08</span>
+    <h3 class="concept__title">The LM head, and the training/inference split</h3>
+  </div>
+  <div class="prose"><p>The final residual stream is normalized and projected to vocabulary size by the LM head, a <code>[4096, 128256]</code> matrix. Output shape: <code>[B, S, 128256]</code>. Those are <strong>logits</strong> — unnormalized scores, one per vocabulary entry.</p>
+<p>That tensor is enormous relative to everything else. At <code>B=1, S=4096</code> in fp32 it is <code>4096 × 128256 × 4 = 2.1 GB</code>. Serving implementations therefore compute the LM head only for positions they actually need — during decode, that is the single last position, turning a <code>[4096, 128256]</code> matmul into a matrix-vector product.</p>
+<p><strong>Training</strong> runs one forward pass over the whole sequence, computes cross-entropy at every position against the next token, and updates. Every position is supervised in parallel. The GPU is doing <code>S</code> positions' worth of arithmetic per weight load, and arithmetic intensity is high.</p>
+<p><strong>Inference</strong> cannot do that, because position <code>i+1</code>'s input is position <code>i</code>'s output. You run the forward pass, take the logits at the last position, sample a token, append it, and run again. The loop is serial by construction.</p>
+<p>Here is the asymmetry stated as a ratio. Generating 500 tokens from a 500-token prompt requires:</p>
+<ul><li><strong>Training-style work:</strong> one pass, 1000 positions, weights read <strong>once</strong>.</li><li><strong>Generation:</strong> one prefill pass over 500 positions, then 500 decode passes each producing one token. Weights read <strong>501 times</strong>.</li></ul>
+<p>Same model, same total tokens, 500× the memory traffic. The prefill pass is doing hundreds of positions per weight load and the GPU is busy. Each decode pass does <em>one</em> position per weight load and the GPU is idle waiting on HBM.</p>
+<p>That is the whole problem. Everything from here is an attempt to get more useful work out of each weight load.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Training computes loss at all S positions in one pass; generation throws away all but the last, then does it all again.</p>
+</article>
+      </section>
+
+      <section class="section ghost ghost--inky" id="math-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--inky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>INKY · MATH BY HAND</p>
+        <h2 class="section__title">Math by hand</h2>
+        <div class="prose"><p>Derive the parameter count of <strong>Llama-3-8B</strong> from its config, without looking up the answer, and check that it lands on 8.03 B.</p>
+<p>Config:</p>
+<pre><code>n_layers        = 32
+d_model         = 4096
+n_heads         = 32
+n_kv_heads      = 8          (grouped-query attention)
+head_dim        = 128
+ffn_hidden      = 14336      (SwiGLU: gate, up, down)
+vocab_size      = 128256
+tied_embeddings = false      (separate input embedding and LM head)</code></pre>
+<p>Compute each of these, showing the multiplication:</p>
+<ol><li>Embedding table parameters.</li><li>Per-layer attention parameters (<code>W_q, W_k, W_v, W_o</code>). Watch the GQA shapes.</li><li>Per-layer MLP parameters (all three SwiGLU matrices).</li><li>Total for all 32 layers.</li><li>LM head parameters.</li><li>Grand total. Then: size in GB at fp16, and at fp8.</li><li>Finally — the question that matters — <strong>how many bytes must be read from memory to generate one token</strong>, ignoring the KV cache?</li></ol></div>
+        <details class="spoiler">
+          <summary>SHOW THE WORKED SOLUTION</summary>
+          <div class="spoiler__body prose"><p><strong>1. Embedding</strong></p>
+<pre><code>128256 x 4096 = 525,336,576</code></pre>
+<p><strong>2. Attention, per layer.</strong> With GQA the K and V projections output <code>n_kv_heads x head_dim = 8 x 128 = 1024</code>, not 4096:</p>
+<pre><code>W_q:  4096 x (32 x 128) = 4096 x 4096 = 16,777,216
+W_k:  4096 x (8  x 128) = 4096 x 1024 =  4,194,304
+W_v:  4096 x (8  x 128) = 4096 x 1024 =  4,194,304
+W_o:  (32 x 128) x 4096 = 4096 x 4096 = 16,777,216
+                                        -----------
+                                         41,943,040</code></pre>
+<p><strong>3. MLP, per layer.</strong> Three matrices, all <code>4096 x 14336</code> in size:</p>
+<pre><code>W_gate: 4096 x 14336 = 58,720,256
+W_up:   4096 x 14336 = 58,720,256
+W_down: 14336 x 4096 = 58,720,256
+                       -----------
+                       176,160,768</code></pre>
+<p><strong>4. All 32 layers</strong></p>
+<pre><code>per layer = 41,943,040 + 176,160,768 = 218,103,808
+x 32      = 6,979,321,856</code></pre>
+<p>(RMSNorm gains are <code>2 x 4096</code> per layer = 262,144 total. Negligible, but they exist.)</p>
+<p><strong>5. LM head</strong></p>
+<pre><code>4096 x 128256 = 525,336,576</code></pre>
+<p><strong>6. Grand total</strong></p>
+<pre><code>  525,336,576   embedding
+6,979,321,856   layers
+  525,336,576   lm head
+      262,144   norms
+-------------
+8,030,257,152   = 8.03 B  ✓</code></pre>
+<p>At fp16 (2 bytes): <code>8.03e9 x 2 = 16.06 GB</code>. At fp8  (1 byte):  <code>8.03 GB</code>.</p>
+<p><strong>7. Bytes per generated token</strong></p>
+<p>Every weight participates in every forward pass, and each is read once. So generating one token requires reading <strong>~16.06 GB</strong> at fp16.</p>
+<p>Two refinements worth noting. The embedding table is a <em>lookup</em>, not a matmul — you touch one row of 4096 values, not all 525 M parameters. So the honest figure is:</p>
+<pre><code>16.06 GB - 1.05 GB (embedding) + 8 KB (one row) ~= 15.01 GB</code></pre>
+<p>Sanity-check it against hardware. An H100 SXM moves 3.35 TB/s:</p>
+<pre><code>15.01 GB / 3350 GB/s = 4.48 ms  -&gt;  ~223 tokens/second, absolute ceiling</code></pre>
+<p>That is the fastest this model can possibly decode at batch size 1 on that GPU, even with a perfect implementation and infinite compute. It is set entirely by bandwidth. Module 4 makes this reasoning systematic.</p></div>
+        </details>
+      </section>
+
+      <section class="section ghost ghost--clyde" id="code-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--clyde)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>CLYDE · CODE LAB</p>
+        <h2 class="section__title">Code lab</h2>
+        <div class="prose"><p>Implement single-head causal attention in pure NumPy and print the shape at every step. No PyTorch, no <code>nn.MultiheadAttention</code>. The point is that after doing this you will never again be unsure what <code>[B, H, S, D]</code> means.</p>
+<p>Then verify the two facts that the rest of the course rests on: that the mask makes the output at position <code>i</code> independent of everything after <code>i</code>, and that appending a token leaves the earlier K and V untouched.</p></div>
+        <div class="prose" style="max-width:none"><pre><code class="lang-python">import numpy as np
+
+np.random.seed(0)
+
+B, S, D_MODEL, D_HEAD = 1, 6, 16, 8
+
+
+def softmax(x, axis=-1):
+    # subtract the max for numerical stability -- exp(1000) overflows
+    x = x - x.max(axis=axis, keepdims=True)
+    e = np.exp(x)
+    return e / e.sum(axis=axis, keepdims=True)
+
+
+def attention(x, Wq, Wk, Wv, show=False):
+    &quot;&quot;&quot;Single-head causal attention. x: [B, S, D_MODEL] -&gt; [B, S, D_HEAD]&quot;&quot;&quot;
+    Q = x @ Wq                                   # [B, S, D_HEAD]
+    K = x @ Wk                                   # [B, S, D_HEAD]
+    V = x @ Wv                                   # [B, S, D_HEAD]
+
+    scores = Q @ K.transpose(0, 2, 1)            # [B, S, S]
+    scores = scores / np.sqrt(D_HEAD)            # keep softmax out of saturation
+
+    s = x.shape[1]
+    mask = np.triu(np.ones((s, s), dtype=bool), k=1)   # True strictly above diagonal
+    scores = np.where(mask, -np.inf, scores)
+
+    weights = softmax(scores)                    # [B, S, S], each row sums to 1
+    out = weights @ V                            # [B, S, D_HEAD]
+
+    if show:
+        for name, t in [(&quot;x&quot;, x), (&quot;Q&quot;, Q), (&quot;K&quot;, K), (&quot;V&quot;, V),
+                        (&quot;scores&quot;, scores), (&quot;weights&quot;, weights), (&quot;out&quot;, out)]:
+            print(f&quot;  {name:8s} {str(t.shape):16s}&quot;)
+        print(&quot;\n  row sums of weights (must all be 1.0):&quot;,
+              np.round(weights[0].sum(-1), 6))
+        print(&quot;\n  attention weights, rounded -- note the zeros above the diagonal:&quot;)
+        print(np.round(weights[0], 3))
+    return out, K, V
+
+
+x = np.random.randn(B, S, D_MODEL)
+Wq = np.random.randn(D_MODEL, D_HEAD) / np.sqrt(D_MODEL)
+Wk = np.random.randn(D_MODEL, D_HEAD) / np.sqrt(D_MODEL)
+Wv = np.random.randn(D_MODEL, D_HEAD) / np.sqrt(D_MODEL)
+
+print(&quot;=== forward pass ===&quot;)
+out, K, V = attention(x, Wq, Wk, Wv, show=True)
+
+# ---- claim 1: causality. Changing the LAST token must not move earlier outputs.
+print(&quot;\n=== claim 1: causal mask actually works ===&quot;)
+x2 = x.copy()
+x2[0, -1] = np.random.randn(D_MODEL)          # scribble over the final token
+out2, _, _ = attention(x2, Wq, Wk, Wv)
+print(&quot;  max change at positions 0..S-2:&quot;, np.abs(out[0, :-1] - out2[0, :-1]).max())
+print(&quot;  max change at the last position:&quot;, np.abs(out[0, -1] - out2[0, -1]).max())
+
+# ---- claim 2: appending a token leaves earlier K/V bit-identical.
+#      This is the entire justification for the KV cache.
+print(&quot;\n=== claim 2: past K/V are frozen ===&quot;)
+x3 = np.concatenate([x, np.random.randn(1, 1, D_MODEL)], axis=1)   # S -&gt; S+1
+_, K3, V3 = attention(x3, Wq, Wk, Wv)
+print(&quot;  K identical for old positions:&quot;, np.array_equal(K, K3[:, :S]))
+print(&quot;  V identical for old positions:&quot;, np.array_equal(V, V3[:, :S]))
+print(&quot;  -&gt; so recomputing them every step is pure waste. See Module 2.&quot;)
+
+# ---- TODO for you:
+#   1. Extend to multi-head: project to [B, S, N_HEADS * D_HEAD], reshape to
+#      [B, N_HEADS, S, D_HEAD], attend, then merge back. Print shapes throughout.
+#   2. Make it grouped-query: use 2 KV heads for 4 query heads. You will need
+#      np.repeat on axis 1. Confirm the K/V tensors shrink by 2x.
+</code></pre></div>
+        <div class="prose"><h3>What you should see</h3><p><code>weights</code> is strictly lower-triangular after softmax — every entry above the diagonal is exactly <code>0.0</code>, and every row sums to <code>1.0</code>.</p>
+<p>Claim 1 prints a max change at positions 0..S−2 of <code>0.0</code> (exactly zero, not merely small) and a nonzero change at the last position. If the earlier positions moved at all, your mask is wrong.</p>
+<p>Claim 2 prints <code>True</code> twice. That is the licence to cache.</p>
+<p>Common failure: using <code>-1e9</code> instead of <code>-np.inf</code> gives <code>~1e-40</code> above the diagonal rather than exact zero. Fine numerically, but claim 1 will print something like <code>3e-38</code> instead of <code>0.0</code>. Worth seeing both.</p></div>
+        <div class="prose"><h3>Stretch</h3><p>Time <code>attention()</code> at <code>S = 128, 256, 512, 1024, 2048</code> with everything else fixed and plot time against <code>S</code>. Fit a curve. You should get a clean quadratic, because <code>scores</code> is <code>[S, S]</code>. Then compute how much memory that <code>[B, 32, S, S]</code> intermediate would need for a real model at <code>S = 8192</code> in fp16 — the answer is 4.3 GB per layer, and it is why Module 7 exists.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pac" id="papers">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>THE KEY · PAPERS</p>
+        <h2 class="section__title">Papers, with a reading frame</h2>
+        <div class="papers">
+          <article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noopener">Attention Is All You Need</a></h3>
+            <p class="paper__by">Vaswani et al., 2017</p>
+            <p class="paper__why">The original. Read it for the architecture, not for the state of the art — almost every detail (post-norm, learned positional encodings, ReLU FFN, the encoder-decoder structure) has since been replaced in decoder-only LLMs.</p>
+            <div class="paper__frame"><p>Read <strong>Section 3.2</strong> (scaled dot-product and multi-head attention) closely and make sure you can reproduce Figure 2 from memory. Read <strong>Section 3.5</strong> on positional encoding to understand what RoPE later replaced. Skim Sections 4–6 entirely — the machine-translation results are of historical interest only. The single sentence to internalize is the note in 3.2.1 on why they divide by <code>sqrt(d_k)</code>.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://jalammar.github.io/illustrated-transformer/" target="_blank" rel="noopener">The Illustrated Transformer</a></h3>
+            <p class="paper__by">Jay Alammar, 2018</p>
+            <p class="paper__why">The best visual explanation of the forward pass. If the shapes in this module have not clicked yet, this is the fastest fix.</p>
+            <div class="paper__frame"><p>Work through it with a pen and write the tensor shape next to every diagram. The post uses the original encoder-decoder architecture, so mentally delete the encoder and the cross-attention — a modern LLM is only the decoder stack, minus its cross-attention block.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://www.youtube.com/watch?v=kCc8FmEb1nY" target="_blank" rel="noopener">Let's build GPT: from scratch, in code, spelled out</a></h3>
+            <p class="paper__by">Andrej Karpathy, 2023</p>
+            <p class="paper__why">Two hours, and you leave with a working transformer you typed yourself. There is no substitute for this.</p>
+            <div class="paper__frame"><p>Type it, do not watch it. Pause at every tensor operation and predict the output shape before he says it. The companion repo is <strong>nanoGPT</strong>, which is the cleanest readable GPT implementation in existence and worth keeping open for the rest of this course.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2104.09864" target="_blank" rel="noopener">RoFormer: Enhanced Transformer with Rotary Position Embedding</a></h3>
+            <p class="paper__by">Su et al., 2021</p>
+            <p class="paper__why">RoPE, which essentially every current open-weight LLM uses. It matters for inference because the cache stores rotated keys.</p>
+            <div class="paper__frame"><p><strong>Section 3.4.2</strong> has the derivation that the inner product depends only on relative position — that is the whole idea, and it is four lines of algebra. Skim the theoretical long-term-decay analysis in 3.4.3. Skip the experiments.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/1910.07467" target="_blank" rel="noopener">Root Mean Square Layer Normalization</a></h3>
+            <p class="paper__by">Zhang &amp; Sennrich, 2019</p>
+            <p class="paper__why">RMSNorm, used by Llama, Mistral, Qwen, Gemma and most others. Short, and a good example of a simplification that stuck.</p>
+            <div class="paper__frame"><p>Read Section 3 and stop. The claim is that re-centering does not matter, only re-scaling does. Ten minutes.</p></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--blinky" id="pitfalls">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--blinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>BLINKY · PITFALLS</p>
+        <h2 class="section__title">What people get wrong</h2>
+        <div class="pitfall">
+          <p class="pitfall__wrong"><span>Multi-head attention runs a loop over heads.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>Heads are a reshape of a single large matmul, not separate operations. <code>W_q</code> is one <code>[d_model, d_model]</code> matrix; you multiply once, then view the result as <code>[B, n_heads, S, head_dim]</code>. Thinking of heads as a loop leads to badly wrong performance intuitions — you start believing 32 heads costs 32 kernel launches when it costs one.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Attention is the expensive part of a transformer.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>It depends entirely on the regime. At long context during prefill, attention's O(S²) term dominates. At decode time with moderate context, the MLP dominates: about 80% of the weight bytes you move per token are MLP weights, and attention is reading a KV cache that is often much smaller. &quot;Attention is expensive&quot; is a statement about prefill and long context, not a universal truth.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>The KV cache is an optimization you could skip if you had enough compute.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>No amount of compute makes recomputation free, because the bottleneck is not compute. Without a cache, generating token <code>n</code> means re-running the full forward pass over all <code>n</code> positions — re-reading every weight <em>and</em> redoing all the attention work. It is O(n²) in total attention FLOPs and it wastes bandwidth on top. The cache is not a nice-to-have; it is what makes generation tractable at all.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>GQA is a quantization or compression technique applied after training.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>GQA is an <em>architectural</em> choice baked in at training time: the model has fewer K and V projection matrices than Q projections. You cannot switch a trained MHA model to GQA for free — you have to fuse the KV heads and fine-tune to recover quality (the &quot;uptraining&quot; procedure in the GQA paper). What GQA shrinks is the KV cache, not the weights.</p></div></div>
+        </div>
+      </section>
+
+      <section class="section" id="checkpoint">
+        <div class="wall checkpoint">
+          <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>POWER PELLET · CHECKPOINT</p>
+          <p class="checkpoint__claim">You can hand-draw the data flow for one transformer layer and state the tensor shape
+at every arrow — from token ids to logits — without notes. And you can explain why the causal
+mask is what makes a KV cache correct, rather than just a speed hack.</p>
+          <details class="qa">
+            <summary>Why are keys and values cached during generation, but not queries?</summary>
+            <div class="qa__a prose"><p>Because of what each one is used for across steps. The key and value for position <code>i</code> are consumed by <em>every</em> future position that attends back to <code>i</code> — they are read again on every subsequent decode step, forever. The query for position <code>i</code> is used exactly once, on the step where <code>i</code> is the newest token, to compute that token's output; after that it is never referenced again. Caching it would store data nothing will read. The causal mask is what guarantees K and V are stable: since no position can attend forward, adding tokens at the end cannot change the K or V of anything earlier.</p></div>
+          </details>
+<details class="qa">
+            <summary>A model has d_model=4096 and n_heads=32. What is head_dim, and what is the shape of the attention score matrix for a batch of 4 sequences of length 1024?</summary>
+            <div class="qa__a prose"><p><code>head_dim = d_model / n_heads = 4096 / 32 = 128</code>. The score matrix is <code>[batch, n_heads, seq, seq] = [4, 32, 1024, 1024]</code>. That is 134,217,728 elements, or 268 MB in fp16 — for one layer. Materialising it for all 32 layers at once would take 8.6 GB, which is why attention is computed layer by layer, and why FlashAttention avoids writing it to HBM at all. Note that <code>head_dim</code> is only forced to be <code>d_model / n_heads</code> by convention; some models set it independently.</p></div>
+          </details>
+<details class="qa">
+            <summary>Which holds more parameters in a Llama-style layer: attention or the MLP? By how much, and why should an inference engineer care?</summary>
+            <div class="qa__a prose"><p>The MLP, by roughly 4×. For Llama-3-8B it is 176.2 M parameters in the MLP versus 41.9 M in attention per layer — the SwiGLU block has three <code>4096 × 14336</code> matrices while attention has two <code>4096 × 4096</code> and, thanks to GQA, two small <code>4096 × 1024</code> ones. It matters because at decode time your cost is bytes moved, and about 80% of the weight bytes you move are MLP weights. Attention gets disproportionate attention (so to speak) because of its O(S²) term, but that term concerns the KV cache and activations, not weights.</p></div>
+          </details>
+<details class="qa">
+            <summary>Explain the difference between teacher forcing and the autoregressive loop in terms of how many times the weights are read.</summary>
+            <div class="qa__a prose"><p>Under teacher forcing the whole target sequence is already known, so a single forward pass computes the loss at all <code>S</code> positions simultaneously. The weights are read <strong>once</strong> and amortized across <code>S</code> positions of arithmetic — high arithmetic intensity, compute-bound, GPU busy. In the autoregressive loop each token depends on the previous one, so you cannot batch positions. Generating <code>N</code> tokens takes <code>N</code> sequential forward passes and the weights are read <strong>N times</strong>, each amortized over a single position. Same model and same token count, but roughly <code>N</code>× the memory traffic — and that traffic, not the arithmetic, is what you wait on.</p></div>
+          </details>
+<details class="qa">
+            <summary>Why does RoPE get applied before the keys are written to the cache, and what breaks if you get the position index wrong?</summary>
+            <div class="qa__a prose"><p>RoPE rotates Q and K by an angle proportional to absolute position, and it is applied inside the attention block before the dot product, so the cache naturally stores already-rotated keys — recomputing rotations on every read would waste work. The correctness of attention then depends on each cached key having been rotated by <em>its own</em> position index. If you reuse a cached prefix at a different offset — as prefix caching does — and do not account for the position change, the keys carry the wrong rotation, the relative-distance property breaks, and attention scores are silently wrong. No crash, no error, just degraded output. It is one of the more common and harder-to-spot bugs in serving systems.</p></div>
+          </details>
+          <p style="margin-top:var(--s7)">
+            <button class="done-toggle" type="button" data-complete="0" aria-pressed="false">
+              MARK LEVEL 00 CLEARED
+            </button>
+          </p>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="glossary">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>GLOSSARY</p>
+        <h2 class="section__title">Glossary</h2>
+        <div class="gloss">
+          <div class="gloss__row"><div class="gloss__term">residual stream</div><div class="gloss__def">The [batch, seq, d_model] tensor that every block reads from and adds back into. Its width is constant through the network.</div></div><div class="gloss__row"><div class="gloss__term">hidden state</div><div class="gloss__def">One d_model-length slice of the residual stream, at one position and one layer.</div></div><div class="gloss__row"><div class="gloss__term">head_dim</div><div class="gloss__def">The width of one attention head. Usually d_model / n_heads, though it can be set independently.</div></div><div class="gloss__row"><div class="gloss__term">GQA</div><div class="gloss__def">Grouped-query attention. Fewer K/V heads than Q heads, with each K/V head shared by a group of query heads. Shrinks the KV cache proportionally.</div></div><div class="gloss__row"><div class="gloss__term">SwiGLU</div><div class="gloss__def">The gated feed-forward block used by Llama-family models: down(silu(gate(x)) * up(x)). Three weight matrices instead of two.</div></div><div class="gloss__row"><div class="gloss__term">RMSNorm</div><div class="gloss__def">Normalization by root-mean-square only, with no mean subtraction and no bias. Cheaper than LayerNorm and works as well.</div></div><div class="gloss__row"><div class="gloss__term">pre-norm</div><div class="gloss__def">Normalizing the input to each block rather than its output, leaving the residual path unbroken. Required in practice for deep transformers.</div></div><div class="gloss__row"><div class="gloss__term">RoPE</div><div class="gloss__def">Rotary position embedding. Rotates Q and K by an angle proportional to absolute position so their dot product depends only on relative distance.</div></div><div class="gloss__row"><div class="gloss__term">logits</div><div class="gloss__def">The unnormalized [.., vocab_size] scores produced by the LM head, before any softmax or sampling.</div></div><div class="gloss__row"><div class="gloss__term">teacher forcing</div><div class="gloss__def">Training on the known target sequence so all positions are computed in one parallel pass. The reason training is far more hardware-efficient than generation.</div></div>
+        </div>
+      </section>
+
+      <nav class="pagenav">
+        <span></span>
+        <a href="autoregressive-loop.html" data-nav="next" style="text-align:right"><span>NEXT LEVEL ▶</span>01 THE AUTOREGRESSIVE LOOP</a>
+      </nav>
+
+    </main>
+  </div>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <p class="foot__h">LEVELS</p>
+        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">&nbsp;</p>
+        <ul><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">REFERENCE</p>
+        <ul>
+          <li><a href="../reference/timeline.html">Timeline</a></li>
+          <li><a href="../reference/hardware.html">GPU spec table</a></li>
+          <li><a href="../reference/engines.html">Serving engines</a></li>
+          <li><a href="../reference/frontier.html">Open problems</a></li>
+          <li><a href="../reference/glossary.html">Glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="foot__h">SOURCE</p>
+        <ul>
+          <li><a href="https://github.com/tushar-amrit-6/inference">GitHub repository</a></li>
+          <li><a href="../reference/how-to-use.html">How to work through this</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
+    do the arithmetic yourself.</p>
+  </div>
+</footer>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

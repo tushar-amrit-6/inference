@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HOW TO WORK THROUGH THIS — LLM INFERENCE</title>
+<meta name="description" content="Eleven levels, roughly three months at a few hours a week. Levels 00 to 03 are the foundation — do not rush them.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="HOW TO WORK THROUGH THIS — LLM INFERENCE">
+<meta property="og:description" content="Eleven levels, roughly three months at a few hours a week. Levels 00 to 03 are the foundation — do not rush them.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/arcade.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20fill%3D%22%23000%22%2F%3E%3Cpath%20d%3D%22M16%2C16%20L29%2C9%20A15%2C15%200%201%200%2029%2C23%20Z%22%20fill%3D%22%23FFE800%22%2F%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="scorebar">
+  <a class="scorebar__home" href="../index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="var(--pac)" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
+  
+  <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/11</span></span>
+  <span class="scorebar__spacer"></span>
+  <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
+</header>
+<div class="wrap wrap--narrow">
+  <main id="main">
+    <div class="mod-head">
+      <p class="mod-head__level">START HERE</p>
+      <h1 class="mod-head__title">HOW TO WORK THROUGH THIS</h1>
+      <p class="mod-head__tag">Eleven levels, roughly three months at a few hours a week. Levels 00 to 03 are the foundation — do not rush them.</p>
+    </div>
+    <section class="section"><div class="prose" style="max-width:none"><h3>The one idea that organizes everything</h3>
+<p>Generating a token requires reading <strong>every</strong> model weight from memory. On modern hardware, moving those bytes takes far longer than the arithmetic performed on them. So decoding a single sequence leaves the GPU almost entirely idle.</p>
+<p>Nearly every technique in this course is an answer to one question: <strong>how do we do more useful work per byte moved from memory?</strong> Batching, quantization, GQA, speculative decoding, PagedAttention — different attacks on the same problem. Keep this in view and the field stops looking like a pile of tricks.</p>
+<h3>How each level is built</h3>
+<p>Every level has the same seven parts, and they are colour-coded so you can navigate without reading:</p>
+<table><thead><tr><th>marker</th><th>part</th><th>what to do with it</th></tr></thead><tbody><tr><td><strong>Pinky</strong> (pink)</td><td>The big idea</td><td>Read first. Intuition before mechanism.</td></tr><tr><td><strong>Pellets</strong> (peach)</td><td>Concepts</td><td>The substance. Read in order.</td></tr><tr><td><strong>Inky</strong> (cyan)</td><td>Math by hand</td><td><strong>Do not skip.</strong> Work it on paper before opening the solution.</td></tr><tr><td><strong>Clyde</strong> (orange)</td><td>Code lab</td><td>Small, runnable, CPU-friendly. Type it, do not read it.</td></tr><tr><td><strong>The key</strong> (yellow)</td><td>Papers</td><td>Each with a reading frame: what to extract, what to skim.</td></tr><tr><td><strong>Blinky</strong> (red)</td><td>Pitfalls</td><td>The specific things people get wrong.</td></tr><tr><td><strong>Power pellet</strong></td><td>Checkpoint</td><td>Answer out loud before revealing. Honest self-assessment.</td></tr></tbody></table>
+<p>The ghost roles are not arbitrary — each one matches how that ghost actually behaves in the arcade game. Pinky targets four tiles ahead of you, so she is the idea out in front. Inky's target is <em>computed</em> from Blinky's position, so he is the derived arithmetic. Blinky chases you directly, so he is the misconception coming for you.</p>
+<h3>The method</h3>
+<p><strong>1. Concept pass.</strong> Read the big idea and the concepts straight through. Do not stop to look things up; get the shape first.</p>
+<p><strong>2. Math by hand.</strong> Work every math lab on paper. This is the non-negotiable part. The arithmetic is where the understanding actually lives, and reading a worked solution feels like learning without being learning. Get a number, <em>then</em> check it.</p>
+<p><strong>3. Code lab.</strong> Type the code. Run it. Change something and predict what happens before you re-run. The TODO items at the bottom of each lab are the real exercise.</p>
+<p><strong>4. Papers.</strong> Use the reading frame — most of these papers have a payload of two or three sections and a lot of context you can skim. Read those sections properly.</p>
+<p><strong>5. Checkpoint.</strong> Answer each question out loud, in full sentences, before revealing the answer. If you cannot, go back. Marking a level cleared is for you, not for anyone else, so be honest about it.</p>
+<h3>Pacing</h3>
+<table><thead><tr><th>levels</th><th>why</th></tr></thead><tbody><tr><td><strong>00–03</strong></td><td>The foundation. Take your time. Everything later assumes you can trace a forward pass and compute a KV cache without notes.</td></tr><tr><td><strong>04</strong></td><td>The analytical core. If you only truly master one level, make it this one — the rest of the course is applied roofline reasoning.</td></tr><tr><td><strong>05–07</strong></td><td>Systems and kernels. Faster going, because you now have the framework.</td></tr><tr><td><strong>08–10</strong></td><td>The frontier. More reading, less arithmetic.</td></tr></tbody></table>
+<p>At a few hours a week this is roughly three months. There is no benefit to going faster; the checkpoints are honest gates and the material compounds.</p>
+<h3>What you need</h3>
+<ul><li>Python and NumPy. PyTorch for a few labs.</li><li>No GPU required. Every code lab runs on CPU; a couple are more interesting on a free Colab GPU and say so.</li><li>A pen and paper. Genuinely — the math labs do not work typed.</li></ul>
+<h3>Progress</h3>
+<p>Marking a level cleared stores it in your browser's local storage. Nothing is sent anywhere, there is no account, and clearing your browser data resets it. The score is cosmetic: 2,200 points a level, 24,200 for all eleven, which is the Pac-Man perfect-game score.</p>
+<p>Arrow keys move between levels.</p>
+<h3>A note on currency</h3>
+<p>The foundational papers here are stable and will not go out of date. The systems material, hardware numbers and frontier discussion will. Where a claim matters to a decision you are making, verify it — particularly hardware specifications, which change between silicon revisions, and anything about which serving engine currently does what.</p>
+<p>The habit worth building is not trusting this site. It is being able to re-derive its numbers yourself, at which point you no longer need it.</p></div></section>
+  </main>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <p class="foot__h">LEVELS</p>
+        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">&nbsp;</p>
+        <ul><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">REFERENCE</p>
+        <ul>
+          <li><a href="../reference/timeline.html">Timeline</a></li>
+          <li><a href="../reference/hardware.html">GPU spec table</a></li>
+          <li><a href="../reference/engines.html">Serving engines</a></li>
+          <li><a href="../reference/frontier.html">Open problems</a></li>
+          <li><a href="../reference/glossary.html">Glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="foot__h">SOURCE</p>
+        <ul>
+          <li><a href="https://github.com/tushar-amrit-6/inference">GitHub repository</a></li>
+          <li><a href="../reference/how-to-use.html">How to work through this</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
+    do the arithmetic yourself.</p>
+  </div>
+</footer>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>08 · SPECULATIVE DECODING — LLM INFERENCE</title>
+<meta name="description" content="Buy back the compute that memory-bound decoding leaves on the floor — and provably change nothing.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="08 · SPECULATIVE DECODING — LLM INFERENCE">
+<meta property="og:description" content="Buy back the compute that memory-bound decoding leaves on the floor — and provably change nothing.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/arcade.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20fill%3D%22%23000%22%2F%3E%3Cpath%20d%3D%22M16%2C16%20L29%2C9%20A15%2C15%200%201%200%2029%2C23%20Z%22%20fill%3D%22%23FFE800%22%2F%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="scorebar">
+  <a class="scorebar__home" href="../index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="var(--pac)" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
+  <span class="scorebar__item"><span class="scorebar__label">LEVEL</span><span class="scorebar__value scorebar__value--pac">08</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/11</span></span>
+  <span class="scorebar__spacer"></span>
+  <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
+</header>
+<div class="wrap">
+  <div class="shell">
+    <nav class="rail" aria-label="Module contents">
+  <p class="rail__head">ON THIS LEVEL</p>
+  <ul class="rail__list">
+    <li><a class="rail__link" href="#big-idea" data-kind="dot"><span class="rail__dot"></span><span>The big idea</span></a></li><li><a class="rail__link" href="#concept-0" data-kind="dot"><span class="rail__dot"></span><span>Draft and verify: why verification is nearly free</span></a></li><li><a class="rail__link" href="#concept-1" data-kind="dot"><span class="rail__dot"></span><span>The acceptance rule, and the proof that nothing changes</span></a></li><li><a class="rail__link" href="#concept-2" data-kind="dot"><span class="rail__dot"></span><span>Acceptance rate: the number that governs everything</span></a></li><li><a class="rail__link" href="#concept-3" data-kind="dot"><span class="rail__dot"></span><span>Self-speculation: Medusa, EAGLE, and n-gram lookup</span></a></li><li><a class="rail__link" href="#concept-4" data-kind="dot"><span class="rail__dot"></span><span>Why speculation stops working at high batch</span></a></li><li><a class="rail__link" href="#math-lab" data-kind="dot"><span class="rail__dot"></span><span>Math by hand</span></a></li><li><a class="rail__link" href="#code-lab" data-kind="dot"><span class="rail__dot"></span><span>Code lab</span></a></li><li><a class="rail__link" href="#papers" data-kind="dot"><span class="rail__dot"></span><span>Papers</span></a></li><li><a class="rail__link" href="#pitfalls" data-kind="dot"><span class="rail__dot"></span><span>Pitfalls</span></a></li><li><a class="rail__link" href="#checkpoint" data-kind="power"><span class="rail__dot"></span><span>Checkpoint</span></a></li><li><a class="rail__link" href="#glossary" data-kind="dot"><span class="rail__dot"></span><span>Glossary</span></a></li>
+  </ul>
+  <div class="rail__nav">
+    <a class="rail__step" href="attention-kernels.html">◀ 07 ATTENTION KERNELS</a>
+    <a class="rail__step" href="../index.html">▲ ALL LEVELS</a>
+    <a class="rail__step" href="distributed-inference.html">09 DISTRIBUTED INFERENCE ▶</a>
+  </div>
+</nav>
+    <main id="main">
+
+      <div class="mod-head">
+        <p class="mod-head__level">LEVEL 08</p>
+        <h1 class="mod-head__title">SPECULATIVE DECODING</h1>
+        <p class="mod-head__tag">Buy back the compute that memory-bound decoding leaves on the floor — and provably change nothing.</p>
+        <div class="mod-head__meta">
+          <span>⏱ 6–8 hours</span>
+          <span>● 5 concepts</span>
+          <span>📄 5 papers</span>
+          <span>▸ needs: Module 1, Module 3, Module 4</span>
+        </div>
+      </div>
+
+      <section class="section ghost ghost--pinky" id="big-idea">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--pinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>PINKY · THE BIG IDEA</p>
+        <div class="prose"><p>Every module so far has attacked the <em>bytes</em> side of the ratio. This one attacks the other side: the wasted arithmetic.</p>
+<p>Here is the setup. At batch 1, a decode step moves 15 GB and does 16 GFLOP — arithmetic intensity of about 1 against an H100's ridge point of 295. <strong>You are using roughly 0.4% of the machine's arithmetic.</strong> The tensor cores sit idle for the entire step.</p>
+<p>Now notice something about that idle capacity. Verifying whether a <em>guessed</em> token is correct costs no extra memory traffic — the weights are already being streamed. If you guess five tokens and check all five in one forward pass, you move the same 15 GB and do five positions' worth of arithmetic instead of one. Intensity goes from 1 to 5. Still nowhere near the ridge, so the extra arithmetic is genuinely free.</p>
+<p>That is speculative decoding: <strong>draft cheaply, verify in parallel, and spend idle FLOPs to shorten the sequential chain.</strong> It is the only technique in this course that reduces the <em>number</em> of forward passes rather than the cost of each one.</p>
+<p>The part that makes it remarkable rather than merely clever is that the output distribution is preserved <strong>exactly</strong>. Not approximately, not usually — provably, by a modified rejection sampling scheme. You are not trading quality for speed. You are getting the same samples faster, and the proof fits on half a page.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="concepts">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>PELLETS · CONCEPTS</p>
+        <article class="concept" id="concept-0">
+  <div class="concept__head">
+    <span class="concept__n">01</span>
+    <h3 class="concept__title">Draft and verify: why verification is nearly free</h3>
+  </div>
+  <div class="prose"><p>The loop:</p>
+<pre><code>1. DRAFT   run a cheap model autoregressively for gamma steps,
+           producing candidate tokens x1..x_gamma and its
+           distributions q(.|prefix), q(.|prefix,x1), ...
+
+2. VERIFY  run the target model ONCE on [prefix, x1, ..., x_gamma].
+           Because attention is causal, one pass gives you the target's
+           distribution p at every one of those positions simultaneously.
+
+3. ACCEPT  walk left to right, accepting or rejecting each x_i by the
+           rule in the next concept. Stop at the first rejection.
+
+4. On rejection at position i, sample a corrected token from a residual
+   distribution. On accepting all gamma, sample one bonus token from
+   p(.|prefix, x1..x_gamma) -- which you already have.</code></pre>
+<p>Step 2 is the crux. <strong>A single forward pass over <code>γ+1</code> positions costs the same weight traffic as a forward pass over one position.</strong> You read all 15 GB either way. The extra positions cost extra arithmetic — which you had in surplus.</p>
+<p>Per accepted token, the cost falls dramatically. If you accept 3 of 4 drafts plus a bonus token, you produced 4 tokens for one target-model pass instead of four passes. <strong>Four times fewer weight reads.</strong></p>
+<p>Note also step 4's bonus token. If every draft is accepted, the verification pass has already computed <code>p</code> at the final position, so you get one extra token for free. This is why the expected yield formula has <code>γ+1</code> in it rather than <code>γ</code>, and it is a meaningful contribution at high acceptance rates.</p>
+<p>Two things this does <em>not</em> do, worth being clear about. It does not reduce total FLOPs — it increases them, since drafts that get rejected were computed for nothing. And it does not help when you are already compute-bound, because then there is no idle arithmetic to spend. Both qualifications become important later in this module.</p></div>
+  <pre class="ascii" aria-label="diagram">  STANDARD DECODE -- 4 tokens, 4 target passes, 4 x 15 GB
+    [target] -&gt; t1
+    [target] -&gt; t2
+    [target] -&gt; t3
+    [target] -&gt; t4                        60 GB moved
+
+  SPECULATIVE -- 4 tokens, 1 target pass, 4 draft passes
+    [draft][draft][draft] -&gt; x1 x2 x3     3 x 0.5 GB
+    [target on x1,x2,x3 at once]          1 x 15 GB
+      accept x1  ✓
+      accept x2  ✓
+      reject x3  ✗ -&gt; resample t3
+                                          16.5 GB moved, 3 tokens
+                                          -&gt; 3.6x less traffic per token</pre>
+  <p class="keypoint"><b>REMEMBER</b>Checking gamma guessed tokens costs one forward pass, the same weight traffic as generating one token — so the extra positions ride in idle arithmetic.</p>
+</article>
+<article class="concept" id="concept-1">
+  <div class="concept__head">
+    <span class="concept__n">02</span>
+    <h3 class="concept__title">The acceptance rule, and the proof that nothing changes</h3>
+  </div>
+  <div class="prose"><p>The naive approach — accept the draft token if the target agrees, otherwise take the target's token — is wrong. It biases the output toward tokens the draft model likes, because the draft gets a veto over which tokens are even considered.</p>
+<p>The correct rule is modified rejection sampling. Let <code>q</code> be the draft's distribution and <code>p</code> the target's, at some position, with draft token <code>x</code>:</p>
+<pre><code>1. accept x with probability  min(1, p(x) / q(x))
+2. if rejected, sample from the residual:
+
+       p'(z) = max(0, p(z) - q(z)) / sum_w max(0, p(w) - q(w))</code></pre>
+<p>Read the intuition first. If the target likes <code>x</code> at least as much as the draft did (<code>p(x) ≥ q(x)</code>), accept unconditionally. If the target likes it less, accept with probability <code>p/q</code> — proportionally to how much less. When you reject, you must not simply sample from <code>p</code>, because you would double-count the mass <code>p</code> and <code>q</code> already agreed on. The residual <code>max(0, p−q)</code> is precisely the mass <code>p</code> wanted that <code>q</code> under-supplied.</p>
+<p><strong>The proof.</strong> Compute the total probability of emitting token <code>z</code>.</p>
+<p>Accepting <code>z</code> requires drafting it and then accepting:</p>
+<pre><code>P(draft z and accept) = q(z) * min(1, p(z)/q(z)) = min(q(z), p(z))</code></pre>
+<p>Rejection happens with probability:</p>
+<pre><code>P(reject) = 1 - sum_w min(q(w), p(w))</code></pre>
+<p>And a useful identity, since both <code>p</code> and <code>q</code> sum to 1:</p>
+<pre><code>sum_w max(0, p(w) - q(w)) = sum_w [ p(w) - min(p(w), q(w)) ]
+                          = 1 - sum_w min(p(w), q(w))
+                          = P(reject)</code></pre>
+<p>The normalizer of the residual is exactly the rejection probability. So:</p>
+<pre><code>P(emit z) = min(q(z), p(z))  +  P(reject) * max(0, p(z) - q(z)) / P(reject)
+          = min(q(z), p(z))  +  max(0, p(z) - q(z))</code></pre>
+<p>Two cases. If <code>p(z) ≤ q(z)</code>: <code>= p(z) + 0 = p(z)</code>. If <code>p(z) &gt; q(z)</code>: <code>= q(z) + p(z) − q(z) = p(z)</code>.</p>
+<p><strong><code>P(emit z) = p(z)</code> in both cases.</strong> The output distribution is the target model's, exactly, regardless of how bad the draft model is. ∎</p>
+<p>This is why speculative decoding is free performance rather than a quality trade. A poor draft model does not corrupt your output — it just gets rejected more often and saves you less. The draft affects <em>speed only</em>. That property is unusual enough in this field to be worth pausing on: almost every other optimization here asks you to give something up.</p>
+<p><em>(One caveat for practice: the proof assumes <code>p</code> and <code>q</code> are the distributions you are actually sampling from. If you apply top-p or temperature, both must see the same processed distribution, or you lose the guarantee. Implementations that apply sampling parameters to the target but not the draft are subtly wrong — and it is a common bug because the output still looks fine.)</em></p></div>
+  <pre class="ascii" aria-label="diagram">  q (draft)   ████████░░░░░░░░
+  p (target)  ████░░░░████████
+
+  min(p,q)    ████             &lt;- accepted directly
+  max(0,p-q)      ░░░░████     &lt;- the residual, sampled on rejection
+
+  accepted mass + residual mass = p, exactly</pre>
+  <p class="keypoint"><b>REMEMBER</b>Accept with probability min(1, p/q) and on rejection sample from the normalized positive part of p−q; the composition is exactly p.</p>
+</article>
+<article class="concept" id="concept-2">
+  <div class="concept__head">
+    <span class="concept__n">03</span>
+    <h3 class="concept__title">Acceptance rate: the number that governs everything</h3>
+  </div>
+  <div class="prose"><p>Let <code>α</code> be the acceptance rate: the probability that a given draft token survives. Leviathan et al. show that under a reasonable independence assumption, the expected number of tokens produced per verification pass is:</p>
+<pre><code>E[tokens] = (1 - alpha^(gamma+1)) / (1 - alpha)</code></pre>
+<p>The <code>γ+1</code> accounts for the bonus token you get when all <code>γ</code> drafts are accepted.</p>
+<p>Tabulate it:</p>
+<table><thead><tr><th>α \ γ</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>7</th><th>10</th></tr></thead><tbody><tr><td>0.5</td><td>1.50</td><td>1.75</td><td>1.88</td><td>1.94</td><td>1.97</td><td>1.99</td><td>2.00</td></tr><tr><td>0.7</td><td>1.70</td><td>2.19</td><td>2.53</td><td>2.77</td><td>2.94</td><td>3.15</td><td>3.28</td></tr><tr><td>0.8</td><td>1.80</td><td>2.44</td><td>2.95</td><td>3.36</td><td>3.69</td><td>4.16</td><td>4.57</td></tr><tr><td>0.9</td><td>1.90</td><td>2.71</td><td>3.44</td><td>4.10</td><td>4.69</td><td>5.70</td><td>6.86</td></tr></tbody></table>
+<p>Two patterns matter.</p>
+<p><strong>Returns diminish sharply.</strong> At <code>α = 0.5</code>, going from <code>γ = 3</code> to <code>γ = 10</code> improves yield from 1.88 to 2.00 — 7% more tokens for 233% more draft work. The limit as <code>γ → ∞</code> is <code>1/(1−α)</code>, so <code>α = 0.5</code> can never exceed 2 tokens per pass no matter how far you draft.</p>
+<p><strong>Acceptance rate matters far more than draft length.</strong> Moving <code>α</code> from 0.7 to 0.9 at <code>γ = 4</code> takes you from 2.77 to 4.10 — a 48% gain. Moving <code>γ</code> from 4 to 10 at <code>α = 0.7</code> gains 18%. If you are tuning, tune the draft model, not the draft length.</p>
+<p>Now the actual speedup, which must account for the cost of drafting. Let <code>c</code> be the draft model's cost as a fraction of the target's:</p>
+<pre><code>                E[tokens]           (1 - alpha^(gamma+1)) / (1 - alpha)
+speedup  =  ----------------  =  ------------------------------------
+             gamma * c + 1                  gamma * c + 1</code></pre>
+<p>The denominator is the cost of one speculation round in units of target passes: <code>γ</code> draft passes at cost <code>c</code> each, plus one verification.</p>
+<p><strong>Break-even</strong> is where the speedup equals 1:</p>
+<pre><code>(1 - alpha^(gamma+1)) / (1 - alpha)  =  gamma * c + 1</code></pre>
+<p>Worked cases at <code>γ = 4</code>:</p>
+<pre><code>alpha = 0.8, c = 0.05 (a 1B draft for a 70B target):
+    3.36 / (0.20 + 1) = 2.80x    strong win
+
+alpha = 0.8, c = 0.15 (a 7B draft for a 70B target):
+    3.36 / (0.60 + 1) = 2.10x    still good
+
+alpha = 0.5, c = 0.15:
+    1.94 / (0.60 + 1) = 1.21x    marginal
+
+alpha = 0.4, c = 0.30:
+    1.64 / (2.20)     = 0.75x    LOSS -- slower than not speculating</code></pre>
+<p>The last row is the important one. <strong>Speculation can make you slower</strong>, and it does so silently — the output is still correct, it just costs more. Any deployment should measure the realized acceptance rate rather than assume it.</p>
+<p>Acceptance rate is not a constant, either. It varies by domain (code drafts better than creative prose, because it is more predictable), by position (the token after &quot;def &quot; is easy, the token starting a new idea is hard), and by sampling temperature (higher temperature flattens <code>p</code>, which reduces agreement). Good implementations adapt <code>γ</code> dynamically based on recent acceptance.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Expected tokens per verification is (1 − α^(γ+1))/(1 − α), and it saturates fast — so long draft lengths pay only at very high acceptance.</p>
+</article>
+<article class="concept" id="concept-3">
+  <div class="concept__head">
+    <span class="concept__n">04</span>
+    <h3 class="concept__title">Self-speculation: Medusa, EAGLE, and n-gram lookup</h3>
+  </div>
+  <div class="prose"><p>Classical speculative decoding needs a second model, and that has real costs: extra weights in memory competing with your KV cache, extra weight bytes streamed per draft step, and the requirement that the draft be well-aligned with the target — a 1B model drafting for a 70B model from a different family will have poor <code>α</code>. Self-speculation avoids all three.</p>
+<p><strong>Medusa</strong> attaches extra decoding heads to the target model's final hidden state. Head <code>k</code> predicts the token <code>k</code> positions ahead. One forward pass produces the current token plus several speculative future tokens, with no separate model at all. Because the heads are individually weak, Medusa proposes multiple candidates per position and verifies them as a <strong>tree</strong> rather than a single chain. The heads are cheap to train — the backbone is frozen.</p>
+<p>The trade: independent heads cannot condition on each other, so head 3's guess does not know what head 2 guessed. Accuracy falls off with distance.</p>
+<p><strong>EAGLE</strong> fixes that by autoregressing at the <em>feature</em> level rather than the token level. It runs a small autoregressive head over the target model's second-to-top-layer hidden states, using both the feature sequence and the token sequence one step shifted. Because the features are far more informative than tokens, a very small head achieves high acceptance — EAGLE reports substantially better acceptance rates than Medusa, and successive versions (EAGLE-2's dynamic draft trees, EAGLE-3's training changes) have pushed it further. EAGLE is currently the strongest general self-speculation approach and is supported in the major serving engines.</p>
+<p><strong>N-gram / prompt lookup decoding</strong> is the cheapest idea in the family and requires no model at all. Search the existing context for the current suffix; if you find it, propose whatever followed it last time. Zero training, zero extra parameters, near-zero cost.</p>
+<p>It sounds too crude to work, and for open-ended chat it largely does not. But for <strong>high-repetition workloads it is excellent</strong>: code editing where most of a file is unchanged, summarization that quotes the source, RAG where the answer copies from retrieved documents, structured output with a fixed schema. In those settings acceptance rates can be very high, and since <code>c ≈ 0</code> the break-even condition is trivially satisfied. It is worth trying first precisely because it costs nothing to try.</p>
+<p><strong>Tree attention</strong> is the shared machinery for Medusa and EAGLE. Rather than verifying one candidate sequence, verify a tree of them in a single pass, using a carefully constructed attention mask so each node attends only to its ancestors. Verifying 64 tree nodes costs one forward pass, and the probability that <em>some</em> path through the tree is accepted is much higher than for a single chain. The cost is a more complex mask and more arithmetic — again, arithmetic you were not using.</p>
+<table><thead><tr><th>method</th><th>extra params</th><th>training</th><th>typical strength</th></tr></thead><tbody><tr><td>draft model</td><td>a whole small model</td><td>none if one exists</td><td>general, if well aligned</td></tr><tr><td>Medusa</td><td>a few heads</td><td>light, backbone frozen</td><td>moderate</td></tr><tr><td>EAGLE</td><td>one small head</td><td>light</td><td>strongest general method</td></tr><tr><td>n-gram lookup</td><td>none</td><td>none</td><td>excellent on repetitive text</td></tr></tbody></table></div>
+  <pre class="ascii" aria-label="diagram">  TREE VERIFICATION -- one forward pass covers every path
+
+                    [prefix]
+                   /        \
+              &quot;the&quot;          &quot;a&quot;
+             /     \           \
+        &quot;cat&quot;     &quot;dog&quot;       &quot;bird&quot;
+         /                       \
+     &quot;sat&quot;                      &quot;flew&quot;
+
+  attention mask: each node sees only its ancestors
+  -&gt; 8 candidate continuations verified in ONE pass
+  -&gt; P(some path accepted) &gt;&gt; P(one chain accepted)</pre>
+  <p class="keypoint"><b>REMEMBER</b>A separate draft model costs memory and alignment effort, so the practical methods generate drafts from the target model itself.</p>
+</article>
+<article class="concept" id="concept-4">
+  <div class="concept__head">
+    <span class="concept__n">05</span>
+    <h3 class="concept__title">Why speculation stops working at high batch</h3>
+  </div>
+  <div class="prose"><p>The single most important practical caveat, and the one most often missed.</p>
+<p>Speculation is free because decode has idle arithmetic. But <strong>batching consumes that same idle arithmetic</strong> — recall from Module 4 that decode arithmetic intensity equals batch size. The two techniques are drawing on one pool of spare compute.</p>
+<pre><code>batch 1, no speculation:      intensity ~1     ridge 295   0.3% used
+batch 1, gamma=4 speculation: intensity ~5                 1.7% used
+batch 64, no speculation:     intensity ~64               22%   used
+batch 64, gamma=4:            intensity ~320             OVER the ridge</code></pre>
+<p>At batch 64 with <code>γ = 4</code>, verification processes <code>64 × 5 = 320</code> positions per pass. You have crossed the ridge point and become <strong>compute-bound</strong> — at which point the extra positions are no longer free, they cost time proportional to their count.</p>
+<p>Now add the second problem: rejected drafts are wasted work. At batch 1 that waste falls into idle capacity and costs nothing. At batch 64, where you are compute-bound, a rejected draft consumes arithmetic that another sequence's real token needed. Speculation stops being free and starts being a tax.</p>
+<p>The empirical picture:</p>
+<table><thead><tr><th>batch</th><th>typical effect of speculation</th></tr></thead><tbody><tr><td>1–4</td><td>large win — 2–3× is achievable</td></tr><tr><td>8–32</td><td>moderate win, shrinking with batch</td></tr><tr><td>64+</td><td>marginal, often a net loss</td></tr></tbody></table>
+<p>This creates a genuine architectural tension. Throughput-oriented serving wants large batches. Latency-oriented serving wants speculation. <strong>You usually cannot have both</strong>, and which you choose should follow from your SLO:</p>
+<ul><li><strong>Low-latency, low-concurrency</strong> (local inference, interactive coding, a single user on dedicated hardware): speculate aggressively, keep the batch small.</li><li><strong>High-throughput, high-concurrency</strong> (a public API optimizing cost per token): large batches, speculation off or adaptive.</li><li><strong>In between:</strong> adapt. Modern schedulers monitor batch occupancy and acceptance rate and adjust <code>γ</code> per step, disabling speculation when the batch is full. Doing this well is an open problem — see Module 10.</li></ul>
+<p>One nuance worth adding: reasoning models change the calculation. A long chain-of-thought trace is thousands of decode tokens whose <em>content</em> is never shown to the user, so per-token latency matters less than total time, and the tokens are often highly predictable. That combination favours aggressive speculation even at moderate batch, and it is an active area.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>The free arithmetic exists only because you are memory-bound; batching consumes exactly the same headroom, so the two techniques compete.</p>
+</article>
+      </section>
+
+      <section class="section ghost ghost--inky" id="math-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--inky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>INKY · MATH BY HAND</p>
+        <h2 class="section__title">Math by hand</h2>
+        <div class="prose"><p><strong>Part 1 — verify the acceptance rule preserves the distribution.</strong> Vocabulary of 4 tokens. Draft <code>q = [0.5, 0.3, 0.15, 0.05]</code>, target <code>p = [0.3, 0.4, 0.2, 0.1]</code>.</p>
+<p>a) For each token, the probability it is drafted <strong>and</strong> accepted. b) The total rejection probability. c) The residual distribution <code>p'</code>. d) Confirm that <code>P(emit z)</code> equals <code>p(z)</code> for all four tokens. Show the arithmetic. e) What is the acceptance rate <code>α</code> for this pair? Relate it to <code>Σ min(p, q)</code>.</p>
+<p><strong>Part 2 — the speedup formula.</strong> Target: Llama-3-70B. Draft: Llama-3-8B. Assume the draft's cost per step is proportional to parameters, so <code>c = 8.03/70.6 = 0.114</code>.</p>
+<p>a) Expected tokens per verification for <code>α = 0.7</code> at <code>γ = 1, 2, 3, 4, 5, 8</code>. b) Speedup for each. Which <code>γ</code> is optimal? c) Repeat for <code>α = 0.85</code>. Does the optimal <code>γ</code> move? In which direction, and why? d) With <code>α = 0.7</code>, how small must <code>c</code> be for <code>γ = 8</code> to beat <code>γ = 3</code>?</p>
+<p><strong>Part 3 — break-even.</strong> a) With <code>γ = 4</code> and <code>c = 0.15</code>, what is the minimum <code>α</code> for any speedup at all? b) With <code>α = 0.6</code>, what is the maximum <code>c</code> that still gives a speedup at <code>γ = 4</code>? c) A 7B draft for a 13B target gives <code>c = 0.54</code> and <code>α = 0.8</code>. Speedup at <code>γ = 2</code>? Comment.</p>
+<p><strong>Part 4 — the batching interaction.</strong> Llama-3-70B on 4×H100 (aggregate bandwidth 13.4 TB/s, aggregate dense BF16 3,956 TFLOP/s, so a ridge point of 295). Weights 141 GB. Ignore KV cache.</p>
+<p>a) Arithmetic intensity of plain decode at batch 1, 8, 32, 64. b) With <code>γ = 4</code> speculation, intensity becomes roughly <code>5 ×</code> batch. Recompute for each. c) At which batch size does speculation push you past the ridge? d) At batch 64 with <code>γ = 4</code>, you are compute-bound. Estimate the time for one verification pass from the FLOP side and compare it to the memory-bound time. What has happened to the &quot;free arithmetic&quot; argument?</p></div>
+        <details class="spoiler">
+          <summary>SHOW THE WORKED SOLUTION</summary>
+          <div class="spoiler__body prose"><p><strong>Part 1</strong></p>
+<p>a) <code>P(draft z and accept) = q(z) × min(1, p(z)/q(z)) = min(p(z), q(z))</code>:</p>
+<pre><code>z=0: min(0.30, 0.50) = 0.30      (ratio p/q = 0.6, accept w.p. 0.6: 0.5 x 0.6 = 0.30)
+z=1: min(0.40, 0.30) = 0.30      (p &gt;= q, accept always: 0.3 x 1.0 = 0.30)
+z=2: min(0.20, 0.15) = 0.15      (p &gt;= q, accept always)
+z=3: min(0.10, 0.05) = 0.05      (p &gt;= q, accept always)
+                       ----
+             sum min = 0.80</code></pre>
+<p>b) <code>P(reject) = 1 − 0.80 = 0.20</code></p>
+<p>c) Residual <code>max(0, p − q)</code>:</p>
+<pre><code>z=0: max(0, 0.30-0.50) = 0.00
+z=1: max(0, 0.40-0.30) = 0.10
+z=2: max(0, 0.20-0.15) = 0.05
+z=3: max(0, 0.10-0.05) = 0.05
+                         ----
+                  sum =  0.20      &lt;- equals P(reject), as the identity requires
+
+p' = [0.00, 0.50, 0.25, 0.25]</code></pre>
+<p>d) <code>P(emit z) = min(p,q) + P(reject) × p'(z)</code>:</p>
+<pre><code>z=0: 0.30 + 0.20 x 0.00 = 0.30   = p(0)  ✓
+z=1: 0.30 + 0.20 x 0.50 = 0.40   = p(1)  ✓
+z=2: 0.15 + 0.20 x 0.25 = 0.20   = p(2)  ✓
+z=3: 0.05 + 0.20 x 0.25 = 0.10   = p(3)  ✓</code></pre>
+<p>Exact for every token, and note it did not depend on <code>q</code> being any good — a different draft would change the acceptance rate but not this table.</p>
+<p>e) <code>α = Σ min(p, q) = 0.80</code>. In general the acceptance rate is exactly the overlap <code>Σ_z min(p(z), q(z))</code>, which equals <code>1 − TV(p, q)</code> where TV is total variation distance. <strong>A better-aligned draft model is literally one whose distribution is closer to the target's in TV distance</strong> — which is a satisfying way to state what &quot;well aligned&quot; means.</p>
+<p><strong>Part 2</strong></p>
+<p>With <code>c = 0.114</code>, <code>E = (1 − α^(γ+1))/(1 − α)</code>, speedup <code>= E/(γc + 1)</code>.</p>
+<p>a) and b), at <code>α = 0.7</code>:</p>
+<pre><code>gamma   E[tokens]   cost (gamma*c+1)   speedup
+  1       1.700          1.114          1.526
+  2       2.190          1.228          1.783
+  3       2.533          1.342          1.887
+  4       2.773          1.456          1.905   &lt;- optimal
+  5       2.941          1.570          1.873
+  8       3.212          1.912          1.680</code></pre>
+<p>Working one: <code>γ=4</code>: <code>E = (1 − 0.7^5)/0.3 = (1 − 0.16807)/0.3 = 2.773</code>; cost <code>= 4(0.114) + 1 = 1.456</code>; speedup <code>= 1.905</code>.</p>
+<p><strong>Optimal γ = 4</strong>, giving 1.91×.</p>
+<p>c) At <code>α = 0.85</code>:</p>
+<pre><code>gamma   E[tokens]   cost    speedup
+  1       1.850     1.114    1.661
+  2       2.573     1.228    2.095
+  3       3.187     1.342    2.375
+  4       3.709     1.456    2.547
+  5       4.153     1.570    2.645
+  8       5.130     1.912    2.683   &lt;- optimal
+ 10       5.591     2.140    2.613</code></pre>
+<p><strong>Optimal γ moves up to about 8</strong>, giving 2.68×. Higher acceptance means drafts survive longer, so longer speculation pays. The general rule: <strong>optimal draft length increases with acceptance rate</strong>, which is exactly why adaptive-<code>γ</code> schemes track recent acceptance.</p>
+<p>d) At <code>α = 0.7</code>, <code>E(3) = 2.533</code> and <code>E(8) = 3.212</code>. For <code>γ=8</code> to beat <code>γ=3</code>:</p>
+<pre><code>3.212 / (8c + 1)  &gt;  2.533 / (3c + 1)
+3.212(3c + 1)     &gt;  2.533(8c + 1)
+9.636c + 3.212    &gt;  20.264c + 2.533
+0.679             &gt;  10.628c
+c                 &lt;  0.0639</code></pre>
+<p>You would need a draft costing under <strong>6.4%</strong> of the target — roughly a 4.5B draft for a 70B target, or smaller. With the 8B draft at <code>c = 0.114</code>, <code>γ = 8</code> is worse than <code>γ = 3</code>.</p>
+<p><strong>Part 3</strong></p>
+<p>a) <code>γ = 4, c = 0.15</code>, so cost <code>= 1.6</code>. Need <code>E ≥ 1.6</code>:</p>
+<pre><code>(1 - alpha^5)/(1 - alpha) = 1.6</code></pre>
+<p>Solving numerically: at <code>α = 0.35</code>, <code>E = (1 − 0.00525)/0.65 = 1.530</code>. At <code>α = 0.40</code>, <code>E = (1 − 0.01024)/0.60 = 1.650</code>. At <code>α = 0.38</code>, <code>E = (1 − 0.00792)/0.62 = 1.600</code>.</p>
+<p><strong>Minimum α ≈ 0.38.</strong></p>
+<p>b) <code>α = 0.6, γ = 4</code>: <code>E = (1 − 0.6^5)/0.4 = (1 − 0.07776)/0.4 = 2.306</code>. Need <code>2.306 / (4c + 1) &gt; 1</code>:</p>
+<pre><code>4c + 1 &lt; 2.306  -&gt;  c &lt; 0.3264</code></pre>
+<p><strong>Maximum c ≈ 0.33</strong> — the draft may cost up to a third of the target.</p>
+<p>c) <code>α = 0.8, γ = 2, c = 0.54</code>:</p>
+<pre><code>E = (1 - 0.8^3)/0.2 = (1 - 0.512)/0.2 = 2.44
+cost = 2(0.54) + 1 = 2.08
+speedup = 2.44 / 2.08 = 1.17x</code></pre>
+<p>Only 1.17× despite an excellent acceptance rate of 0.8. <strong>The draft is too expensive relative to the target.</strong> A 7B draft for a 13B target is a bad pairing — the models are too close in size. The general guidance that follows: you want roughly a <strong>10× or greater</strong> size gap, which is why 1B drafts for 70B targets are the classic configuration, and why self-speculation (where <code>c</code> is tiny) often beats a separate draft model even at lower <code>α</code>.</p>
+<p><strong>Part 4</strong></p>
+<p>a) Plain decode intensity equals batch size: <strong>1, 8, 32, 64.</strong></p>
+<p>b) With <code>γ = 4</code>, verification processes <code>5 ×</code> batch positions per pass:</p>
+<pre><code>batch 1:   ~5
+batch 8:   ~40
+batch 32:  ~160
+batch 64:  ~320</code></pre>
+<p>c) Ridge point is 295. <code>5 × batch &gt; 295</code> gives <code>batch &gt; 59</code>. <strong>Speculation pushes you past the ridge at around batch 60</strong>, whereas plain decode would not reach it until batch 295.</p>
+<p>d) At batch 64, <code>γ = 4</code> — 320 positions per verification pass:</p>
+<pre><code>memory time:  141 GB / 13,400 GB/s                  = 10.5 ms
+compute time: 2 x 70.6e9 x 320 / 3,956e12           = 11.4 ms</code></pre>
+<p>Compute time now <strong>exceeds</strong> memory time. The pass is compute-bound, so those extra positions are no longer riding in idle capacity — each one costs real time.</p>
+<p>And the arithmetic is worse than that comparison suggests, because with <code>α = 0.7</code> you only harvest 2.77 tokens per sequence per pass out of the 5 positions you paid for. You are spending compute-bound time on 320 positions to obtain <code>64 × 2.77 = 177</code> tokens, versus a plain memory-bound pass costing 10.5 ms for 64 tokens:</p>
+<pre><code>speculative:  177 tokens / 11.4 ms = 15.5 tokens/ms
+plain:         64 tokens / 10.5 ms =  6.1 tokens/ms</code></pre>
+<p>Still ahead here — but the margin is collapsing, and pushing to batch 128 or <code>γ = 8</code> inverts it. <strong>The &quot;free arithmetic&quot; argument holds only while you are on the memory-bound side of the ridge.</strong> Speculation and batching draw on the same finite pool of spare compute, and past the ridge that pool is empty.</p></div>
+        </details>
+      </section>
+
+      <section class="section ghost ghost--clyde" id="code-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--clyde)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>CLYDE · CODE LAB</p>
+        <h2 class="section__title">Code lab</h2>
+        <div class="prose"><p>Implement the modified rejection sampling scheme and verify empirically that the output distribution matches the target's — that is the claim the whole technique rests on, and it is worth proving to yourself rather than trusting.</p>
+<p>Then build the speedup model and find the break-even surface, so you can tell in advance whether speculation will pay for a given deployment.</p></div>
+        <div class="prose" style="max-width:none"><pre><code class="lang-python">&quot;&quot;&quot;
+Speculative decoding: correctness, then economics.
+
+    pip install numpy
+&quot;&quot;&quot;
+import numpy as np
+
+rng = np.random.default_rng(17)
+
+
+# ==========================================================================
+# Part A -- the acceptance rule, and proof by simulation
+# ==========================================================================
+def speculative_step(p, q, rng):
+    &quot;&quot;&quot;One draft token, verified. Returns the emitted token.
+
+    p: target distribution, q: draft distribution (both over the vocabulary)
+    &quot;&quot;&quot;
+    x = rng.choice(len(q), p=q)                      # draft samples from q
+
+    if rng.random() &lt; min(1.0, p[x] / q[x]):         # accept with prob min(1, p/q)
+        return x, True
+
+    residual = np.maximum(0.0, p - q)                # the mass p wanted that q undersupplied
+    s = residual.sum()
+    if s &lt;= 0:                                       # p == q everywhere: cannot happen
+        return int(rng.choice(len(p), p=p)), False
+    return int(rng.choice(len(p), p=residual / s)), False
+
+
+def naive_step(p, q, rng):
+    &quot;&quot;&quot;The WRONG rule: take the draft if the target's argmax agrees, else target's token.
+    Included so you can see the bias it introduces.&quot;&quot;&quot;
+    x = rng.choice(len(q), p=q)
+    if x == p.argmax():
+        return x, True
+    return int(rng.choice(len(p), p=p)), False
+
+
+print(&quot;=== Part A: does the acceptance rule preserve the target distribution? ===&quot;)
+p = np.array([0.30, 0.40, 0.20, 0.10])
+q = np.array([0.50, 0.30, 0.15, 0.05])
+
+N = 400_000
+counts = np.zeros(4)
+accepts = 0
+for _ in range(N):
+    tok, acc = speculative_step(p, q, rng)
+    counts[tok] += 1
+    accepts += acc
+emp = counts / N
+
+print(f&quot;  target p     {np.array2string(p, precision=4)}&quot;)
+print(f&quot;  draft  q     {np.array2string(q, precision=4)}&quot;)
+print(f&quot;  empirical    {np.array2string(emp, precision=4)}&quot;)
+print(f&quot;  max abs err  {np.abs(emp - p).max():.4f}   (sampling noise ~ {1/np.sqrt(N):.4f})&quot;)
+print(f&quot;  acceptance   {accepts/N:.4f}   predicted sum min(p,q) = {np.minimum(p,q).sum():.4f}&quot;)
+
+counts = np.zeros(4)
+for _ in range(N):
+    tok, _ = naive_step(p, q, rng)
+    counts[tok] += 1
+print(f&quot;\n  the NAIVE rule gives {np.array2string(counts/N, precision=4)}&quot;)
+print(f&quot;  max abs err  {np.abs(counts/N - p).max():.4f}   &lt;- biased, and not by a little&quot;)
+
+# does it hold for arbitrary distributions?
+print(&quot;\n  checking 200 random (p, q) pairs over a 50-token vocabulary...&quot;)
+worst = 0.0
+for _ in range(200):
+    pv = rng.dirichlet(np.ones(50) * rng.uniform(0.2, 3))
+    qv = rng.dirichlet(np.ones(50) * rng.uniform(0.2, 3))
+    c = np.zeros(50)
+    for _ in range(4000):
+        t, _ = speculative_step(pv, qv, rng)
+        c[t] += 1
+    worst = max(worst, np.abs(c / 4000 - pv).max())
+print(f&quot;  worst deviation across all pairs: {worst:.4f} (noise floor ~{1/np.sqrt(4000):.4f})&quot;)
+print(&quot;  -&gt; holds regardless of how badly q matches p. The draft affects SPEED only.&quot;)
+
+
+# ==========================================================================
+# Part B -- multi-token speculation and the yield formula
+# ==========================================================================
+def speculate_gamma(p_fn, q_fn, gamma, rng):
+    &quot;&quot;&quot;Draft gamma tokens, verify all at once. Returns the accepted tokens.
+
+    p_fn(prefix) / q_fn(prefix) return distributions -- here they are stubs, but
+    the accept/reject logic is exactly what a real implementation does.
+    &quot;&quot;&quot;
+    prefix, drafts, qs = [], [], []
+    for _ in range(gamma):                            # DRAFT sequentially
+        qd = q_fn(prefix + drafts)
+        x = int(rng.choice(len(qd), p=qd))
+        drafts.append(x)
+        qs.append(qd)
+
+    # VERIFY: one target pass gives p at every drafted position
+    ps = [p_fn(prefix + drafts[:i]) for i in range(gamma + 1)]
+
+    out = []
+    for i in range(gamma):
+        x, pd, qd = drafts[i], ps[i], qs[i]
+        if rng.random() &lt; min(1.0, pd[x] / qd[x]):
+            out.append(x)
+        else:
+            resid = np.maximum(0.0, pd - qd)
+            out.append(int(rng.choice(len(pd), p=resid / resid.sum())))
+            return out                                # stop at first rejection
+    out.append(int(rng.choice(len(ps[gamma]), p=ps[gamma])))   # bonus token
+    return out
+
+
+def make_pair(alpha_target, vocab=32, rng=rng):
+    &quot;&quot;&quot;Build (p, q) whose overlap sum min(p,q) is approximately alpha_target.&quot;&quot;&quot;
+    base = rng.dirichlet(np.ones(vocab))
+    noise = rng.dirichlet(np.ones(vocab))
+    lo, hi = 0.0, 1.0
+    for _ in range(40):                               # bisect on the mixing weight
+        w = (lo + hi) / 2
+        qv = (1 - w) * base + w * noise
+        if np.minimum(base, qv).sum() &gt; alpha_target:
+            lo = w
+        else:
+            hi = w
+    return base, (1 - lo) * base + lo * noise
+
+
+print(&quot;\n=== Part B: expected tokens per verification ===&quot;)
+print(f&quot;  {'alpha':&gt;7} {'gamma':&gt;6} {'predicted':&gt;11} {'simulated':&gt;11}&quot;)
+for alpha in (0.5, 0.7, 0.9):
+    for gamma in (1, 2, 4, 8):
+        pv, qv = make_pair(alpha)
+        a_real = np.minimum(pv, qv).sum()
+        pred = (1 - a_real ** (gamma + 1)) / (1 - a_real)
+        got = np.mean([len(speculate_gamma(lambda _: pv, lambda _: qv, gamma, rng))
+                       for _ in range(3000)])
+        print(f&quot;  {a_real:&gt;7.3f} {gamma:&gt;6} {pred:&gt;11.3f} {got:&gt;11.3f}&quot;)
+
+
+# ==========================================================================
+# Part C -- the economics
+# ==========================================================================
+def expected_tokens(alpha, gamma):
+    if alpha &gt;= 1.0:
+        return gamma + 1
+    return (1 - alpha ** (gamma + 1)) / (1 - alpha)
+
+
+def speedup(alpha, gamma, c):
+    return expected_tokens(alpha, gamma) / (gamma * c + 1)
+
+
+print(&quot;\n=== Part C: speedup surface (c = 0.114, an 8B draft for a 70B target) ===&quot;)
+c = 8.03 / 70.6
+print(f&quot;  {'alpha':&gt;7} &quot; + &quot; &quot;.join(f&quot;g={g:&lt;5}&quot; for g in (1, 2, 3, 4, 6, 8, 12)) + &quot;   best&quot;)
+for alpha in (0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95):
+    row, best_g, best_s = [], 0, 0
+    for g in (1, 2, 3, 4, 6, 8, 12):
+        s = speedup(alpha, g, c)
+        row.append(f&quot;{s:&lt;7.2f}&quot;)
+        if s &gt; best_s:
+            best_s, best_g = s, g
+    print(f&quot;  {alpha:&gt;7.2f} &quot; + &quot; &quot;.join(row) + f&quot;   g={best_g} ({best_s:.2f}x)&quot;)
+
+print(&quot;\n=== break-even: minimum alpha for a speedup at all ===&quot;)
+print(f&quot;  {'c':&gt;8} &quot; + &quot; &quot;.join(f&quot;g={g:&lt;7}&quot; for g in (1, 2, 4, 8)))
+for c_ in (0.02, 0.05, 0.10, 0.20, 0.35, 0.50):
+    cells = []
+    for g in (1, 2, 4, 8):
+        lo, hi = 0.0, 0.999
+        for _ in range(60):
+            mid = (lo + hi) / 2
+            if speedup(mid, g, c_) &gt; 1.0:
+                hi = mid
+            else:
+                lo = mid
+        cells.append(f&quot;{hi:&lt;9.3f}&quot; if hi &lt; 0.99 else &quot;never    &quot;)
+    print(f&quot;  {c_:&gt;8.2f} &quot; + &quot; &quot;.join(cells))
+
+print(&quot;\n=== the batching interaction (ridge point 295) ===&quot;)
+print(f&quot;  {'batch':&gt;6} {'plain I':&gt;9} {'g=4 I':&gt;8} {'g=8 I':&gt;8}  regime at g=4&quot;)
+for b in (1, 4, 16, 32, 64, 128, 256):
+    i1, i4, i8 = b, b * 5, b * 9
+    reg = &quot;compute-bound (speculation no longer free)&quot; if i4 &gt; 295 else &quot;memory-bound (speculation free)&quot;
+    print(f&quot;  {b:&gt;6} {i1:&gt;9} {i4:&gt;8} {i8:&gt;8}  {reg}&quot;)
+
+# --- TODO for you ---
+#   1. Add temperature. Recompute alpha as sum min(p,q) after applying the same
+#      temperature to both. Plot alpha vs temperature -- it should fall, which
+#      is why speculation works better at low temperature.
+#   2. Model tree verification: with a branching factor b and depth d, you verify
+#      b^d paths in one pass. Estimate P(some path accepted) and redo the speedup.
+#   3. Write an adaptive-gamma controller: track a rolling acceptance rate and
+#      pick gamma to maximize predicted speedup each step. Test it on a workload
+#      whose alpha shifts halfway through.
+</code></pre></div>
+        <div class="prose"><h3>What you should see</h3><p><strong>Part A</strong> is the important one. The empirical distribution matches <code>p</code> to within sampling noise — a max absolute error around <code>0.002</code> at 400,000 samples, which is the <code>1/√N ≈ 0.0016</code> noise floor. The measured acceptance rate lands on <code>Σ min(p,q) = 0.80</code>.</p>
+<p>The naive rule shows an error of <code>0.05–0.15</code> — clearly, visibly biased. Seeing the two side by side makes it obvious why the rejection scheme is necessary rather than pedantic.</p>
+<p>The 200-random-pair check confirms the guarantee holds for arbitrary <code>q</code>. <strong>The draft model cannot corrupt your output no matter how bad it is.</strong></p>
+<p><strong>Part B</strong> shows simulated yields matching <code>(1 − α^(γ+1))/(1 − α)</code> closely — within a few percent at 3,000 trials.</p>
+<p><strong>Part C</strong> reproduces the math lab: at <code>α = 0.7</code> the optimum is around <code>γ = 4</code> at ~1.9×, and at <code>α = 0.9</code> the optimum moves to <code>γ = 8</code> or beyond at ~3×. The break-even table shows that with an expensive draft (<code>c = 0.5</code>) you need <code>α &gt; 0.6</code> even at <code>γ = 1</code>, and <code>γ = 8</code> may never pay.</p>
+<p>The final table is the one to remember: at <code>γ = 4</code>, speculation crosses the ridge point at around <strong>batch 60</strong>. Past that, the free-arithmetic argument no longer holds.</p></div>
+        <div class="prose"><h3>Stretch</h3><p>Run it against a real model pair. Use <code>gpt2</code> as the target and <code>distilgpt2</code> as the draft (same tokenizer, which is required), and measure the actual acceptance rate on three different prompt types: natural prose, Python code, and a repeated-structure prompt such as a JSON list. You should find code and structured text accepting substantially better than prose, because they are more predictable. Then implement n-gram lookup speculation and compare — on the repeated-structure prompt it will likely beat the draft model outright, at zero cost.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pac" id="papers">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>THE KEY · PAPERS</p>
+        <h2 class="section__title">Papers, with a reading frame</h2>
+        <div class="papers">
+          <article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2211.17192" target="_blank" rel="noopener">Fast Inference from Transformers via Speculative Decoding</a></h3>
+            <p class="paper__by">Leviathan, Kalman &amp; Matias (Google), 2022</p>
+            <p class="paper__why">The original. Contains the acceptance rule, the distribution-preservation proof, and the expected-yield analysis this module is built on.</p>
+            <div class="paper__frame"><p><strong>Section 2.1</strong> defines the algorithm and <strong>Theorem 3.5</strong> with its appendix proof is the payload — work through it yourself; it is half a page and it is the reason the technique is adoptable. <strong>Section 3.2</strong> derives the expected number of accepted tokens. Pay attention to their discussion of choosing <code>γ</code>, which is where the practical guidance lives.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2302.01318" target="_blank" rel="noopener">Accelerating Large Language Model Decoding with Speculative Sampling</a></h3>
+            <p class="paper__by">Chen et al. (DeepMind), 2023</p>
+            <p class="paper__why">Independent concurrent discovery, with a cleaner presentation of the sampling argument and results on Chinchilla at scale.</p>
+            <div class="paper__frame"><p>Read alongside Leviathan — the two derivations of the same result illuminate each other. This one is more direct about the modified rejection sampling and has a clearer treatment of what happens with different sampling parameters.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2401.10774" target="_blank" rel="noopener">Medusa: Simple LLM Inference Acceleration Framework with Multiple Decoding Heads</a></h3>
+            <p class="paper__by">Cai et al., 2024</p>
+            <p class="paper__why">Self-speculation via extra decoding heads, removing the need for a separate draft model. Also introduces tree attention for multi-candidate verification.</p>
+            <div class="paper__frame"><p>Read Section 3 for the heads and Section 3.2 for tree attention and the mask construction — the tree idea generalizes beyond Medusa and is the more durable contribution. Note the two training regimes (frozen backbone vs joint) and what each costs.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2401.15077" target="_blank" rel="noopener">EAGLE: Speculative Sampling Requires Rethinking Feature Uncertainty</a></h3>
+            <p class="paper__by">Li et al., 2024</p>
+            <p class="paper__why">The strongest general self-speculation method. Autoregresses at the feature level rather than the token level, which is a genuinely better idea than Medusa's independent heads.</p>
+            <div class="paper__frame"><p>The key insight is in Section 3: features are more predictable than tokens, but feature-level autoregression alone is ambiguous because the sampled token is not determined — so EAGLE conditions on the token sequence shifted one step. Understand why that shift is necessary. Follow up with EAGLE-2 for dynamic draft trees.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2402.02057" target="_blank" rel="noopener">Break the Sequential Dependency of LLM Inference Using Lookahead Decoding</a></h3>
+            <p class="paper__by">Fu et al., 2024</p>
+            <p class="paper__why">A different route: generate and verify n-grams in parallel using Jacobi iteration, with no draft model and no extra training at all.</p>
+            <div class="paper__frame"><p>Read Sections 2 and 3. The Jacobi-iteration framing of autoregressive decoding as a fixed-point problem is a genuinely different way to look at the sequential dependency, and worth having in your head even if you never deploy it.</p></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--blinky" id="pitfalls">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--blinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>BLINKY · PITFALLS</p>
+        <h2 class="section__title">What people get wrong</h2>
+        <div class="pitfall">
+          <p class="pitfall__wrong"><span>Accept the draft token if the target model would have picked it too.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>That rule is biased. It gives the draft model an effective veto over which tokens are considered, skewing output toward the draft's preferences. The correct rule accepts with probability <code>min(1, p/q)</code> and, on rejection, samples from the normalized <code>max(0, p − q)</code>. Only that composition provably yields <code>p</code>. The naive version produces plausible text, which is exactly what makes the bug hard to notice.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>A better draft model always means a better speedup.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>Speedup is <code>E(α, γ) / (γc + 1)</code>, so a draft that raises <code>α</code> but also raises <code>c</code> can easily be worse. A 7B draft for a 13B target with <code>α = 0.8</code> gives only 1.17×, because <code>c = 0.54</code> dominates. You want roughly a 10× size gap — or self-speculation, where <code>c</code> is near zero and a lower <code>α</code> still wins.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Turning on speculation in a high-throughput serving deployment.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>Speculation converts idle arithmetic into tokens, and at large batch there is no idle arithmetic left — batching already consumed it. At <code>γ = 4</code> you cross an H100's ridge point around batch 60, after which extra draft positions cost real time and rejected drafts steal compute from real tokens. Speculation is for low-concurrency, latency-sensitive serving. Measure before enabling it at scale.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Assuming a published acceptance rate transfers to your workload.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>Acceptance varies substantially by domain (code drafts far better than creative prose), by sampling temperature (higher temperature flattens <code>p</code>, reducing overlap with <code>q</code>), and by position within a sequence. A configuration measured at 0.8 on one benchmark can be 0.5 on yours, which moves you from a 2.8× win to a 1.2× marginal one. Instrument the realized rate in production and adapt <code>γ</code> to it.</p></div></div>
+        </div>
+      </section>
+
+      <section class="section" id="checkpoint">
+        <div class="wall checkpoint">
+          <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>POWER PELLET · CHECKPOINT</p>
+          <p class="checkpoint__claim">You can explain why speculative decoding is free performance rather than a
+quality/speed trade-off — including the proof — and you can compute in advance whether it will
+pay for a given model pair, acceptance rate and batch size.</p>
+          <details class="qa">
+            <summary>Prove that the acceptance rule preserves the target distribution.</summary>
+            <div class="qa__a prose"><p>Let <code>q</code> be the draft distribution and <code>p</code> the target's. A token <code>z</code> is emitted either by being drafted and accepted, or by being sampled from the residual after a rejection. First path: <code>P = q(z) × min(1, p(z)/q(z)) = min(p(z), q(z))</code>. Rejection probability is <code>1 − Σ_w min(p(w), q(w))</code>, and since both distributions sum to 1, <code>Σ_w max(0, p(w) − q(w)) = 1 − Σ_w min(p(w), q(w))</code> — the residual's normalizer equals the rejection probability exactly, so they cancel. Therefore <code>P(emit z) = min(p(z), q(z)) + max(0, p(z) − q(z))</code>. If <code>p(z) ≤ q(z)</code> that is <code>p(z) + 0</code>; if <code>p(z) &gt; q(z)</code> it is <code>q(z) + p(z) − q(z) = p(z)</code>. Either way <code>P(emit z) = p(z)</code>, for any <code>q</code> whatsoever.</p></div>
+          </details>
+<details class="qa">
+            <summary>Your acceptance rate is 0.6 and your draft costs 40% of your target. Should you speculate?</summary>
+            <div class="qa__a prose"><p>Probably not. At <code>γ = 2</code>: <code>E = (1 − 0.6³)/0.4 = 2.06</code>, cost <code>= 2(0.4) + 1 = 1.8</code>, so speedup <code>= 1.14×</code>. At <code>γ = 4</code>: <code>E = 2.31</code>, cost <code>= 2.6</code>, speedup <code>= 0.89×</code> — an actual slowdown. The best you can do is around 1.1× at <code>γ = 1–2</code>, which is not worth the implementation and operational complexity. The problem is <code>c = 0.4</code>: the draft is far too expensive relative to the target. You want roughly a 10× size gap. Better options here would be a much smaller draft model, self-speculation (EAGLE, where <code>c</code> is tiny), or n-gram lookup if the workload is repetitive.</p></div>
+          </details>
+<details class="qa">
+            <summary>Why does speculation stop helping at large batch size?</summary>
+            <div class="qa__a prose"><p>Because it and batching draw on the same resource: idle arithmetic. Decode is free to speculate only because arithmetic intensity is far below the ridge point — at batch 1 you use about 0.3% of an H100's compute. But intensity equals batch size, so batching consumes that headroom too. With <code>γ = 4</code>, verification processes <code>5 × batch</code> positions, so you cross the 295 ridge at around batch 60. Past that you are compute-bound and the extra positions cost real time rather than riding in idle capacity — and rejected drafts now consume arithmetic that another sequence's real token needed. Speculation is a latency technique for low-concurrency serving; batching is a throughput technique for high-concurrency serving, and you generally pick one.</p></div>
+          </details>
+<details class="qa">
+            <summary>Why does the optimal draft length increase with the acceptance rate?</summary>
+            <div class="qa__a prose"><p>Because the marginal value of the <code>(γ+1)</code>-th draft token is the probability that all <code>γ</code> before it were accepted, which is <code>α^γ</code> — it decays geometrically in <code>γ</code> at a rate set by <code>α</code>. At <code>α = 0.5</code> the fifth draft token is worth <code>0.5⁴ = 6%</code> of a token while costing a full draft step, so long speculation is wasted. At <code>α = 0.9</code> it is worth <code>0.9⁴ = 66%</code>, so drafting further still pays. Concretely with <code>c = 0.114</code>: at <code>α = 0.7</code> the optimum is <code>γ ≈ 4</code> (1.91×), and at <code>α = 0.85</code> it moves to <code>γ ≈ 8</code> (2.68×). This is why production implementations track a rolling acceptance rate and adapt <code>γ</code> rather than fixing it.</p></div>
+          </details>
+<details class="qa">
+            <summary>When would n-gram lookup beat a trained draft model?</summary>
+            <div class="qa__a prose"><p>Whenever the output substantially repeats the context, because then the lookup's acceptance rate is high and its cost is essentially zero — so the break-even condition is trivially satisfied and the speedup approaches the raw yield. Good cases: code editing where most of a file is unchanged, summarization that quotes the source, RAG where answers copy from retrieved documents, structured output with a fixed schema, and any diff-style task. A trained draft model has <code>c &gt; 0</code> and needs a meaningfully higher <code>α</code> to justify itself. It is also worth trying first for the practical reason that it needs no extra weights, no training, no alignment, and no memory — if it works for your workload you are done.</p></div>
+          </details>
+<details class="qa">
+            <summary>A colleague applies top-p 0.9 to the target model but samples the draft at full distribution. What is wrong?</summary>
+            <div class="qa__a prose"><p>The distribution-preservation proof assumes <code>p</code> and <code>q</code> are the distributions actually being sampled from. If the target's <code>p</code> is truncated by top-p but the draft's <code>q</code> is not, then <code>q</code> can place mass on tokens where <code>p</code> is exactly zero. Those drafts are always rejected — wasting speculation — and more importantly the acceptance/residual arithmetic no longer composes to the intended distribution, so you lose the exactness guarantee. Both models must see the same processed distribution: apply identical temperature, top-p, top-k and penalties to each before the accept/reject step. This is a common bug precisely because the output still looks fine — it is plausible text, just not samples from the distribution you specified.</p></div>
+          </details>
+          <p style="margin-top:var(--s7)">
+            <button class="done-toggle" type="button" data-complete="8" aria-pressed="false">
+              MARK LEVEL 08 CLEARED
+            </button>
+          </p>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="glossary">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>GLOSSARY</p>
+        <h2 class="section__title">Glossary</h2>
+        <div class="gloss">
+          <div class="gloss__row"><div class="gloss__term">draft model</div><div class="gloss__def">A small, cheap model that proposes candidate tokens for the target model to verify.</div></div><div class="gloss__row"><div class="gloss__term">acceptance rate (alpha)</div><div class="gloss__def">Probability a drafted token survives verification. Equals sum min(p, q), i.e. 1 minus the total variation distance between draft and target.</div></div><div class="gloss__row"><div class="gloss__term">gamma</div><div class="gloss__def">Draft length: how many tokens are proposed before each verification pass.</div></div><div class="gloss__row"><div class="gloss__term">modified rejection sampling</div><div class="gloss__def">Accept with probability min(1, p/q); on rejection sample from normalized max(0, p - q). Provably yields p.</div></div><div class="gloss__row"><div class="gloss__term">residual distribution</div><div class="gloss__def">The normalized positive part of p - q. The mass the target wanted that the draft undersupplied.</div></div><div class="gloss__row"><div class="gloss__term">bonus token</div><div class="gloss__def">The extra token available when all gamma drafts are accepted, since the verification pass already computed p at the final position.</div></div><div class="gloss__row"><div class="gloss__term">self-speculation</div><div class="gloss__def">Generating drafts from the target model itself via extra heads or a small feature-level head, avoiding a separate draft model.</div></div><div class="gloss__row"><div class="gloss__term">Medusa</div><div class="gloss__def">Self-speculation with multiple independent decoding heads predicting several positions ahead, verified as a tree.</div></div><div class="gloss__row"><div class="gloss__term">EAGLE</div><div class="gloss__def">Self-speculation by autoregressing over the target's hidden features rather than tokens. The strongest general method.</div></div><div class="gloss__row"><div class="gloss__term">tree attention</div><div class="gloss__def">Verifying many candidate continuations in one pass using a mask where each node attends only to its ancestors.</div></div><div class="gloss__row"><div class="gloss__term">n-gram lookup</div><div class="gloss__def">Drafting by searching the context for the current suffix and proposing what followed it. Free, and excellent on repetitive text.</div></div>
+        </div>
+      </section>
+
+      <nav class="pagenav">
+        <a href="attention-kernels.html" data-nav="prev"><span>◀ PREVIOUS LEVEL</span>07 ATTENTION KERNELS</a>
+        <a href="distributed-inference.html" data-nav="next" style="text-align:right"><span>NEXT LEVEL ▶</span>09 DISTRIBUTED INFERENCE</a>
+      </nav>
+
+    </main>
+  </div>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <p class="foot__h">LEVELS</p>
+        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">&nbsp;</p>
+        <ul><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">REFERENCE</p>
+        <ul>
+          <li><a href="../reference/timeline.html">Timeline</a></li>
+          <li><a href="../reference/hardware.html">GPU spec table</a></li>
+          <li><a href="../reference/engines.html">Serving engines</a></li>
+          <li><a href="../reference/frontier.html">Open problems</a></li>
+          <li><a href="../reference/glossary.html">Glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="foot__h">SOURCE</p>
+        <ul>
+          <li><a href="https://github.com/tushar-amrit-6/inference">GitHub repository</a></li>
+          <li><a href="../reference/how-to-use.html">How to work through this</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
+    do the arithmetic yourself.</p>
+  </div>
+</footer>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

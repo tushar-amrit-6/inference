@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>05 · BATCHING — LLM INFERENCE</title>
+<meta name="description" content="The largest throughput lever in serving, and the scheduling problem it creates.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="05 · BATCHING — LLM INFERENCE">
+<meta property="og:description" content="The largest throughput lever in serving, and the scheduling problem it creates.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/arcade.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20fill%3D%22%23000%22%2F%3E%3Cpath%20d%3D%22M16%2C16%20L29%2C9%20A15%2C15%200%201%200%2029%2C23%20Z%22%20fill%3D%22%23FFE800%22%2F%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="scorebar">
+  <a class="scorebar__home" href="../index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="var(--pac)" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
+  <span class="scorebar__item"><span class="scorebar__label">LEVEL</span><span class="scorebar__value scorebar__value--pac">05</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/11</span></span>
+  <span class="scorebar__spacer"></span>
+  <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
+</header>
+<div class="wrap">
+  <div class="shell">
+    <nav class="rail" aria-label="Module contents">
+  <p class="rail__head">ON THIS LEVEL</p>
+  <ul class="rail__list">
+    <li><a class="rail__link" href="#big-idea" data-kind="dot"><span class="rail__dot"></span><span>The big idea</span></a></li><li><a class="rail__link" href="#concept-0" data-kind="dot"><span class="rail__dot"></span><span>Static batching, and where the capacity goes</span></a></li><li><a class="rail__link" href="#concept-1" data-kind="dot"><span class="rail__dot"></span><span>Continuous batching: decide every iteration, not every request</span></a></li><li><a class="rail__link" href="#concept-2" data-kind="dot"><span class="rail__dot"></span><span>Prefill/decode interference</span></a></li><li><a class="rail__link" href="#concept-3" data-kind="dot"><span class="rail__dot"></span><span>Chunked prefill and the token budget</span></a></li><li><a class="rail__link" href="#concept-4" data-kind="dot"><span class="rail__dot"></span><span>Scheduling policy: admission, preemption, and fairness</span></a></li><li><a class="rail__link" href="#concept-5" data-kind="dot"><span class="rail__dot"></span><span>How batching interacts with the roofline</span></a></li><li><a class="rail__link" href="#math-lab" data-kind="dot"><span class="rail__dot"></span><span>Math by hand</span></a></li><li><a class="rail__link" href="#code-lab" data-kind="dot"><span class="rail__dot"></span><span>Code lab</span></a></li><li><a class="rail__link" href="#papers" data-kind="dot"><span class="rail__dot"></span><span>Papers</span></a></li><li><a class="rail__link" href="#pitfalls" data-kind="dot"><span class="rail__dot"></span><span>Pitfalls</span></a></li><li><a class="rail__link" href="#checkpoint" data-kind="power"><span class="rail__dot"></span><span>Checkpoint</span></a></li><li><a class="rail__link" href="#glossary" data-kind="dot"><span class="rail__dot"></span><span>Glossary</span></a></li>
+  </ul>
+  <div class="rail__nav">
+    <a class="rail__step" href="roofline.html">◀ 04 METRICS AND THE ROOFLINE</a>
+    <a class="rail__step" href="../index.html">▲ ALL LEVELS</a>
+    <a class="rail__step" href="memory-optimization.html">06 MEMORY OPTIMIZATION ▶</a>
+  </div>
+</nav>
+    <main id="main">
+
+      <div class="mod-head">
+        <p class="mod-head__level">LEVEL 05</p>
+        <h1 class="mod-head__title">BATCHING</h1>
+        <p class="mod-head__tag">The largest throughput lever in serving, and the scheduling problem it creates.</p>
+        <div class="mod-head__meta">
+          <span>⏱ 5–7 hours</span>
+          <span>● 6 concepts</span>
+          <span>📄 4 papers</span>
+          <span>▸ needs: Module 1, Module 2, Module 4</span>
+        </div>
+      </div>
+
+      <section class="section ghost ghost--pinky" id="big-idea">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--pinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>PINKY · THE BIG IDEA</p>
+        <div class="prose"><p>Module 4 gave you the result that matters: <strong>decode arithmetic intensity equals batch size</strong>. At batch 1 you are at 1 FLOP per byte on a machine that wants 295. At batch 64 you are at 64. The weights get read once and serve everyone.</p>
+<p>So the throughput problem reduces to a scheduling problem: <strong>keep the batch as full as possible, at all times</strong>. That sounds trivial and is not, because sequences have wildly different lengths and nobody tells you in advance how long any of them will be. A batch assembled at time <code>t</code> is mostly finished by time <code>t + 200ms</code>, and if you wait for the slowest member before starting anything new, the GPU spends most of its life running a batch of two.</p>
+<p>The fix — <strong>continuous batching</strong>, from the Orca paper — is one of those ideas that seems obvious once stated and took years to arrive: make batching decisions at every <em>iteration</em> rather than every <em>request</em>. A sequence that finishes leaves immediately; a waiting request takes its slot on the next step.</p>
+<p>The second half of this module is the complication that continuous batching creates. Prefill and decode want the GPU for different reasons and cannot politely share it. One 32k-token prompt arriving mid-stream will stall every other user's token stream unless you do something about it, and <strong>chunked prefill</strong> is what you do.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="concepts">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>PELLETS · CONCEPTS</p>
+        <article class="concept" id="concept-0">
+  <div class="concept__head">
+    <span class="concept__n">01</span>
+    <h3 class="concept__title">Static batching, and where the capacity goes</h3>
+  </div>
+  <div class="prose"><p>The naive approach: collect <code>B</code> requests, run them together until all are done, then collect the next <code>B</code>.</p>
+<p>The problem is that generation lengths vary enormously and are not known in advance. Real traffic has a heavy right tail — most responses are short, a few are very long. If your batch of 8 has lengths <code>[20, 35, 40, 60, 80, 120, 200, 900]</code>, the batch runs for 900 steps. The sequence that finished at step 20 occupies a slot doing nothing for the remaining 880.</p>
+<p>Quantify it. Utilization is mean length over max length:</p>
+<pre><code>total useful work  = 20+35+40+60+80+120+200+900 = 1455 sequence-steps
+slots x steps      = 8 x 900                    = 7200 sequence-steps
+utilization        = 1455 / 7200                = 20.2%</code></pre>
+<p><strong>Four fifths of your paid-for capacity produced nothing.</strong> And this is not a contrived example — a lognormal length distribution with a realistic tail gives numbers in this range routinely. The larger the batch, the worse it gets, because <code>max</code> over more samples reaches further into the tail. Static batching is one of the few optimizations that gets <em>worse</em> as you scale it up.</p>
+<p>There is a second cost that is easy to miss: <strong>padding</strong>. Sequences in a static batch must be padded to a common length for the tensors to be rectangular. Attention over padding positions is wasted arithmetic, and the padding also sits in the KV cache consuming memory that could have held real sequences.</p>
+<p>Orca's contribution begins with noticing that the padding problem and the early-finish problem have the same root cause — treating a batch as a fixed rectangular object with a lifetime.</p></div>
+  <pre class="ascii" aria-label="diagram">  STATIC BATCH, 8 slots, batch runs until the longest finishes
+
+  slot 0  ####································································
+  slot 1  ######······························································
+  slot 2  #######·····························································
+  slot 3  ##########··························································
+  slot 4  #############·······················································
+  slot 5  ####################································
+  slot 6  #################################···································
+  slot 7  ####################################################################
+
+          ^ useful work        ^ idle slot, still allocated, still costing you
+
+          utilization = 20.2%</pre>
+  <p class="keypoint"><b>REMEMBER</b>A static batch runs until its longest member finishes, so every shorter sequence leaves its slot idle for the remainder.</p>
+</article>
+<article class="concept" id="concept-1">
+  <div class="concept__head">
+    <span class="concept__n">02</span>
+    <h3 class="concept__title">Continuous batching: decide every iteration, not every request</h3>
+  </div>
+  <div class="prose"><p>Orca's insight is to move the scheduling granularity from the request to the <strong>iteration</strong>. The loop becomes:</p>
+<pre><code>loop forever:
+    1. remove any sequence that emitted EOS or hit its length limit
+    2. free its KV cache blocks
+    3. admit waiting requests while memory allows
+    4. run one forward step for the whole current batch
+    5. sample one token for each sequence</code></pre>
+<p>A sequence that finishes at step 20 releases its slot at step 20. Someone else takes it at step 21. The batch stays near capacity permanently, and utilization goes from ~20% to ~90%+ on the same traffic.</p>
+<p>Orca reported throughput improvements of up to <strong>36.9×</strong> over FasterTransformer at comparable latency. That number is large partly because the baseline was weak, but the mechanism is real and it is why every serious engine implements this.</p>
+<p>There is a genuine technical obstacle, and Orca's solution to it is the part people skip. <strong>Different sequences in the batch are at different positions</strong>, so their attention computations have different shapes. You cannot batch them into one rectangular attention call the way you can for a uniform batch.</p>
+<p>Orca's answer is <strong>selective batching</strong>: batch the operations that permit it and split the one that does not.</p>
+<pre><code>QKV projections, MLP, LM head   -&gt;  batch across sequences
+                                     (these are position-independent; each
+                                      token is an independent row of a matmul)
+
+attention                       -&gt;  handle per-sequence
+                                     (each has a different KV length)</code></pre>
+<p>This works because the position-independent operations are where nearly all the weight traffic lives. Flatten all the batch's tokens into a single <code>[total_tokens, d_model]</code> matrix, do one big matmul, and the weights are amortized across everyone. Attention is then handled with a kernel that takes per-sequence lengths and offsets — which is exactly what PagedAttention and FlashAttention's varlen variants provide.</p>
+<p>Two costs worth knowing. First, admitting a request means running its <strong>prefill</strong>, which is a different and much heavier operation than a decode step — the subject of the next two concepts. Second, the scheduler now runs every iteration, so it must be fast; at 100 steps/second a scheduler taking 2 ms is consuming 20% of your wall clock. This is why production schedulers are C++ and why vLLM's V1 rewrite moved the scheduling loop out of the Python hot path.</p></div>
+  <pre class="ascii" aria-label="diagram">  CONTINUOUS BATCHING, same 8 slots, same traffic
+
+  slot 0  ####|######|##########|#############|####################|####
+  slot 1  ######|#######|###################################|##########
+  slot 2  #######|####################|#########|################|####
+  slot 3  ##########|#############################|###############
+  slot 4  #############|##########|#####################|############
+  slot 5  ####################|###############|#####################
+  slot 6  #################################|##########|##############
+  slot 7  ####################################################################
+
+          | = a sequence finished, its slot was refilled on the next step
+
+          utilization &gt; 90%</pre>
+  <p class="keypoint"><b>REMEMBER</b>Evict finished sequences and admit waiting ones at every decode step, so the batch stays full regardless of length variance.</p>
+</article>
+<article class="concept" id="concept-2">
+  <div class="concept__head">
+    <span class="concept__n">03</span>
+    <h3 class="concept__title">Prefill/decode interference</h3>
+  </div>
+  <div class="prose"><p>Continuous batching creates a problem it did not have to solve before: prefill and decode now contend for the same GPU, iteration by iteration.</p>
+<p>Numbers make it concrete. Llama-3-8B on an H100:</p>
+<pre><code>one decode step, batch 32       ~10 ms
+one prefill of 8,000 tokens    ~130 ms  (compute-bound: 2 x 8.03e9 x 8000 FLOP)</code></pre>
+<p>If the scheduler runs that prefill as a single unit, then for 130 ms <strong>every one of your 32 decoding sequences produces nothing</strong>. Their inter-token latency for that step is 130 ms instead of 10 ms — a 13× spike. To a user watching text stream, it is a visible stall.</p>
+<p>Worse, this is not rare. Any traffic mix with both chat (short prompts, long outputs) and document processing (long prompts, short outputs) produces it constantly. A single user pasting a long document degrades the experience of everyone currently streaming.</p>
+<p>The scheduling policies you can choose between all have a real cost:</p>
+<p><strong>Prefill-priority.</strong> Run prefills as soon as they arrive. Best TTFT, worst TPOT stability. This is what naive continuous batching does by default.</p>
+<p><strong>Decode-priority.</strong> Never interrupt decoding; queue prefills until there is slack. Smooth token streams, terrible TTFT under load, and requests can starve.</p>
+<p><strong>Chunked prefill.</strong> Split a long prefill into fixed-size chunks and process one chunk per iteration alongside the ongoing decode. The next concept, and the answer most systems settled on.</p>
+<p><strong>Disaggregation.</strong> Put prefill and decode on separate hardware entirely so they cannot interfere. The cleanest fix, and the subject of Module 9.</p>
+<p>The underlying reason the conflict exists is the asymmetry from Module 1: prefill is compute-bound and decode is memory-bound. They are not competing for the same resource, which sounds like it should help, but they cannot run <em>simultaneously</em> on the same SMs — so in practice they simply take turns, and the long one wins.</p></div>
+  <pre class="ascii" aria-label="diagram">  UNCHUNKED: one 8k prefill blocks everyone
+
+  time -&gt;  |--10ms--|--10ms--|------------- 130ms -------------|--10ms--|
+  decoders    tok      tok    (nothing for 130ms -- visible stall)  tok
+  new req                     [======== prefill 8000 ========]
+
+  CHUNKED: 512-token chunks share each iteration
+
+  time -&gt;  |-14ms-|-14ms-|-14ms-|-14ms-| ... |-14ms-|
+  decoders   tok    tok    tok    tok         tok      (steady stream)
+  new req    [c1]   [c2]   [c3]   [c4]  ...   [c16]    (TTFT slightly later)</pre>
+  <p class="keypoint"><b>REMEMBER</b>One long prefill occupies the GPU for hundreds of milliseconds, during which every decoding sequence emits nothing.</p>
+</article>
+<article class="concept" id="concept-3">
+  <div class="concept__head">
+    <span class="concept__n">04</span>
+    <h3 class="concept__title">Chunked prefill and the token budget</h3>
+  </div>
+  <div class="prose"><p>Chunked prefill splits a long prompt into pieces and processes one piece per iteration, mixed in with ongoing decode work. Since causal attention only looks backward, chunk <code>k</code> can attend to all of chunks <code>0..k-1</code> from the cache — the result is identical to prefilling the whole prompt at once.</p>
+<p>The mechanism is a <strong>token budget</strong> per iteration. A scheduler with a budget of 2,048 tokens might assemble:</p>
+<pre><code>iteration budget: 2048 tokens
+
+  32 decode sequences        -&gt;    32 tokens
+  1 prefill chunk            -&gt; 2,016 tokens
+                                 -------
+                                 2,048</code></pre>
+<p>Decode tokens are admitted first because they are latency-critical and cheap — 32 of them cost 32 of your 2,048. Prefill chunks fill the remainder. The result is that every iteration takes about the same amount of time, so inter-token latency stays flat regardless of what prompts are arriving.</p>
+<p>The choice of budget is a real trade-off:</p>
+<table><thead><tr><th>budget</th><th>TTFT</th><th>TPOT stability</th><th>GPU efficiency</th></tr></thead><tbody><tr><td>small (256)</td><td>worse — more iterations to finish a prefill</td><td>excellent</td><td>poor — too few tokens to saturate</td></tr><tr><td>medium (2048)</td><td>good</td><td>good</td><td>good</td></tr><tr><td>large (8192)</td><td>best</td><td>poor — long iterations</td><td>best</td></tr></tbody></table>
+<p>There is also a subtle benefit that is easy to miss and is arguably the main one. A pure decode iteration at batch 32 has arithmetic intensity 32 — deep in memory-bound territory, GPU mostly idle. Adding 2,016 prefill tokens to that same iteration raises the intensity to roughly 2,048. <strong>The prefill work is nearly free</strong>, because it uses the arithmetic capacity that the decode step was wasting anyway.</p>
+<p>That reframes chunked prefill entirely. It is not a scheduling compromise that trades TTFT for TPOT. It is a way to run prefill in the compute the decode step was leaving on the floor — the purest possible expression of this course's thesis. Both workloads finish faster than they would if you ran them separately.</p>
+<p>Sarathi-Serve, which introduced this technique as &quot;stall-free batching&quot;, reported substantial improvements in serving capacity under latency SLOs for exactly this reason.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Cap the tokens processed per iteration, then fill that budget with decode tokens first and prefill chunks second.</p>
+</article>
+<article class="concept" id="concept-4">
+  <div class="concept__head">
+    <span class="concept__n">05</span>
+    <h3 class="concept__title">Scheduling policy: admission, preemption, and fairness</h3>
+  </div>
+  <div class="prose"><p>The scheduler decides, every iteration, who runs. It faces a problem with no clean solution: <strong>it does not know how long any sequence will be</strong>, but it must commit memory to it anyway.</p>
+<p><strong>Admission control.</strong> How many sequences to admit is a bet. Admit too few and you waste throughput. Admit too many and you run out of KV cache mid-generation, because every admitted sequence's cache grows every step. Some systems admit conservatively based on <code>max_tokens</code>; others admit optimistically and deal with the consequences.</p>
+<p><strong>Preemption</strong> is how you deal with the consequences. When memory runs short, a running sequence must give some back. Two options:</p>
+<ul><li><strong>Swap</strong> — copy its KV cache to CPU memory and restore it later. Costs a PCIe round trip: moving 2.5 GiB at ~50 GB/s is about 50 ms each way.</li><li><strong>Recompute</strong> — discard the cache and re-prefill from the tokens when the sequence resumes. Costs a prefill.</li></ul>
+<p>Which is cheaper depends on sequence length and interconnect, and vLLM implements both. The crossover is roughly where prefill time exceeds transfer time — so short sequences favour recomputation, long ones favour swapping.</p>
+<p><strong>Queueing policy.</strong> FCFS is the default and is fair in the obvious sense, but it lets one 100k prompt delay everyone behind it. Shortest-job-first would be better for mean latency, but you cannot see job length in advance — output length is unknown at admission time. Some systems predict it; the predictions are not good.</p>
+<p><strong>Priority and fairness.</strong> A production system with multiple tenants needs to prevent one user from occupying the whole batch. This is genuinely hard because the natural unit of fairness is unclear: is it requests, tokens, or GPU-time? A user sending one 100k-token request and a user sending a thousand 100-token requests consume comparable resources through very different shapes.</p>
+<p><strong>The starvation trap.</strong> Any policy that prioritizes decode over prefill can starve new requests indefinitely under sustained load, because there is always more decode work. Real schedulers need an aging mechanism — a request's priority rises with its wait time — or they will occasionally never serve someone.</p>
+<p>The honest summary is that scheduling here is a live research area with no settled answer, and the defaults in every engine are heuristics tuned against a particular traffic assumption. If your traffic looks different from that assumption, the defaults will be wrong for you, and measuring is the only way to find out.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Because KV memory is finite and sequence lengths are unknown, the scheduler must be able to admit optimistically and take memory back.</p>
+</article>
+<article class="concept" id="concept-5">
+  <div class="concept__head">
+    <span class="concept__n">06</span>
+    <h3 class="concept__title">How batching interacts with the roofline</h3>
+  </div>
+  <div class="prose"><p>Tie this module back to Module 4. Batching is the mechanism that moves you right along the roofline, but the movement is bounded twice.</p>
+<p><strong>Bound 1 — the ridge point.</strong> Beyond intensity ≈ 295 on an H100, you are compute-bound and further batching buys nothing per weight-byte. In practice you rarely get there.</p>
+<p><strong>Bound 2 — the KV cache.</strong> Every sequence brings its own cache, so batch is capped by memory — and, more subtly, throughput saturates <em>before</em> the memory cap, because KV traffic grows with batch while weight traffic does not.</p>
+<p>The throughput curve therefore has a characteristic shape:</p>
+<pre><code>throughput
+    |                    ........................  &lt;- flat: KV-traffic dominated
+    |              .....
+    |         ....
+    |      ...
+    |    ..                                        &lt;- steep: weight-amortization region
+    |  ..
+    | .
+    +--------------------------------------------&gt; batch size
+        ^                    ^
+     the steep part      the knee -- operate here</code></pre>
+<p>For Llama-3-8B on an H100 at 4k context (from Module 4's table), the knee is around batch 32–64: going from 1 to 32 gains 15× throughput, and from 64 to 111 gains only 14%.</p>
+<p><strong>Operating past the knee is usually a mistake.</strong> You gain a few percent of throughput and pay for it with substantially worse tail latency, more preemption, and less headroom for traffic spikes. The right operating point is the knee, or wherever your latency SLO puts you if that is tighter.</p>
+<p>Two practical consequences:</p>
+<p><strong>Measure the knee for your own workload.</strong> It moves with model, context length, KV dtype and hardware. A batch size copied from someone else's blog post is a guess.</p>
+<p><strong>Anything that shrinks the KV cache moves the knee right.</strong> fp8 KV, GQA, MLA, better paging — each one lets the steep region continue further before KV traffic flattens it. This is why Module 6 belongs immediately after this one: memory optimization is how you get more out of batching, and batching is how memory optimization turns into throughput.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Batching raises arithmetic intensity linearly until KV traffic takes over, and the knee of the throughput curve is where you should operate.</p>
+</article>
+      </section>
+
+      <section class="section ghost ghost--inky" id="math-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--inky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>INKY · MATH BY HAND</p>
+        <h2 class="section__title">Math by hand</h2>
+        <div class="prose"><p><strong>Part 1 — the cost of static batching.</strong> A batch of 8 requests generates <code>[20, 35, 40, 60, 80, 120, 200, 900]</code> tokens.</p>
+<p>a) Under static batching, how many iterations does the batch run for? b) How many sequence-steps of useful work are done? c) What is the slot utilization? d) Now suppose you use batch size 32 drawn from the same distribution, and the longest of the 32 is 2,000 tokens with a mean of 180. What is the utilization? Which direction did it move, and why?</p>
+<p><strong>Part 2 — continuous batching throughput.</strong> Llama-3-8B on an H100. A decode step at batch <code>B</code> takes <code>(15.0 + B × 0.27) / 3350</code> seconds, where 15.0 GB is the weights and 0.27 GB is the KV cache for one sequence at 2k context. Assume 70% achieved bandwidth.</p>
+<p>a) Compute TPOT and throughput at batch 1, 8, 32, 64, 128. b) Where is the knee — the batch beyond which you gain less than 10% throughput for a doubling? c) At the knee, what is the arithmetic intensity, and what fraction of the H100's ridge point (295) is that?</p>
+<p><strong>Part 3 — chunked prefill.</strong> A request arrives with an 8,000-token prompt while 32 sequences are decoding.</p>
+<p>a) Unchunked: prefill costs <code>2 × 8.03e9 × 8000</code> FLOP at 989 TFLOP/s with 70% efficiency. How long, and what is the worst inter-token latency the 32 decoders see? b) Chunked at a 2,048-token budget: how many iterations does the prefill take? What is the per-iteration cost, and the worst inter-token latency now? c) Total time for the prefill to complete in each case. Which finishes the prompt sooner? d) Compute the arithmetic intensity of a pure decode iteration at batch 32, and of a mixed iteration with 32 decode tokens plus a 2,016-token prefill chunk. What does the comparison tell you?</p></div>
+        <details class="spoiler">
+          <summary>SHOW THE WORKED SOLUTION</summary>
+          <div class="spoiler__body prose"><p><strong>Part 1</strong></p>
+<p>a) The batch runs until the longest finishes: <strong>900 iterations</strong>.</p>
+<p>b) <code>20+35+40+60+80+120+200+900 = 1,455</code> sequence-steps of useful work.</p>
+<p>c)</p>
+<pre><code>capacity = 8 slots x 900 iterations = 7,200 sequence-steps
+utilization = 1455 / 7200 = 20.2%</code></pre>
+<p>d)</p>
+<pre><code>useful   = 32 x 180 = 5,760
+capacity = 32 x 2000 = 64,000
+utilization = 5760 / 64000 = 9.0%</code></pre>
+<p>Utilization got <strong>worse</strong>, from 20.2% to 9.0%. The reason is that <code>max</code> over a larger sample reaches further into the tail while the mean stays put, so the ratio mean/max falls as batch grows. Static batching degrades as you scale it — which is close to the worst property an optimization can have.</p>
+<p><strong>Part 2</strong></p>
+<p>Effective bandwidth: <code>3350 × 0.70 = 2345 GB/s</code>.</p>
+<pre><code>B      bytes (GB)        TPOT (ms)   throughput (tok/s)   intensity
+1      15.0 + 0.27 = 15.27   6.51            154              1
+8      15.0 + 2.16 = 17.16   7.32          1,093              8
+32     15.0 + 8.64 = 23.64  10.08          3,175             32
+64     15.0 + 17.28 = 32.28 13.76          4,651             64
+128    15.0 + 34.56 = 49.56 21.13          6,057            128</code></pre>
+<p>Working one: at B=32, <code>23.64 / 2345 = 0.01008 s = 10.08 ms</code>, and <code>32 / 0.01008 = 3,175 tok/s</code>.</p>
+<p>b) Gains per doubling:</p>
+<pre><code>1  -&gt; 8:     154 -&gt; 1,093    +610%
+8  -&gt; 32:  1,093 -&gt; 3,175    +190%
+32 -&gt; 64:  3,175 -&gt; 4,651     +46%
+64 -&gt; 128: 4,651 -&gt; 6,057     +30%</code></pre>
+<p>No doubling in this range falls below 10%, so the strict knee is beyond 128 — but the returns are clearly decaying, and the practical knee is around <strong>64</strong>, where you have captured most of the available gain (77% of the throughput at batch 128) at 65% of the latency. Note also that batch 128 needs <code>15.0 + 34.56 = 49.6</code> GB, so on an 80 GB card you are approaching the memory limit as well.</p>
+<p>c) At batch 64: intensity <strong>64</strong>, which is <code>64 / 295 = 22%</code> of the ridge point. Even at the knee you are using roughly a fifth of the machine's arithmetic capability. This is completely normal and it is what Module 6 exists to improve.</p>
+<p><strong>Part 3</strong></p>
+<p>a) Unchunked:</p>
+<pre><code>FLOPs   = 2 x 8.03e9 x 8000 = 1.285e14 = 128.5 TFLOP
+rate    = 989e12 x 0.70 = 692 TFLOP/s
+time    = 128.5 / 692 = 0.186 s = 186 ms</code></pre>
+<p>The 32 decoders see an inter-token latency of <strong>186 ms</strong> for that step, against their usual ~10 ms. An <strong>18.6× spike</strong>, and a visible stall.</p>
+<p>b) Chunked at 2,048:</p>
+<pre><code>chunks = 8000 / 2048 = 3.9  -&gt;  4 iterations
+per-iteration prefill tokens ~ 2,016 (32 slots go to decode)</code></pre>
+<p>Cost of one mixed iteration — take the larger of the compute and memory times:</p>
+<pre><code>compute: 2 x 8.03e9 x 2048 = 3.29e13 FLOP / 692e12 = 47.5 ms
+memory:  15.0 GB weights + KV / 2345 GB/s          = ~10 ms
+-&gt; compute-bound, ~47.5 ms per iteration</code></pre>
+<p>Worst inter-token latency: <strong>~48 ms</strong>, versus 186 ms unchunked. Still a spike, but a 3.9× improvement — and reducing the budget to 512 would bring it to ~13 ms at the cost of more iterations.</p>
+<p>c) Total prefill completion:</p>
+<pre><code>unchunked:  186 ms
+chunked:    4 x 47.5 = 190 ms</code></pre>
+<p>Essentially identical — about 2% slower. <strong>You get a 3.9× reduction in latency spike for a 2% increase in TTFT.</strong> That trade is why chunked prefill is on by default nearly everywhere.</p>
+<p>d) Arithmetic intensity:</p>
+<pre><code>pure decode, batch 32:
+  FLOPs = 2 x 8.03e9 x 32 = 5.14e11
+  bytes = 23.64e9
+  I = 21.7 FLOP/byte          -&gt; 7% of ridge, deeply memory-bound
+
+mixed, 32 decode + 2016 prefill = 2048 tokens:
+  FLOPs = 2 x 8.03e9 x 2048 = 3.29e13
+  bytes = 23.64e9   (the same weights! prefill adds negligible bytes)
+  I = 1,392 FLOP/byte         -&gt; 4.7x PAST the ridge, compute-bound</code></pre>
+<p>This is the result worth sitting with. The mixed iteration moves <strong>the same bytes</strong> as the pure decode iteration — the weights are read once either way — but does <strong>64× the arithmetic</strong>. The prefill work is riding along in compute capacity the decode step was already wasting.</p>
+<p>So chunked prefill is not a compromise between TTFT and TPOT. It is a way to reclaim idle arithmetic, and it makes both workloads faster than running them separately would. It is the clearest example in the whole course of what &quot;more useful work per byte moved&quot; means in practice.</p></div>
+        </details>
+      </section>
+
+      <section class="section ghost ghost--clyde" id="code-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--clyde)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>CLYDE · CODE LAB</p>
+        <h2 class="section__title">Code lab</h2>
+        <div class="prose"><p>Simulate static versus continuous batching over a realistic distribution of sequence lengths. No GPU needed — this is a discrete-event simulation, and the point is to reproduce the utilization numbers yourself rather than take them on faith.</p>
+<p>Then add chunked prefill and measure what it does to the tail of the inter-token latency distribution.</p></div>
+        <div class="prose" style="max-width:none"><pre><code class="lang-python">&quot;&quot;&quot;
+Batching simulator: static vs continuous, then chunked prefill.
+Pure Python + numpy. No GPU.
+
+    pip install numpy matplotlib
+&quot;&quot;&quot;
+import heapq
+import numpy as np
+
+rng = np.random.default_rng(7)
+
+# --- workload model -------------------------------------------------------
+# Real traffic is heavy-tailed: most responses short, a few very long.
+N_REQUESTS = 400
+ARRIVAL_RATE = 12.0          # requests/second (Poisson)
+MAX_BATCH = 32
+
+
+def sample_workload(n):
+    prompt = rng.lognormal(mean=6.2, sigma=1.1, size=n).astype(int).clip(16, 32000)
+    output = rng.lognormal(mean=4.6, sigma=1.2, size=n).astype(int).clip(1, 4000)
+    gaps = rng.exponential(1.0 / ARRIVAL_RATE, size=n)
+    arrival = np.cumsum(gaps)
+    return list(zip(arrival, prompt, output))
+
+
+# --- cost model (Llama-3-8B on an H100, 70% achieved) ---------------------
+WEIGHT_GB = 15.0
+KV_GB_PER_TOKEN = 131072 / 1e9
+BW = 3350 * 0.70                       # GB/s
+FLOPS = 989e12 * 0.70                  # FLOP/s
+N_PARAMS = 8.03e9
+
+
+def decode_step_time(batch_tokens_cached):
+    &quot;&quot;&quot;Memory-bound: weights + all cached KV.&quot;&quot;&quot;
+    gb = WEIGHT_GB + batch_tokens_cached * KV_GB_PER_TOKEN
+    return gb / BW
+
+
+def prefill_time(n_tokens):
+    &quot;&quot;&quot;Compute-bound.&quot;&quot;&quot;
+    return (2 * N_PARAMS * n_tokens) / FLOPS
+
+
+# ==========================================================================
+def simulate_static(work, batch_size=MAX_BATCH):
+    &quot;&quot;&quot;Collect batch_size requests, run to completion, repeat.&quot;&quot;&quot;
+    t = 0.0
+    i = 0
+    useful = 0
+    capacity = 0
+    latencies = []
+
+    while i &lt; len(work):
+        group = work[i:i + batch_size]
+        i += len(group)
+        t = max(t, group[-1][0])                       # wait for the last arrival
+
+        for _, p, _o in group:                         # prefill each, unchunked
+            t += prefill_time(p)
+
+        longest = max(o for _, _, o in group)
+        cached = sum(p for _, p, _ in group)
+        for step in range(longest):
+            alive = sum(1 for _, _, o in group if o &gt; step)
+            cached += alive
+            t += decode_step_time(cached)
+        for a, p, o in group:
+            latencies.append(t - a)
+
+        useful += sum(o for _, _, o in group)
+        capacity += len(group) * longest
+
+    return {&quot;makespan&quot;: t, &quot;utilization&quot;: useful / capacity,
+            &quot;throughput&quot;: sum(o for _, _, o in work) / t,
+            &quot;p50&quot;: np.percentile(latencies, 50), &quot;p99&quot;: np.percentile(latencies, 99)}
+
+
+# ==========================================================================
+def simulate_continuous(work, max_batch=MAX_BATCH, chunk_budget=None):
+    &quot;&quot;&quot;Iteration-level scheduling. chunk_budget=None means unchunked prefill.&quot;&quot;&quot;
+    t = 0.0
+    pending = list(work)
+    running = []            # dicts: remaining output, cached tokens, arrival, ttft
+    itl = []                # every inter-token gap seen by a decoding sequence
+    done = []
+    prefill_queue = []      # (tokens_left, request)
+
+    total_out = sum(o for _, _, o in work)
+
+    while pending or running or prefill_queue:
+        # admit arrivals whose time has come, while slots remain
+        while pending and pending[0][0] &lt;= t and len(running) + len(prefill_queue) &lt; max_batch:
+            a, p, o = pending.pop(0)
+            prefill_queue.append([p, {&quot;arrival&quot;: a, &quot;prompt&quot;: p, &quot;out&quot;: o,
+                                      &quot;cached&quot;: 0, &quot;ttft&quot;: None}])
+
+        if not running and not prefill_queue:
+            t = pending[0][0]                          # idle: jump to next arrival
+            continue
+
+        # --- assemble this iteration ---
+        decode_tokens = len(running)
+        cached = sum(r[&quot;cached&quot;] for r in running)
+        step_t = decode_step_time(cached) if running else 0.0
+
+        prefill_tokens = 0
+        if prefill_queue:
+            want = prefill_queue[0][0]
+            if chunk_budget is None:
+                prefill_tokens = want                  # whole prompt, blocking
+            else:
+                prefill_tokens = min(want, max(0, chunk_budget - decode_tokens))
+            if prefill_tokens &gt; 0:
+                # compute- and memory-bound paths run on the same SMs: take the max
+                step_t = max(step_t, prefill_time(prefill_tokens))
+                prefill_queue[0][0] -= prefill_tokens
+                if prefill_queue[0][0] &lt;= 0:
+                    _, req = prefill_queue.pop(0)
+                    req[&quot;cached&quot;] = req[&quot;prompt&quot;]
+                    req[&quot;ttft&quot;] = t + step_t - req[&quot;arrival&quot;]
+                    running.append(req)
+
+        if step_t == 0:
+            t += 1e-4
+            continue
+
+        t += step_t
+
+        # --- advance every decoding sequence by one token ---
+        for r in list(running):
+            if r[&quot;ttft&quot;] is None:
+                continue
+            itl.append(step_t)
+            r[&quot;out&quot;] -= 1
+            r[&quot;cached&quot;] += 1
+            if r[&quot;out&quot;] &lt;= 0:
+                r[&quot;finish&quot;] = t
+                done.append(r)
+                running.remove(r)
+
+    lat = [r[&quot;finish&quot;] - r[&quot;arrival&quot;] for r in done]
+    return {&quot;makespan&quot;: t, &quot;throughput&quot;: total_out / t,
+            &quot;p50&quot;: np.percentile(lat, 50), &quot;p99&quot;: np.percentile(lat, 99),
+            &quot;itl_p50&quot;: np.percentile(itl, 50) * 1000,
+            &quot;itl_p99&quot;: np.percentile(itl, 99) * 1000,
+            &quot;itl_max&quot;: max(itl) * 1000}
+
+
+# ==========================================================================
+work = sample_workload(N_REQUESTS)
+lens = [o for _, _, o in work]
+prompts = [p for _, p, _ in work]
+print(f&quot;workload: {N_REQUESTS} requests&quot;)
+print(f&quot;  prompt  tokens: mean {np.mean(prompts):.0f}  p99 {np.percentile(prompts,99):.0f}&quot;
+      f&quot;  max {max(prompts)}&quot;)
+print(f&quot;  output  tokens: mean {np.mean(lens):.0f}  p99 {np.percentile(lens,99):.0f}&quot;
+      f&quot;  max {max(lens)}&quot;)
+
+print(&quot;\n=== static batching ===&quot;)
+s = simulate_static(work)
+print(f&quot;  slot utilization  {s['utilization']*100:&gt;8.1f}%&quot;)
+print(f&quot;  throughput        {s['throughput']:&gt;8.0f} tok/s&quot;)
+print(f&quot;  latency p50/p99   {s['p50']:&gt;8.1f} / {s['p99']:.1f} s&quot;)
+
+print(&quot;\n=== continuous batching, unchunked prefill ===&quot;)
+c = simulate_continuous(work, chunk_budget=None)
+print(f&quot;  throughput        {c['throughput']:&gt;8.0f} tok/s&quot;
+      f&quot;   ({c['throughput']/s['throughput']:.1f}x static)&quot;)
+print(f&quot;  latency p50/p99   {c['p50']:&gt;8.1f} / {c['p99']:.1f} s&quot;)
+print(f&quot;  ITL p50/p99/max   {c['itl_p50']:&gt;8.1f} / {c['itl_p99']:.1f} / {c['itl_max']:.1f} ms&quot;)
+
+print(&quot;\n=== continuous batching + chunked prefill ===&quot;)
+print(f&quot;  {'budget':&gt;8} {'tok/s':&gt;9} {'ITL p50':&gt;9} {'ITL p99':&gt;9} {'ITL max':&gt;9}&quot;)
+for budget in (256, 512, 1024, 2048, 8192):
+    r = simulate_continuous(work, chunk_budget=budget)
+    print(f&quot;  {budget:&gt;8} {r['throughput']:&gt;9.0f} {r['itl_p50']:&gt;9.1f} &quot;
+          f&quot;{r['itl_p99']:&gt;9.1f} {r['itl_max']:&gt;9.1f}&quot;)
+
+# --- TODO for you ---
+#   1. Add KV memory as a hard constraint: cap total cached tokens at
+#      (80 GB - 15 GB) / 128 KiB and preempt (recompute) when you exceed it.
+#      Watch throughput fall as context lengths grow.
+#   2. Add a priority queue with aging and measure whether long prompts starve
+#      under a decode-priority policy.
+#   3. Plot the throughput/latency Pareto frontier by sweeping MAX_BATCH.
+</code></pre></div>
+        <div class="prose"><h3>What you should see</h3><p>Static batching lands somewhere around <strong>10–25% slot utilization</strong> — the exact figure depends on the sampled tail, but it will be low, and it gets lower if you raise <code>MAX_BATCH</code>. That is the headline result: the number is bad, and scaling makes it worse.</p>
+<p>Continuous batching should show a <strong>3–10× throughput improvement</strong> over static on the same workload. It will not reproduce Orca's 36.9× — that figure was against a weaker baseline and with a different workload — but the direction and rough magnitude are right.</p>
+<p>The chunked prefill table is the interesting one. As the budget falls from 8192 to 256:</p>
+<ul><li><strong>ITL max drops sharply</strong> — often by 10× or more. This is the stall being eliminated.</li><li><strong>ITL p50 stays roughly flat</strong> — typical steps were never the problem.</li><li><strong>Throughput dips slightly</strong> at very small budgets, because 256 tokens is not enough work to use the GPU well.</li></ul>
+<p>The sweet spot is usually in the 512–2048 range, which is what production defaults look like. If your run shows ITL max at 8192 being 10–20× the p50 and at 512 being 2–3×, you have reproduced the effect the Sarathi-Serve paper is about.</p>
+<p>The simulator is deliberately simplified — no KV memory limit, no preemption, an approximate overlap model for mixed iterations. It gets the shapes right, not the absolute numbers.</p></div>
+        <div class="prose"><h3>Stretch</h3><p>Add the KV memory constraint (TODO 1) and then sweep context length from 1k to 32k, plotting achievable throughput. You should see throughput collapse as context grows, not because of any compute effect but purely because fewer sequences fit — reproducing Module 2's table from the scheduler's side. Then add fp8 KV (halve <code>KV_GB_PER_TOKEN</code>) and watch the whole curve lift. That plot is the single best argument for Module 6.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pac" id="papers">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>THE KEY · PAPERS</p>
+        <h2 class="section__title">Papers, with a reading frame</h2>
+        <div class="papers">
+          <article class="paper">
+            <h3 class="paper__title"><a href="https://www.usenix.org/conference/osdi22/presentation/yu" target="_blank" rel="noopener">Orca: A Distributed Serving System for Transformer-Based Generative Models</a></h3>
+            <p class="paper__by">Yu et al., OSDI 2022</p>
+            <p class="paper__why">Introduced continuous (iteration-level) batching, which is the single largest throughput win in LLM serving and is now in every engine.</p>
+            <div class="paper__frame"><p><strong>Section 3</strong> is the contribution: iteration-level scheduling. Pay particular attention to <strong>Section 3.2 on selective batching</strong> — the observation that you can batch the position-independent operations while handling attention per-sequence is what makes the whole thing implementable, and it is the part most summaries omit. Figure 4 is the one to remember. Skim the distributed execution details in Section 4.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2403.02310" target="_blank" rel="noopener">Taming Throughput-Latency Tradeoff in LLM Inference with Sarathi-Serve</a></h3>
+            <p class="paper__by">Agrawal et al., OSDI 2024</p>
+            <p class="paper__why">Chunked prefill and &quot;stall-free batching&quot;. The clearest analysis of prefill/decode interference and how to schedule around it.</p>
+            <div class="paper__frame"><p><strong>Section 3</strong> quantifies the interference problem — read it before the solution so the numbers land. <strong>Section 4</strong> is chunked prefill and the token-budget scheduler. The key insight to extract is that mixing a prefill chunk into a decode iteration is close to free because the decode iteration had idle arithmetic; that reframes the technique from a compromise into a win.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2309.06180" target="_blank" rel="noopener">Efficient Memory Management for LLM Serving with PagedAttention</a></h3>
+            <p class="paper__by">Kwon et al., SOSP 2023</p>
+            <p class="paper__why">Continuous batching depends on being able to cheaply allocate and free per-sequence memory, which is exactly what paging provides. The two ideas are inseparable in practice.</p>
+            <div class="paper__frame"><p>Read <strong>Section 4.3</strong> on scheduling and preemption — the swap-versus-recompute decision and how the block manager supports admission and eviction. The rest is Module 6.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2401.09670" target="_blank" rel="noopener">DistServe: Disaggregating Prefill and Decoding</a></h3>
+            <p class="paper__by">Zhong et al., OSDI 2024</p>
+            <p class="paper__why">The argument that prefill and decode should not share hardware at all — the alternative to chunked prefill rather than a complement to it.</p>
+            <div class="paper__frame"><p>Read <strong>Section 3</strong> for the interference analysis and compare it against Sarathi-Serve. The two papers diagnose the same problem and reach opposite architectural conclusions, which makes reading them together unusually instructive.</p></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--blinky" id="pitfalls">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--blinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>BLINKY · PITFALLS</p>
+        <h2 class="section__title">What people get wrong</h2>
+        <div class="pitfall">
+          <p class="pitfall__wrong"><span>Bigger batch is always better for throughput.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>Only until KV traffic dominates. Batching amortizes weight bytes, which are fixed, but each sequence brings its own cache, so KV bytes scale with batch. Once the cache dominates, extra batch adds work and bytes in equal measure and throughput flattens — while latency keeps degrading and preemption risk keeps rising. Find the knee and operate there.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Continuous batching is just dynamic batching with a shorter timeout.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>Dynamic batching still runs a batch to completion; it only changes how the batch is assembled. Continuous batching changes the <em>scheduling granularity</em> to the iteration, so a sequence can join or leave the batch at any decode step. That is what eliminates the wait-for-the-longest problem, and it requires selective batching and per-sequence KV management to implement at all.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Chunked prefill trades TTFT for TPOT.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>It costs a little TTFT — around 2% in the worked example — but it does not merely redistribute a fixed amount of work. A mixed iteration moves the same bytes as a pure decode iteration while doing far more arithmetic, so the prefill is riding in capacity that was being wasted. Both phases come out ahead of running them separately.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>A decode-priority scheduler is the safe choice for smooth streaming.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>It gives smooth streams to sequences that are already running, and can starve new requests indefinitely under sustained load, because there is always more decode work to do. Any priority scheme needs an aging mechanism so that waiting requests eventually win, or some user will simply never be served.</p></div></div>
+        </div>
+      </section>
+
+      <section class="section" id="checkpoint">
+        <div class="wall checkpoint">
+          <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>POWER PELLET · CHECKPOINT</p>
+          <p class="checkpoint__claim">You can explain why continuous batching is worth an order of magnitude, why prefill
+and decode interfere, and why mixing them in one iteration turns out to be nearly free.</p>
+          <details class="qa">
+            <summary>Why does static batching get worse as you increase the batch size?</summary>
+            <div class="qa__a prose"><p>Because a static batch runs until its longest member finishes, and utilization is mean length divided by max length. As you draw more samples from a heavy-tailed distribution, the maximum reaches further into the tail while the mean stays roughly constant, so the ratio falls. A batch of 8 with a mean of 180 and a max of 900 gives 20% utilization; a batch of 32 with the same mean and a max of 2,000 gives 9%. It is one of the few optimizations that actively degrades as you scale it, which is precisely why iteration-level scheduling was necessary rather than just nice.</p></div>
+          </details>
+<details class="qa">
+            <summary>What is selective batching, and why is it needed for continuous batching to work?</summary>
+            <div class="qa__a prose"><p>In a continuous batch every sequence is at a different position, so their attention computations have different KV lengths and cannot be packed into one rectangular call. Selective batching — Orca's solution — splits the layer: the position-independent operations (QKV projections, MLP, LM head) are batched by flattening all the batch's tokens into a single <code>[total_tokens, d_model]</code> matmul, while attention is handled per-sequence with a kernel that takes per-sequence lengths and offsets. This works because essentially all the weight traffic lives in the batchable operations, so you still get the amortization that makes batching worthwhile.</p></div>
+          </details>
+<details class="qa">
+            <summary>A user pastes a 32k-token document and everyone else's token stream freezes. Explain the mechanism and give two fixes.</summary>
+            <div class="qa__a prose"><p>The scheduler ran that prefill as a single unit. Prefill is compute-bound and scales with prompt length — 32k tokens on Llama-3-8B is roughly 2 × 8.03e9 × 32000 = 514 TFLOP, about 740 ms at realistic H100 throughput. For that whole time the GPU is doing prefill, so every decoding sequence produces nothing and sees an inter-token latency of 740 ms instead of ~10 ms. Two fixes: <strong>chunked prefill</strong>, which splits the prompt into fixed-size pieces and processes one per iteration alongside ongoing decode, capping the stall at the chunk cost; and <strong>disaggregation</strong>, running prefill and decode on separate hardware pools so they cannot contend at all.</p></div>
+          </details>
+<details class="qa">
+            <summary>Why is adding a prefill chunk to a decode iteration close to free?</summary>
+            <div class="qa__a prose"><p>Because they are bounded by different resources. A decode iteration at batch 32 moves ~23.6 GB of weights and KV and does only ~5.1e11 FLOP — arithmetic intensity around 22, deep in memory-bound territory, with the tensor cores mostly idle. Adding 2,016 prefill tokens to that iteration moves <strong>the same bytes</strong> (the weights are read once regardless) while doing 64× the arithmetic, pushing intensity to roughly 1,400 — past the ridge point. The prefill runs in compute capacity the decode step was already wasting. That is why chunked prefill improves both TTFT stability and effective throughput rather than trading one for the other.</p></div>
+          </details>
+<details class="qa">
+            <summary>Your scheduler must free memory. When would you swap a sequence to CPU rather than recompute its cache?</summary>
+            <div class="qa__a prose"><p>Compare the two costs. Swapping means a PCIe round trip: a 2.5 GiB cache at ~50 GB/s is roughly 50 ms out and 50 ms back. Recomputing means re-running prefill over the sequence's tokens, which is compute-bound and scales with length. For short sequences prefill is cheap and recomputation wins; for long ones prefill is expensive and swapping wins, provided you have host memory and PCIe headroom. The crossover is roughly where prefill time exceeds transfer time. vLLM implements both for exactly this reason. A third consideration: swapping consumes PCIe bandwidth that may be needed for other things, so under heavy load recomputation can be preferable even when it looks slower in isolation.</p></div>
+          </details>
+<details class="qa">
+            <summary>Why should you usually operate at the knee of the throughput curve rather than at maximum batch size?</summary>
+            <div class="qa__a prose"><p>Because past the knee you buy very little throughput for a lot of latency. Once KV traffic dominates the byte count, each extra sequence adds proportionally to both work done and bytes moved, so the curve flattens — for Llama-3-8B on an H100 at 4k context, going from batch 64 to 111 adds 73% more sequences for about 14% more throughput while TPOT rises substantially. You also lose headroom: running at the memory ceiling means any traffic spike triggers preemption, which is far more expensive than the throughput you gained. The knee is where you have captured most of the available gain and still have slack.</p></div>
+          </details>
+          <p style="margin-top:var(--s7)">
+            <button class="done-toggle" type="button" data-complete="5" aria-pressed="false">
+              MARK LEVEL 05 CLEARED
+            </button>
+          </p>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="glossary">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>GLOSSARY</p>
+        <h2 class="section__title">Glossary</h2>
+        <div class="gloss">
+          <div class="gloss__row"><div class="gloss__term">static batching</div><div class="gloss__def">Fixed batch that runs to completion. Utilization collapses when sequence lengths vary, and gets worse as batch grows.</div></div><div class="gloss__row"><div class="gloss__term">continuous batching</div><div class="gloss__def">Iteration-level scheduling: evict finished sequences and admit waiting ones at every decode step. From Orca.</div></div><div class="gloss__row"><div class="gloss__term">selective batching</div><div class="gloss__def">Batch the position-independent operations across sequences while handling attention per-sequence. What makes continuous batching implementable.</div></div><div class="gloss__row"><div class="gloss__term">chunked prefill</div><div class="gloss__def">Splitting a long prefill into fixed-size pieces processed one per iteration, mixed with ongoing decode.</div></div><div class="gloss__row"><div class="gloss__term">token budget</div><div class="gloss__def">The cap on tokens processed per scheduler iteration. Decode tokens are admitted first, prefill chunks fill the rest.</div></div><div class="gloss__row"><div class="gloss__term">prefill/decode interference</div><div class="gloss__def">A long compute-bound prefill blocking every decoding sequence, spiking their inter-token latency.</div></div><div class="gloss__row"><div class="gloss__term">preemption</div><div class="gloss__def">Reclaiming a running sequence's KV memory, either by swapping it to host memory or discarding and recomputing it.</div></div><div class="gloss__row"><div class="gloss__term">admission control</div><div class="gloss__def">Deciding how many sequences to admit given that their eventual lengths, and therefore memory needs, are unknown.</div></div><div class="gloss__row"><div class="gloss__term">knee</div><div class="gloss__def">The batch size beyond which throughput gains become small relative to the latency cost. The right default operating point.</div></div>
+        </div>
+      </section>
+
+      <nav class="pagenav">
+        <a href="roofline.html" data-nav="prev"><span>◀ PREVIOUS LEVEL</span>04 METRICS AND THE ROOFLINE</a>
+        <a href="memory-optimization.html" data-nav="next" style="text-align:right"><span>NEXT LEVEL ▶</span>06 MEMORY OPTIMIZATION</a>
+      </nav>
+
+    </main>
+  </div>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <p class="foot__h">LEVELS</p>
+        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">&nbsp;</p>
+        <ul><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">REFERENCE</p>
+        <ul>
+          <li><a href="../reference/timeline.html">Timeline</a></li>
+          <li><a href="../reference/hardware.html">GPU spec table</a></li>
+          <li><a href="../reference/engines.html">Serving engines</a></li>
+          <li><a href="../reference/frontier.html">Open problems</a></li>
+          <li><a href="../reference/glossary.html">Glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="foot__h">SOURCE</p>
+        <ul>
+          <li><a href="https://github.com/tushar-amrit-6/inference">GitHub repository</a></li>
+          <li><a href="../reference/how-to-use.html">How to work through this</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
+    do the arithmetic yourself.</p>
+  </div>
+</footer>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

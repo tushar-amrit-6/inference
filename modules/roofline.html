@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>04 · METRICS AND THE ROOFLINE — LLM INFERENCE</title>
+<meta name="description" content="The analytical core. Everything after this module is applied roofline reasoning.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="04 · METRICS AND THE ROOFLINE — LLM INFERENCE">
+<meta property="og:description" content="The analytical core. Everything after this module is applied roofline reasoning.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/arcade.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20fill%3D%22%23000%22%2F%3E%3Cpath%20d%3D%22M16%2C16%20L29%2C9%20A15%2C15%200%201%200%2029%2C23%20Z%22%20fill%3D%22%23FFE800%22%2F%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="scorebar">
+  <a class="scorebar__home" href="../index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="var(--pac)" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
+  <span class="scorebar__item"><span class="scorebar__label">LEVEL</span><span class="scorebar__value scorebar__value--pac">04</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/11</span></span>
+  <span class="scorebar__spacer"></span>
+  <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
+</header>
+<div class="wrap">
+  <div class="shell">
+    <nav class="rail" aria-label="Module contents">
+  <p class="rail__head">ON THIS LEVEL</p>
+  <ul class="rail__list">
+    <li><a class="rail__link" href="#big-idea" data-kind="dot"><span class="rail__dot"></span><span>The big idea</span></a></li><li><a class="rail__link" href="#concept-0" data-kind="dot"><span class="rail__dot"></span><span>The four metrics, and why one number is never enough</span></a></li><li><a class="rail__link" href="#concept-1" data-kind="dot"><span class="rail__dot"></span><span>Arithmetic intensity, and how to compute it</span></a></li><li><a class="rail__link" href="#concept-2" data-kind="dot"><span class="rail__dot"></span><span>The roofline model and the ridge point</span></a></li><li><a class="rail__link" href="#concept-3" data-kind="dot"><span class="rail__dot"></span><span>Deriving TPOT from first principles</span></a></li><li><a class="rail__link" href="#concept-4" data-kind="dot"><span class="rail__dot"></span><span>Where the batch dial actually takes you</span></a></li><li><a class="rail__link" href="#concept-5" data-kind="dot"><span class="rail__dot"></span><span>Reading a GPU spec sheet without being misled</span></a></li><li><a class="rail__link" href="#math-lab" data-kind="dot"><span class="rail__dot"></span><span>Math by hand</span></a></li><li><a class="rail__link" href="#code-lab" data-kind="dot"><span class="rail__dot"></span><span>Code lab</span></a></li><li><a class="rail__link" href="#papers" data-kind="dot"><span class="rail__dot"></span><span>Papers</span></a></li><li><a class="rail__link" href="#pitfalls" data-kind="dot"><span class="rail__dot"></span><span>Pitfalls</span></a></li><li><a class="rail__link" href="#checkpoint" data-kind="power"><span class="rail__dot"></span><span>Checkpoint</span></a></li><li><a class="rail__link" href="#glossary" data-kind="dot"><span class="rail__dot"></span><span>Glossary</span></a></li>
+  </ul>
+  <div class="rail__nav">
+    <a class="rail__step" href="decoding-and-sampling.html">◀ 03 DECODING AND SAMPLING</a>
+    <a class="rail__step" href="../index.html">▲ ALL LEVELS</a>
+    <a class="rail__step" href="batching.html">05 BATCHING ▶</a>
+  </div>
+</nav>
+    <main id="main">
+
+      <div class="mod-head">
+        <p class="mod-head__level">LEVEL 04</p>
+        <h1 class="mod-head__title">METRICS AND THE ROOFLINE</h1>
+        <p class="mod-head__tag">The analytical core. Everything after this module is applied roofline reasoning.</p>
+        <div class="mod-head__meta">
+          <span>⏱ 8–10 hours</span>
+          <span>● 6 concepts</span>
+          <span>📄 4 papers</span>
+          <span>▸ needs: Module 1, Module 2</span>
+        </div>
+      </div>
+
+      <section class="section ghost ghost--pinky" id="big-idea">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--pinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>PINKY · THE BIG IDEA</p>
+        <div class="prose"><p>Up to now you have been told that decode is memory-bound. This module gives you the tool to <em>derive</em> that, and to derive the answer for any model, any GPU, any batch size, any context length — on paper, in about ninety seconds.</p>
+<p>The tool is the <strong>roofline model</strong>, and it rests on one observation: a computation has two costs, arithmetic and data movement, and they happen concurrently. Whichever takes longer is your time. That gives you a single number to compute — <strong>arithmetic intensity</strong>, FLOPs performed per byte moved — and a single number to compare it against — the machine's <strong>ridge point</strong>, its peak FLOP/s divided by its peak bytes/s.</p>
+<pre><code>intensity &lt; ridge point   -&gt;  memory-bound. Optimize bytes.
+intensity &gt; ridge point   -&gt;  compute-bound. Optimize FLOPs.</code></pre>
+<p>That is the whole model. Its power is that it tells you which optimizations <em>cannot possibly help</em> before you spend a week implementing one. If you are memory-bound at intensity 4 on a machine whose ridge is 295, then a kernel that halves your FLOP count buys exactly nothing, and you should know that before you write it.</p>
+<p>By the end of this module you should be unable to read a performance claim without immediately asking: at what batch size, and on which side of the ridge?</p></div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="concepts">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>PELLETS · CONCEPTS</p>
+        <article class="concept" id="concept-0">
+  <div class="concept__head">
+    <span class="concept__n">01</span>
+    <h3 class="concept__title">The four metrics, and why one number is never enough</h3>
+  </div>
+  <div class="prose"><p><strong>TTFT — time to first token.</strong> Queue time plus prefill. Scales with prompt length (roughly linearly, with a quadratic attention term at long context) and with how much other work is ahead of you. This is what determines whether an interface feels responsive.</p>
+<p><strong>TPOT / ITL — time per output token.</strong> The steady-state gap between tokens once streaming has started. Set by decode, so it is set by bandwidth. Roughly independent of context length, and degrades gently with batch size. Human reading is around 5–8 tokens/second, so anything under ~150 ms/token feels adequate and anything under ~30 ms feels instant.</p>
+<p><strong>End-to-end latency.</strong> <code>TTFT + TPOT × output_tokens</code>. What actually matters to someone waiting for a complete answer, and dominated by the second term for any substantial output.</p>
+<p><strong>Throughput.</strong> Total output tokens per second across all concurrent requests. This is what sets your cost per million tokens, and it is the only one of the four that your finance team cares about.</p>
+<p>The reason a single number is meaningless is that these move in opposite directions:</p>
+<pre><code>batch size  1 -&gt;  256
+
+throughput   ▲▲▲▲▲▲▲▲▲  up ~100x or more
+TPOT         ▼          slightly worse
+TTFT         ▼▼▼▼       much worse (queueing + prefill contention)</code></pre>
+<p>A system advertising &quot;20,000 tokens/second&quot; at batch 256 may be delivering 10 tokens/second to each user. Both numbers are honest; only one of them is relevant to any given question.</p>
+<p>Two further points that separate real measurement from marketing:</p>
+<p><strong>Percentiles, not means.</strong> Latency distributions in serving are heavily right-skewed — a mean TPOT of 30 ms is compatible with a p99 of 400 ms if a few requests get preempted or stuck behind long prefills. Report p50, p95, p99. A mean alone hides exactly the behaviour users complain about.</p>
+<p><strong>Goodput, not throughput.</strong> If you have an SLO — say, TTFT under 500 ms and TPOT under 50 ms — then tokens delivered outside that SLO are worth nothing. <strong>Goodput</strong> counts only requests that met their SLO. A system can have excellent throughput and terrible goodput by running at a batch size that violates latency targets for everyone. Optimizing throughput without an SLO constraint is optimizing the wrong thing, and it is a common way for benchmarks to mislead.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>TTFT, TPOT, end-to-end latency and throughput are separate quantities that trade against each other through batch size.</p>
+</article>
+<article class="concept" id="concept-1">
+  <div class="concept__head">
+    <span class="concept__n">02</span>
+    <h3 class="concept__title">Arithmetic intensity, and how to compute it</h3>
+  </div>
+  <div class="prose"><p>Arithmetic intensity is the ratio you can compute from the operation alone, with no knowledge of the hardware:</p>
+<pre><code>I = FLOPs performed / bytes moved between DRAM and the chip</code></pre>
+<p>&quot;Moved from DRAM&quot; is the important qualifier. Data already resident in cache or registers is free by this accounting; the roofline is about traffic to <em>main</em> memory.</p>
+<p>Work the fundamental case. A matmul <code>Y = W @ X</code> with <code>W</code> of shape <code>[n, k]</code> and <code>X</code> of shape <code>[k, B]</code>:</p>
+<pre><code>FLOPs  = 2 * n * k * B          (one multiply and one add per element pair)
+bytes  = 2 * n * k              (read W once, fp16; X and Y are small by comparison)
+
+I = 2nkB / 2nk = B</code></pre>
+<p><strong>The arithmetic intensity of a weight-stationary matmul equals the batch size.</strong> That is one of the cleanest and most useful results in the field, and worth stopping on. It says the <em>only</em> way to raise the intensity of a linear layer is to put more sequences through it. Not a better kernel, not a faster GPU — more concurrent work per weight load.</p>
+<p>Applying it to the transformer:</p>
+<table><thead><tr><th>operation</th><th>intensity</th><th>why</th></tr></thead><tbody><tr><td>decode linear layers, batch B</td><td><strong>B</strong></td><td>each weight read once, used by B sequences</td></tr><tr><td>prefill linear layers, seq S</td><td><strong>≈ B × S</strong></td><td>each weight read once, used by every position</td></tr><tr><td>RMSNorm, residual add, RoPE</td><td><strong>≈ 1</strong></td><td>read, do a couple of FLOPs, write</td></tr><tr><td>attention during decode</td><td><strong>≈ 1</strong> per KV byte</td><td>each cached K/V element used once</td></tr><tr><td>attention during prefill</td><td><strong>≈ S / const</strong></td><td>grows with sequence length</td></tr></tbody></table>
+<p>Two consequences that people find surprising:</p>
+<p><strong>Attention during decode is memory-bound no matter what you do to it.</strong> Each cached key element is read and used in a single multiply-accumulate. The intensity is O(1), independent of batch size — because every sequence has its <em>own</em> cache, so batching does not amortize KV reads the way it amortizes weight reads. This is why FlashDecoding exists as a separate kernel from FlashAttention (Module 7), and why KV cache size directly and unavoidably costs you decode time.</p>
+<p><strong>The elementwise operations are pure overhead.</strong> RMSNorm, residual adds and RoPE do almost no arithmetic per byte. Left unfused, each one is a full round trip to HBM for nothing. In a decode step where you are already bandwidth-starved, they can account for 10–20% of the time. This is the entire justification for kernel fusion.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Intensity is FLOPs divided by bytes moved from DRAM — and for a decode-time matmul it comes out exactly equal to the batch size.</p>
+</article>
+<article class="concept" id="concept-2">
+  <div class="concept__head">
+    <span class="concept__n">03</span>
+    <h3 class="concept__title">The roofline model and the ridge point</h3>
+  </div>
+  <div class="prose"><p>Two hard limits bound any computation on a machine:</p>
+<pre><code>compute ceiling:   P_peak                    FLOP/s
+memory ceiling:    I * BW                    FLOP/s  (intensity x bandwidth)
+
+attainable = min(P_peak, I * BW)</code></pre>
+<p>Plot attainable performance against intensity on log-log axes and you get a roof: a diagonal line of slope 1 (the bandwidth limit) meeting a horizontal line (the compute limit). The corner where they meet is the <strong>ridge point</strong>:</p>
+<pre><code>I_ridge = P_peak / BW</code></pre>
+<p>Below it you are on the slanted roof, memory-bound, and performance rises linearly with intensity. Above it you are on the flat roof, compute-bound, and more intensity buys nothing.</p>
+<p>Here are the machines you are likely to care about. Compute figures are <strong>dense</strong> BF16 (not the sparsity-doubled numbers vendors like to headline):</p>
+<table><thead><tr><th>GPU</th><th>memory</th><th>bandwidth</th><th>BF16 dense</th><th>ridge point</th></tr></thead><tbody><tr><td>A100 80GB SXM</td><td>80 GB HBM2e</td><td>2.04 TB/s</td><td>312 TFLOP/s</td><td><strong>153</strong></td></tr><tr><td>H100 SXM</td><td>80 GB HBM3</td><td>3.35 TB/s</td><td>989 TFLOP/s</td><td><strong>295</strong></td></tr><tr><td>H200 SXM</td><td>141 GB HBM3e</td><td>4.8 TB/s</td><td>989 TFLOP/s</td><td><strong>206</strong></td></tr><tr><td>B200</td><td>192 GB HBM3e</td><td>~8 TB/s</td><td>~2.25 PFLOP/s</td><td><strong>~281</strong></td></tr><tr><td>L40S</td><td>48 GB GDDR6</td><td>0.86 TB/s</td><td>362 TFLOP/s</td><td><strong>419</strong></td></tr><tr><td>RTX 4090</td><td>24 GB GDDR6X</td><td>1.01 TB/s</td><td>165 TFLOP/s</td><td><strong>164</strong></td></tr><tr><td>MI300X</td><td>192 GB HBM3</td><td>5.3 TB/s</td><td>~1.31 PFLOP/s</td><td><strong>~247</strong></td></tr></tbody></table>
+<p><em>(Treat these as good working numbers rather than gospel — vendors quote compute under varying assumptions, and you should confirm against the current datasheet for anything load-bearing.)</em></p>
+<p>Read the table for structure, not for individual entries.</p>
+<p><strong>The H200 has a lower ridge point than the H100.</strong> Same silicon compute, 43% more bandwidth. A lower ridge is <em>better for decode</em>: you need less intensity — a smaller batch — to saturate the machine. The H200 is a straightforwardly better decode part than the H100 while being an identical prefill part. This is what it looks like when a vendor targets the memory wall directly.</p>
+<p><strong>The L40S has a ridge point of 419.</strong> GDDR6 instead of HBM, and a lot of compute. You would need batch 419 to saturate it, which the 48 GB of memory will not let you reach for any large model. It is a fine prefill and fine-tuning card and a poor decode card, and the ridge point tells you that in one number.</p>
+<p><strong>Every ridge point is in the 150–420 range.</strong> Modern accelerators have added FLOPs far faster than bandwidth for a decade, so the ridge keeps drifting right and decode keeps getting relatively worse. This trend is why this course exists.</p></div>
+  <pre class="ascii" aria-label="diagram">  attainable
+  FLOP/s
+    |                       ┌──────────────────  P_peak (989 TF)
+    |                      /
+    |                    /
+    |                  /  slope = bandwidth
+    |                /
+    |              /
+    |            /
+    |          /
+    +--------+-------------+-------------------&gt; arithmetic intensity
+             ^             ^
+       decode, B=1     ridge point
+       I ~= 1          I = 295
+
+  You are here ^                          ...you want to be here ^</pre>
+  <p class="keypoint"><b>REMEMBER</b>Attainable performance is min(peak FLOP/s, intensity × bandwidth), and the ridge point is where those two lines cross.</p>
+</article>
+<article class="concept" id="concept-3">
+  <div class="concept__head">
+    <span class="concept__n">04</span>
+    <h3 class="concept__title">Deriving TPOT from first principles</h3>
+  </div>
+  <div class="prose"><p>Since decode is memory-bound, its floor follows directly from bandwidth. The recipe:</p>
+<pre><code>1.  bytes_per_step = weight_bytes + batch * seq_len * kv_bytes_per_token
+2.  TPOT_min       = bytes_per_step / bandwidth
+3.  throughput_max = batch / TPOT_min</code></pre>
+<p><strong>Worked: Llama-3-8B, fp16, batch 1, 2k context, on an H100.</strong></p>
+<pre><code>weights:      8.03e9 x 2       = 16.06 GB   (15.0 GB excluding the embedding lookup)
+KV:           131072 x 2048    =  0.27 GB
+                                  --------
+                                   15.27 GB
+
+TPOT_min = 15.27 / 3350 GB/s   = 4.56 ms
+max rate = 1 / 0.00456         = 219 tokens/second</code></pre>
+<p>That is the ceiling. No implementation, however good, beats 219 tok/s for this model on this GPU at batch 1. If a vendor claims 400, they have changed something — quantization, speculative decoding, or the definition of a token.</p>
+<p><strong>Now the same model at batch 64:</strong></p>
+<pre><code>weights:  15.0 GB      (unchanged -- shared)
+KV:       131072 x 2048 x 64 = 17.2 GB
+                               -------
+                               32.2 GB
+
+TPOT_min   = 32.2 / 3350        = 9.6 ms
+throughput = 64 / 0.0096        = 6,667 tokens/second</code></pre>
+<p>Per-user latency worsened by 2.1× while aggregate throughput improved by 30×. And notice <em>why</em> TPOT got worse: not because of the weights, which are shared, but because the KV cache now outweighs them. This is the two-regime crossover from Module 2 showing up directly in a latency number.</p>
+<p><strong>Now account for the gap to reality.</strong> Measured TPOT is typically 1.5–3× the roofline floor. The causes, roughly in order:</p>
+<ol><li><strong>You do not get peak bandwidth.</strong> Real kernels achieve 70–85% of the spec figure. That alone is a 1.2–1.4× gap, and it is unavoidable.</li><li><strong>Kernel launch overhead.</strong> Hundreds of tiny kernels per decode step at ~5 µs each is ~1 ms of CPU-side cost against a 4.5 ms budget. CUDA Graphs largely fix this; without them it is brutal.</li><li><strong>Unfused elementwise ops.</strong> Every unfused RMSNorm or residual add is an extra HBM round trip.</li><li><strong>Attention kernel inefficiency.</strong> Decode attention has query length 1, which is a genuinely awkward shape to parallelize.</li><li><strong>Sampling and detokenization.</strong> Sorting 128k logits per sequence is not free at large batch.</li><li><strong>Python and scheduler overhead.</strong> Real in naive implementations, largely engineered away in vLLM/TRT-LLM.</li><li><strong>Communication</strong>, if you are running tensor-parallel (Module 9).</li></ol>
+<p>The discipline worth building: compute the roofline number first, measure second, and then <em>account for the gap</em>. If you are within 1.5× your implementation is good. At 5× something specific is wrong and the list above tells you where to look.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Minimum decode latency is bytes moved divided by bandwidth, and you can compute it before you have access to the machine.</p>
+</article>
+<article class="concept" id="concept-4">
+  <div class="concept__head">
+    <span class="concept__n">05</span>
+    <h3 class="concept__title">Where the batch dial actually takes you</h3>
+  </div>
+  <div class="prose"><p>Module 2 said the KV cache caps batch size. This module lets you say what that costs in throughput terms.</p>
+<p><strong>Llama-3-8B, fp16, on one H100 80GB, 4k context:</strong></p>
+<pre><code>weights 16.06 GB, workspace ~4 GB  -&gt;  ~60 GB for KV
+KV per sequence: 131072 x 4096 = 0.54 GB
+max batch = 60 / 0.54 = 111</code></pre>
+<table><thead><tr><th>batch</th><th>bytes/step</th><th>TPOT</th><th>throughput</th><th>intensity</th><th>% of ridge</th></tr></thead><tbody><tr><td>1</td><td>15.5 GB</td><td>4.6 ms</td><td>217 tok/s</td><td>1</td><td>0.3%</td></tr><tr><td>8</td><td>19.3 GB</td><td>5.8 ms</td><td>1,390 tok/s</td><td>8</td><td>2.7%</td></tr><tr><td>32</td><td>32.2 GB</td><td>9.6 ms</td><td>3,330 tok/s</td><td>32</td><td>11%</td></tr><tr><td>64</td><td>49.4 GB</td><td>14.7 ms</td><td>4,340 tok/s</td><td>64</td><td>22%</td></tr><tr><td>111</td><td>74.9 GB</td><td>22.4 ms</td><td>4,960 tok/s</td><td>111</td><td>38%</td></tr></tbody></table>
+<p>Three things to take from this table.</p>
+<p><strong>Throughput saturates well before the ridge point.</strong> Going from batch 64 to 111 — nearly double the sequences — buys only 14% more throughput. The reason is that KV traffic now dominates, and unlike weight traffic, KV traffic <em>scales with batch</em>. Batching amortizes weights; it does not amortize the cache. Once you are cache-dominated, additional batch adds proportional bytes and buys proportionally little.</p>
+<p><strong>You never reach the ridge.</strong> At maximum batch you are at 38% of the intensity you would need to saturate the H100's arithmetic. The machine is memory-bound at every operating point available to you. This is the normal condition of LLM serving, not an edge case.</p>
+<p><strong>Latency degrades 5× across the range.</strong> TPOT goes from 4.6 ms to 22.4 ms. That is the price of the 23× throughput gain, and whether it is acceptable is an SLO question, not a technical one.</p>
+<p>Now the important corollary. Since KV traffic is what stops the table from continuing, <strong>halving the KV cache moves the whole table</strong>. With fp8 KV you get to batch ~200 and past 6,000 tok/s. This is the concrete mechanism by which Module 6's memory work turns into throughput, and it is why &quot;we reduced memory&quot; and &quot;we increased throughput&quot; are frequently the same sentence.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Throughput rises with batch size until either you hit the ridge point or you run out of KV cache — and for large models it is almost always the second.</p>
+</article>
+<article class="concept" id="concept-5">
+  <div class="concept__head">
+    <span class="concept__n">06</span>
+    <h3 class="concept__title">Reading a GPU spec sheet without being misled</h3>
+  </div>
+  <div class="prose"><p>Vendor marketing is optimized for a benchmark you are not running. A short field guide.</p>
+<p><strong>The FLOP number is probably doubled by sparsity.</strong> NVIDIA quotes structured 2:4 sparsity figures prominently — an H100 is listed at 1,979 TFLOP/s BF16 &quot;with sparsity&quot; and 989 dense. Almost no production LLM uses 2:4 sparsity. <strong>Always use the dense number.</strong> If a spec sheet does not say which it is, assume sparse and halve it.</p>
+<p><strong>FP8 and FP4 numbers are real but conditional.</strong> FP8 on Hopper genuinely doubles throughput over BF16, and it is usable — fp8 inference is in production. FP4 on Blackwell likewise. But these apply only to operations you have actually quantized, and they do nothing for a memory-bound decode step except insofar as they shrink the bytes.</p>
+<p><strong>Bandwidth is the number that matters for decode, and it is honest.</strong> HBM bandwidth figures are close to achievable — you will see 70–85% of spec in a good kernel. Unlike FLOPs, there is no sparsity asterisk.</p>
+<p><strong>Memory capacity determines what you can run at all.</strong> 80 GB versus 141 GB is the difference between a 70B model fitting on two GPUs or one, which changes the communication picture entirely (Module 9).</p>
+<p><strong>Interconnect matters the moment you need more than one GPU.</strong> NVLink between H100s is around 900 GB/s per GPU; PCIe Gen5 x16 is about 64 GB/s bidirectional. That is a 14× difference, and tensor parallelism does an all-reduce twice per layer. TP over PCIe is usually a mistake.</p>
+<p>A quick decision procedure for a serving workload:</p>
+<pre><code>1. Will the weights fit?           -&gt; memory capacity
+2. How fast can I decode?          -&gt; bandwidth / weight_bytes
+3. How many sequences fit?         -&gt; (capacity - weights) / kv_per_seq
+4. Will I ever be compute-bound?   -&gt; compare max batch to the ridge point
+5. If multi-GPU, what links?       -&gt; NVLink vs PCIe</code></pre>
+<p>Note that step 2 uses only bandwidth and step 4 usually answers &quot;no&quot;. For decode-dominated serving, <strong>peak FLOPs is close to irrelevant</strong> — which is a strange thing to say about a GPU purchase, and precisely the point of this module.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>For decode, read the bandwidth line first; the headline FLOP number is usually inflated by sparsity and rarely the binding constraint.</p>
+</article>
+      </section>
+
+      <section class="section ghost ghost--inky" id="math-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--inky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>INKY · MATH BY HAND</p>
+        <h2 class="section__title">Math by hand</h2>
+        <div class="prose"><p>The signature calculation of this course. Do it on paper.</p>
+<p><strong>Part 1 — derive the floor.</strong> A 7B model, fp16, batch 1, short context (ignore the KV cache). Compute the theoretical minimum TPOT and maximum tokens/second on:</p>
+<pre><code>a) A100 80GB SXM   2.04 TB/s
+b) H100 SXM        3.35 TB/s
+c) H200 SXM        4.80 TB/s
+d) RTX 4090        1.01 TB/s</code></pre>
+<p><strong>Part 2 — the gap.</strong> You measure 61 tok/s on the H100 with a naive Hugging Face loop. Your answer to 1(b) is much higher. Account for the gap: list the causes and give each a plausible multiplier that multiplies out to what you observed.</p>
+<p><strong>Part 3 — where is the ridge?</strong> Compute the ridge point for each GPU above using dense BF16 figures: A100 312 TFLOP/s, H100 989, H200 989, 4090 165. What batch size would you need on each to become compute-bound during decode?</p>
+<p><strong>Part 4 — can you get there?</strong> For the H100, with the 7B model at fp16, GQA-8 (32 layers, 8 kv heads, head_dim 128) and 4k context: how many sequences fit in 80 GB? Is that above or below the batch you computed in Part 3?</p>
+<p><strong>Part 5 — the design question.</strong> You must serve this model with a p95 TPOT budget of 40 ms. What is the largest batch size you can run on an H100, and what throughput does it give?</p></div>
+        <details class="spoiler">
+          <summary>SHOW THE WORKED SOLUTION</summary>
+          <div class="spoiler__body prose"><p><strong>Part 1 — the floor</strong></p>
+<p>Weight bytes: <code>7e9 × 2 = 14 GB</code>.</p>
+<pre><code>a) A100:  14 / 2040  = 6.86 ms  -&gt;  146 tok/s
+b) H100:  14 / 3350  = 4.18 ms  -&gt;  239 tok/s
+c) H200:  14 / 4800  = 2.92 ms  -&gt;  343 tok/s
+d) 4090:  14 / 1010  = 13.86 ms -&gt;   72 tok/s</code></pre>
+<p>Note the H100→H200 improvement is 43%, exactly the bandwidth ratio, with identical compute. And the 4090 — a card with 165 TFLOP/s of perfectly good arithmetic — is 3.3× slower than the H200 purely on bandwidth. For decode, the compute spec is decoration.</p>
+<p><strong>Part 2 — accounting for the gap</strong></p>
+<p>Observed 61 tok/s against a floor of 239 tok/s is a <strong>3.9× gap</strong>. A plausible decomposition:</p>
+<pre><code>achieved bandwidth ~80% of peak                      1.25x
+no CUDA graphs: ~250 kernel launches x 5 us = 1.25ms
+   against a 4.18 ms step                            1.30x
+unfused RMSNorm / residual / RoPE round trips        1.15x
+decode attention kernel inefficiency (q_len = 1)     1.10x
+Python loop, sampling, detokenization per step       1.20x
+HF generate() overhead: cache reallocation, logits
+   processors, tensor churn                          1.35x
+                                                     ------
+1.25 x 1.30 x 1.15 x 1.10 x 1.20 x 1.35            = 3.33x</code></pre>
+<p><code>239 / 3.33 = 72 tok/s</code>, close to the observed 61 — the residual is unmodelled overhead. The useful conclusion: <strong>almost none of this gap is arithmetic.</strong> It is bandwidth efficiency and CPU overhead. Switching to vLLM or TensorRT-LLM typically recovers most of it and lands you in the 150–200 tok/s range, i.e. within 1.2–1.6× of the floor.</p>
+<p><strong>Part 3 — ridge points</strong></p>
+<pre><code>A100:  312e12 / 2.04e12  = 153 FLOP/byte
+H100:  989e12 / 3.35e12  = 295
+H200:  989e12 / 4.80e12  = 206
+4090:  165e12 / 1.01e12  = 163</code></pre>
+<p>Since decode intensity equals batch size, those numbers <em>are</em> the required batch sizes: 153, 295, 206 and 163 respectively.</p>
+<p>The H200 needs a <strong>smaller</strong> batch to saturate than the H100 (206 vs 295) despite being the faster card. More bandwidth relative to compute means an easier machine to keep busy. That is the shape of a decode-optimized part.</p>
+<p><strong>Part 4 — can you reach it?</strong></p>
+<pre><code>kv per token = 2 x 32 x 8 x 128 x 2 = 131,072 bytes = 128 KiB
+kv per 4k sequence = 131072 x 4096 = 0.537 GB
+
+available = 80 GB - 14 GB weights - 4 GB workspace = 62 GB
+max batch = 62 / 0.537 = 115 sequences</code></pre>
+<p><strong>115 against a required 295.</strong> You reach 39% of the ridge point. Even with memory perfectly packed, a 7B model on a single H100 at 4k context is memory-bound at every achievable operating point. There is no batch size that makes this workload compute-bound.</p>
+<p>That is worth stating plainly: <strong>you cannot saturate an H100's arithmetic with a 7B model at 4k context on one GPU.</strong> To get there you would need to shrink the KV cache — fp8 KV doubles you to 230, still short; fp8 KV plus fp8 weights gets you past it. Which is exactly the argument for Module 6.</p>
+<p><strong>Part 5 — the SLO-constrained design</strong></p>
+<p>Solve for the batch where TPOT hits 40 ms.</p>
+<pre><code>bytes_at_40ms = 0.040 s x 3350 GB/s = 134 GB</code></pre>
+<p>That exceeds the 80 GB of physical memory, so at the roofline floor the memory capacity binds before the latency target does — the whole feasible range is inside the SLO. Recompute using the realistic 1.5× implementation factor:</p>
+<pre><code>effective bandwidth ~ 3350 / 1.5 = 2233 GB/s
+bytes_at_40ms = 0.040 x 2233 = 89.3 GB
+89.3 = 14 (weights) + batch x 0.537
+batch = (89.3 - 14) / 0.537 = 140</code></pre>
+<p>Still above the 115 that memory allows. <strong>So memory capacity is the binding constraint, not the latency SLO</strong>, and the answer is batch 115:</p>
+<pre><code>bytes/step = 14 + 115 x 0.537 = 75.8 GB
+TPOT       = 75.8 / 2233 = 34 ms      (inside the 40 ms budget)
+throughput = 115 / 0.034 = 3,380 tok/s</code></pre>
+<p>The design conclusion — and this is the habit worth forming — is that <strong>you are memory-capacity bound, not latency bound</strong>. Every gram of effort should go into fitting more sequences in memory, because you have 6 ms of latency headroom you cannot spend. Had the numbers come out the other way, you would be tuning the scheduler instead. The roofline told you which problem you have before you wrote a line of code.</p></div>
+        </details>
+      </section>
+
+      <section class="section ghost ghost--clyde" id="code-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--clyde)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>CLYDE · CODE LAB</p>
+        <h2 class="section__title">Code lab</h2>
+        <div class="prose"><p>Build a roofline calculator that takes a model config, a GPU, a batch size and a context length, and reports where you sit, what your bottleneck is, and what your ceiling is. Then measure a real model and account for the gap.</p>
+<p>This is the tool you will reach for in every remaining module. Write it properly.</p></div>
+        <div class="prose" style="max-width:none"><pre><code class="lang-python">&quot;&quot;&quot;
+A roofline calculator for LLM inference. Keep this one.
+    pip install torch transformers    (only needed for the measurement section)
+&quot;&quot;&quot;
+from dataclasses import dataclass
+
+GB = 10 ** 9
+TF = 10 ** 12
+
+
+@dataclass
+class GPU:
+    name: str
+    memory_gb: float
+    bandwidth_gbs: float        # GB/s
+    dense_bf16_tflops: float    # DENSE, not the sparsity-doubled marketing number
+
+    @property
+    def ridge(self):
+        &quot;&quot;&quot;FLOP/byte at which the machine flips from memory- to compute-bound.&quot;&quot;&quot;
+        return (self.dense_bf16_tflops * TF) / (self.bandwidth_gbs * GB)
+
+
+@dataclass
+class Model:
+    name: str
+    n_params: float
+    n_layers: int
+    n_kv_heads: int
+    head_dim: int
+
+    def weight_bytes(self, dtype=2):
+        return self.n_params * dtype
+
+    def kv_per_token(self, dtype=2):
+        return 2 * self.n_layers * self.n_kv_heads * self.head_dim * dtype
+
+
+A100 = GPU(&quot;A100 80GB&quot;, 80, 2039, 312)
+H100 = GPU(&quot;H100 SXM&quot;, 80, 3350, 989)
+H200 = GPU(&quot;H200 SXM&quot;, 141, 4800, 989)
+B200 = GPU(&quot;B200&quot;, 192, 8000, 2250)
+L40S = GPU(&quot;L40S&quot;, 48, 864, 362)
+RTX4090 = GPU(&quot;RTX 4090&quot;, 24, 1008, 165)
+
+LLAMA3_8B = Model(&quot;Llama-3-8B&quot;, 8.03e9, 32, 8, 128)
+LLAMA3_70B = Model(&quot;Llama-3-70B&quot;, 70.6e9, 80, 8, 128)
+MISTRAL_7B = Model(&quot;Mistral-7B&quot;, 7.24e9, 32, 8, 128)
+
+
+def analyze(model, gpu, batch=1, seq_len=2048, w_dtype=2, kv_dtype=2,
+            n_gpus=1, efficiency=1.0):
+    &quot;&quot;&quot;efficiency &lt; 1 models real achieved bandwidth (0.6-0.8 is typical).&quot;&quot;&quot;
+    w = model.weight_bytes(w_dtype)
+    kv = model.kv_per_token(kv_dtype) * seq_len * batch
+    total_bytes = w + kv
+
+    bw = gpu.bandwidth_gbs * GB * n_gpus * efficiency
+    flops_per_step = 2 * model.n_params * batch
+
+    tpot = total_bytes / bw
+    intensity = flops_per_step / total_bytes
+
+    return {
+        &quot;weight_gb&quot;: w / GB,
+        &quot;kv_gb&quot;: kv / GB,
+        &quot;total_gb&quot;: total_bytes / GB,
+        &quot;tpot_ms&quot;: tpot * 1000,
+        &quot;tok_per_s&quot;: batch / tpot,
+        &quot;intensity&quot;: intensity,
+        &quot;ridge&quot;: gpu.ridge,
+        &quot;bound&quot;: &quot;COMPUTE&quot; if intensity &gt; gpu.ridge else &quot;MEMORY&quot;,
+        &quot;pct_of_ridge&quot;: 100 * intensity / gpu.ridge,
+        &quot;fits&quot;: total_bytes &lt; gpu.memory_gb * GB * n_gpus * 0.95,
+    }
+
+
+def max_batch(model, gpu, seq_len, w_dtype=2, kv_dtype=2, n_gpus=1, workspace_gb=4):
+    avail = gpu.memory_gb * GB * n_gpus - model.weight_bytes(w_dtype) - workspace_gb * GB
+    per_seq = model.kv_per_token(kv_dtype) * seq_len
+    return max(0, int(avail // per_seq))
+
+
+# ============================================================
+print(&quot;=== Part 1: the floor for a 7B fp16 model at batch 1 ===&quot;)
+print(f&quot;{'GPU':&lt;12} {'BW GB/s':&gt;9} {'TPOT ms':&gt;9} {'tok/s':&gt;8} {'ridge':&gt;7}&quot;)
+for g in (A100, H100, H200, RTX4090):
+    r = analyze(MISTRAL_7B, g, batch=1, seq_len=1)
+    print(f&quot;{g.name:&lt;12} {g.bandwidth_gbs:&gt;9.0f} {r['tpot_ms']:&gt;9.2f} &quot;
+          f&quot;{r['tok_per_s']:&gt;8.0f} {g.ridge:&gt;7.0f}&quot;)
+
+print(&quot;\n=== Part 3/4: can a 7B saturate an H100 at 4k context? ===&quot;)
+mb = max_batch(MISTRAL_7B, H100, 4096)
+print(f&quot;  ridge point needs batch  {H100.ridge:.0f}&quot;)
+print(f&quot;  memory allows batch      {mb}&quot;)
+print(f&quot;  -&gt; {'compute-bound reachable' if mb &gt; H100.ridge else 'MEMORY-BOUND at every batch'}&quot;)
+
+print(&quot;\n=== the batch sweep (Llama-3-8B, H100, 4k ctx) ===&quot;)
+print(f&quot;{'batch':&gt;6} {'bytes GB':&gt;10} {'TPOT ms':&gt;9} {'tok/s':&gt;9} &quot;
+      f&quot;{'intensity':&gt;10} {'% ridge':&gt;8} {'bound':&gt;8}&quot;)
+for b in (1, 8, 16, 32, 64, 111):
+    r = analyze(LLAMA3_8B, H100, batch=b, seq_len=4096)
+    flag = &quot;&quot; if r[&quot;fits&quot;] else &quot;  &lt;- OOM&quot;
+    print(f&quot;{b:&gt;6} {r['total_gb']:&gt;10.1f} {r['tpot_ms']:&gt;9.1f} {r['tok_per_s']:&gt;9.0f} &quot;
+          f&quot;{r['intensity']:&gt;10.0f} {r['pct_of_ridge']:&gt;7.0f}% {r['bound']:&gt;8}{flag}&quot;)
+
+print(&quot;\n=== what fp8 KV buys you (Llama-3-8B, H100, 4k ctx) ===&quot;)
+for label, kvd in [(&quot;fp16 KV&quot;, 2), (&quot;fp8 KV&quot;, 1)]:
+    mb = max_batch(LLAMA3_8B, H100, 4096, kv_dtype=kvd)
+    r = analyze(LLAMA3_8B, H100, batch=mb, seq_len=4096, kv_dtype=kvd)
+    print(f&quot;  {label:&lt;9} max batch {mb:&gt;4}  -&gt;  {r['tok_per_s']:&gt;6.0f} tok/s  &quot;
+          f&quot;({r['pct_of_ridge']:.0f}% of ridge)&quot;)
+
+print(&quot;\n=== Llama-3-70B: how many GPUs, and how many users? ===&quot;)
+for n in (2, 4, 8):
+    w = LLAMA3_70B.weight_bytes() / GB
+    cap = H100.memory_gb * n
+    if w &gt; cap * 0.9:
+        print(f&quot;  {n}x H100: weights {w:.0f} GB do not fit in {cap:.0f} GB&quot;)
+        continue
+    mb = max_batch(LLAMA3_70B, H100, 8192, n_gpus=n)
+    r = analyze(LLAMA3_70B, H100, batch=max(mb, 1), seq_len=8192, n_gpus=n)
+    print(f&quot;  {n}x H100: max batch {mb:&gt;3} @ 8k ctx  -&gt;  {r['tok_per_s']:&gt;6.0f} tok/s aggregate&quot;)
+
+
+# ============================================================
+# Measure a real model and account for the gap
+# ============================================================
+def measure():
+    import time, torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    if not torch.cuda.is_available():
+        print(&quot;\n(no CUDA -- skipping measurement)&quot;)
+        return
+
+    name = &quot;gpt2&quot;
+    model = AutoModelForCausalLM.from_pretrained(
+        name, torch_dtype=torch.float16).cuda().eval()
+    tok = AutoTokenizer.from_pretrained(name)
+    ids = tok(&quot;Roofline analysis says&quot;, return_tensors=&quot;pt&quot;).input_ids.cuda()
+
+    n_params = sum(p.numel() for p in model.parameters())
+    props = torch.cuda.get_device_properties(0)
+    print(f&quot;\n=== measuring {name} ({n_params/1e6:.0f}M params) on {props.name} ===&quot;)
+
+    with torch.no_grad():
+        out = model(ids, use_cache=True)
+        past, nxt = out.past_key_values, out.logits[:, -1:].argmax(-1)
+        for _ in range(10):                                  # warmup
+            out = model(nxt, past_key_values=past, use_cache=True)
+            past, nxt = out.past_key_values, out.logits[:, -1:].argmax(-1)
+        torch.cuda.synchronize()
+
+        t0 = time.perf_counter()
+        N = 100
+        for _ in range(N):
+            out = model(nxt, past_key_values=past, use_cache=True)
+            past, nxt = out.past_key_values, out.logits[:, -1:].argmax(-1)
+        torch.cuda.synchronize()
+        measured = (time.perf_counter() - t0) / N
+
+    weight_bytes = n_params * 2
+    # torch reports bandwidth in kHz * bus bits; convert to GB/s
+    peak_bw = props.memory_clock_rate * 1000 * (props.memory_bus_width / 8) * 2 / GB
+    floor = weight_bytes / (peak_bw * GB)
+
+    print(f&quot;  peak bandwidth (from device)  {peak_bw:&gt;8.0f} GB/s&quot;)
+    print(f&quot;  roofline floor                {floor*1000:&gt;8.2f} ms/token&quot;)
+    print(f&quot;  measured                      {measured*1000:&gt;8.2f} ms/token&quot;)
+    print(f&quot;  gap                           {measured/floor:&gt;8.2f}x&quot;)
+    print(&quot;  -&gt; small models are launch-overhead dominated; expect a large gap here.&quot;)
+
+
+if __name__ == &quot;__main__&quot;:
+    try:
+        measure()
+    except ImportError:
+        print(&quot;\n(pip install torch transformers to run the measurement)&quot;)
+
+# --- TODO for you ---
+#   1. Add a prefill_analyze() that computes TTFT and reports whether prefill is
+#      compute- or memory-bound. Find the sequence length at which the O(S^2)
+#      attention term overtakes the 2*N*S matmul term.
+#   2. Add speculative decoding: given acceptance rate alpha, draft length gamma,
+#      and draft cost ratio c, compute effective tok/s. Come back after Module 8.
+</code></pre></div>
+        <div class="prose"><h3>What you should see</h3><p>Part 1 reproduces the math lab: 146 / 239 / 343 / 72 tok/s and ridge points of 153 / 295 / 206 / 163.</p>
+<p>The saturation check prints <code>MEMORY-BOUND at every batch</code> — memory allows batch ~115 against a required 295.</p>
+<p>The batch sweep shows throughput climbing from ~217 to ~4,900 tok/s while TPOT degrades from 4.6 ms to 22 ms, and <code>% ridge</code> never exceeding about 38%. The fp8 KV comparison roughly doubles the achievable batch and pushes throughput past 6,000 tok/s — that single line is the argument for Module 6 in numeric form.</p>
+<p>The 70B section shows 2×H100 failing to fit 141 GB of weights, with 4× and 8× working.</p>
+<p>The measurement section on GPT-2 will show a <strong>large</strong> gap — often 10–30×. That is expected and instructive: GPT-2 is 124M parameters, so a decode step moves only ~250 MB and takes well under a millisecond at the roofline, which means fixed per-step overhead (kernel launches, Python) completely dominates. Small models are overhead-bound, not bandwidth-bound. Run it on a 7B model if you have the memory and the gap drops to 1.5–3×.</p></div>
+        <div class="prose"><h3>Stretch</h3><p>Produce the actual roofline plot. Log-log axes, intensity on x and attainable FLOP/s on y. Draw the two rooflines for an H100 and an H200. Then plot points for: decode at batch 1, 8, 32, 128; prefill at 512, 2k, 8k tokens; and an RMSNorm. Seeing prefill and decode land three orders of magnitude apart on the same chart is the single clearest picture of why this field is shaped the way it is.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pac" id="papers">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>THE KEY · PAPERS</p>
+        <h2 class="section__title">Papers, with a reading frame</h2>
+        <div class="papers">
+          <article class="paper">
+            <h3 class="paper__title"><a href="https://dl.acm.org/doi/10.1145/1498765.1498785" target="_blank" rel="noopener">Roofline: An Insightful Visual Performance Model for Multicore Architectures</a></h3>
+            <p class="paper__by">Williams, Waterman &amp; Patterson, 2009</p>
+            <p class="paper__why">The original roofline paper. Predates deep learning entirely, which is part of the point — this is a general model that happens to explain LLM inference perfectly.</p>
+            <div class="paper__frame"><p>Read <strong>Sections 2 and 3</strong> for the model and the ridge point. The multicore examples are dated; the framework is not. Notice that they were already arguing in 2009 that memory bandwidth, not FLOPs, is the binding constraint for most real kernels. Fifteen years later the ratio has only got worse.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://kipp.ly/transformer-inference-arithmetic/" target="_blank" rel="noopener">Transformer Inference Arithmetic</a></h3>
+            <p class="paper__by">Carol Chen (kipply), 2022</p>
+            <p class="paper__why">The standard practitioner reference for exactly the arithmetic in this module.</p>
+            <div class="paper__frame"><p>Read it end to end with a calculator. Re-derive every number rather than accepting it. The flops-versus-memory-bandwidth section is the heart. Some hardware figures have aged out; the method has not.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2211.05102" target="_blank" rel="noopener">Efficiently Scaling Transformer Inference</a></h3>
+            <p class="paper__by">Pope et al., 2022</p>
+            <p class="paper__why">Applies exactly this analysis at scale, and derives partitioning strategies from it. The best worked example of roofline reasoning in the LLM literature.</p>
+            <div class="paper__frame"><p>Now read <strong>Section 2</strong> properly — you have the background for it. Their cost model separates weight traffic, KV traffic and communication, which is the decomposition you will need in Module 9. <strong>Figure 3</strong> (the latency/throughput Pareto frontier) is the picture this module has been building toward.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2401.09670" target="_blank" rel="noopener">DistServe: Disaggregating Prefill and Decoding for Goodput-optimized LLM Serving</a></h3>
+            <p class="paper__by">Zhong et al., OSDI 2024</p>
+            <p class="paper__why">The clearest treatment of goodput as the right metric, and the strongest argument that prefill and decode should not share hardware.</p>
+            <div class="paper__frame"><p>Read <strong>Sections 2 and 3</strong> now for the goodput definition and the interference analysis. The disaggregation mechanism itself is Module 9 material — come back to Sections 4–6 then.</p></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--blinky" id="pitfalls">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--blinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>BLINKY · PITFALLS</p>
+        <h2 class="section__title">What people get wrong</h2>
+        <div class="pitfall">
+          <p class="pitfall__wrong"><span>Using the headline TFLOPs from the spec sheet.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>That number is usually the 2:4-structured-sparsity figure, which is double the dense number and does not apply to any production LLM. An H100 is 989 dense BF16 TFLOP/s, not 1,979. Using the sparse figure inflates your ridge point by 2× and will tell you that you are memory-bound when you are not — or, more often, exaggerate how far from the ridge you are.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Optimizing FLOPs when you are memory-bound.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>At batch 32 on an H100 you are at 11% of the ridge point. A kernel that halves your arithmetic changes your runtime by approximately zero, because the arithmetic was already hidden behind memory traffic. Compute the intensity first; it tells you which entire <em>categories</em> of optimization are dead before you invest in one.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Treating the roofline floor as an achievable target.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>The floor assumes 100% of peak bandwidth, zero launch overhead, perfect fusion and no sampling cost. Real systems land at 1.5–3× the floor, and a well-engineered one at 1.2–1.6×. Use the floor to know whether your gap is 1.5× (fine, stop optimizing) or 8× (something specific is broken), not as a number to chase.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Quoting throughput without batch size, context length, and percentiles.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>Those three numbers determine the result more than the implementation does. &quot;15,000 tok/s&quot; at batch 256 with 512-token contexts and &quot;1,200 tok/s&quot; at batch 8 with 32k contexts can come from the same system on the same GPU. Any benchmark missing them cannot be compared against anything, and any benchmark reporting a mean rather than p95/p99 is hiding its worst behaviour.</p></div></div>
+        </div>
+      </section>
+
+      <section class="section" id="checkpoint">
+        <div class="wall checkpoint">
+          <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>POWER PELLET · CHECKPOINT</p>
+          <p class="checkpoint__claim">Given a model, a GPU and a batch size, you can predict roughly where you sit on the
+roofline, name the binding constraint, and state which optimizations could possibly help — before
+running anything.</p>
+          <details class="qa">
+            <summary>What is the arithmetic intensity of a decode-time linear layer, and why is that result so useful?</summary>
+            <div class="qa__a prose"><p>It equals the batch size, exactly. For <code>Y = W @ X</code> with <code>W</code> of shape <code>[n, k]</code> and <code>X</code> of shape <code>[k, B]</code>, the FLOPs are <code>2nkB</code> and the bytes are <code>2nk</code> (reading the fp16 weights once), so intensity is <code>B</code>. It is useful because it collapses a complicated question into a one-parameter comparison: put your batch size next to the machine's ridge point and you know your regime immediately. Batch 32 on an H100 (ridge 295) is 11% of the way there — decisively memory-bound, so any optimization that only reduces FLOPs is guaranteed to do nothing.</p></div>
+          </details>
+<details class="qa">
+            <summary>The H200 has the same compute as the H100 but 43% more bandwidth. What happens to its ridge point, and is that good or bad?</summary>
+            <div class="qa__a prose"><p>The ridge point <em>falls</em>, from 295 to 206 FLOP/byte, because ridge is peak FLOP/s divided by bandwidth. A lower ridge is better for decode: you need less arithmetic intensity — a smaller batch — to saturate the machine's compute. In practice you also just decode 43% faster at any batch, since decode time is bytes over bandwidth. The H200 is a strictly better decode part and an identical prefill part. The general lesson: for memory-bound work, read the bandwidth line first, and be suspicious of ranking accelerators by FLOPs.</p></div>
+          </details>
+<details class="qa">
+            <summary>You compute a floor of 239 tok/s and measure 61. Where did the factor of 4 go?</summary>
+            <div class="qa__a prose"><p>Not into arithmetic — decode does about 0.016 ms of FLOPs against a 4.2 ms step. The usual decomposition: achieved bandwidth is 70–85% of spec (~1.25×); several hundred unfused kernel launches at ~5 µs each add ~1 ms of CPU-side cost to a 4.2 ms budget (~1.3×); unfused RMSNorm and residual adds add HBM round trips (~1.15×); the decode attention kernel is awkward at query length 1 (~1.1×); sampling and detokenization per step (~1.2×); and Hugging Face <code>generate()</code> overhead like cache reallocation and logits processors (~1.35×). Those multiply to roughly 3.3×. The fix is a real serving engine: CUDA graphs, fused kernels, and a C++ scheduler typically recover most of it.</p></div>
+          </details>
+<details class="qa">
+            <summary>Why does throughput stop improving with batch size well before the ridge point?</summary>
+            <div class="qa__a prose"><p>Because batching amortizes weight traffic but not KV traffic. Weights are shared, so their bytes are constant as batch grows. Each sequence brings its own KV cache, so KV bytes grow linearly with batch. Once the cache dominates the byte count, adding a sequence adds proportionally to both the numerator and denominator of throughput, and the curve flattens. For Llama-3-8B on an H100 at 4k context, going from batch 64 to 111 adds 73% more sequences for 14% more throughput. The way to move the whole curve is to shrink the per-sequence cache — which is why memory optimization and throughput optimization are the same project.</p></div>
+          </details>
+<details class="qa">
+            <summary>When would peak FLOPs actually matter for an LLM serving deployment?</summary>
+            <div class="qa__a prose"><p>Three situations. First, prefill-heavy workloads — long prompts with short outputs, like classification, RAG scoring, or embedding — where you are on the compute-bound side and FLOPs directly set TTFT. Second, speculative decoding, which deliberately converts spare compute into throughput by verifying several draft tokens per pass; the more headroom you have below the ridge, the more speculation pays. Third, very large batch on a model whose KV cache has been aggressively shrunk, where you finally cross the ridge. For ordinary decode-dominated chat serving, peak FLOPs is close to irrelevant, which is the counterintuitive punchline of this module.</p></div>
+          </details>
+<details class="qa">
+            <summary>Why is goodput a better target than throughput, and how can they diverge?</summary>
+            <div class="qa__a prose"><p>Goodput counts only requests that met their SLO; throughput counts every token delivered. They diverge whenever you push batch size past the point where latency targets hold. A system running batch 256 might report 20,000 tok/s while every request has a TPOT of 80 ms against a 50 ms budget — throughput excellent, goodput zero. Because throughput rises monotonically with batch and latency degrades with it, optimizing throughput alone reliably lands you on a configuration that violates your SLO for everyone. Stating the SLO first and maximizing goodput under it is the honest formulation, and it is the framing DistServe argues for.</p></div>
+          </details>
+          <p style="margin-top:var(--s7)">
+            <button class="done-toggle" type="button" data-complete="4" aria-pressed="false">
+              MARK LEVEL 04 CLEARED
+            </button>
+          </p>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="glossary">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>GLOSSARY</p>
+        <h2 class="section__title">Glossary</h2>
+        <div class="gloss">
+          <div class="gloss__row"><div class="gloss__term">roofline model</div><div class="gloss__def">attainable = min(peak FLOP/s, intensity x bandwidth). A two-line model that identifies your bottleneck.</div></div><div class="gloss__row"><div class="gloss__term">arithmetic intensity</div><div class="gloss__def">FLOPs performed per byte moved from main memory. For a decode linear layer it equals the batch size.</div></div><div class="gloss__row"><div class="gloss__term">ridge point</div><div class="gloss__def">peak FLOP/s divided by bandwidth. The intensity at which a machine flips from memory- to compute-bound.</div></div><div class="gloss__row"><div class="gloss__term">goodput</div><div class="gloss__def">Throughput counting only requests that met their latency SLO. The metric that matches what you are actually selling.</div></div><div class="gloss__row"><div class="gloss__term">TTFT</div><div class="gloss__def">Time to first token: queue time plus prefill. Scales with prompt length.</div></div><div class="gloss__row"><div class="gloss__term">TPOT / ITL</div><div class="gloss__def">Time per output token. Set by decode, so set by bandwidth.</div></div><div class="gloss__row"><div class="gloss__term">dense vs sparse FLOPs</div><div class="gloss__def">Vendors quote 2:4 structured sparsity figures that are double the dense number. Production LLMs use dense.</div></div><div class="gloss__row"><div class="gloss__term">achieved bandwidth</div><div class="gloss__def">The fraction of peak HBM bandwidth a real kernel reaches. Typically 70-85%.</div></div><div class="gloss__row"><div class="gloss__term">CUDA Graph</div><div class="gloss__def">A captured, replayable launch sequence that removes per-kernel CPU overhead. Essential when a decode step is hundreds of tiny kernels.</div></div>
+        </div>
+      </section>
+
+      <nav class="pagenav">
+        <a href="decoding-and-sampling.html" data-nav="prev"><span>◀ PREVIOUS LEVEL</span>03 DECODING AND SAMPLING</a>
+        <a href="batching.html" data-nav="next" style="text-align:right"><span>NEXT LEVEL ▶</span>05 BATCHING</a>
+      </nav>
+
+    </main>
+  </div>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <p class="foot__h">LEVELS</p>
+        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">&nbsp;</p>
+        <ul><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">REFERENCE</p>
+        <ul>
+          <li><a href="../reference/timeline.html">Timeline</a></li>
+          <li><a href="../reference/hardware.html">GPU spec table</a></li>
+          <li><a href="../reference/engines.html">Serving engines</a></li>
+          <li><a href="../reference/frontier.html">Open problems</a></li>
+          <li><a href="../reference/glossary.html">Glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="foot__h">SOURCE</p>
+        <ul>
+          <li><a href="https://github.com/tushar-amrit-6/inference">GitHub repository</a></li>
+          <li><a href="../reference/how-to-use.html">How to work through this</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
+    do the arithmetic yourself.</p>
+  </div>
+</footer>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

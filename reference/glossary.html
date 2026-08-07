@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GLOSSARY — LLM INFERENCE</title>
+<meta name="description" content="97 terms from across all eleven levels, each linked back to where it is explained.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="GLOSSARY — LLM INFERENCE">
+<meta property="og:description" content="97 terms from across all eleven levels, each linked back to where it is explained.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/arcade.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20fill%3D%22%23000%22%2F%3E%3Cpath%20d%3D%22M16%2C16%20L29%2C9%20A15%2C15%200%201%200%2029%2C23%20Z%22%20fill%3D%22%23FFE800%22%2F%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="scorebar">
+  <a class="scorebar__home" href="../index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="var(--pac)" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
+  
+  <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/11</span></span>
+  <span class="scorebar__spacer"></span>
+  <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
+</header>
+<div class="wrap wrap--narrow">
+  <main id="main">
+    <div class="mod-head">
+      <p class="mod-head__level">REFERENCE</p>
+      <h1 class="mod-head__title">GLOSSARY</h1>
+      <p class="mod-head__tag">97 terms from across all eleven levels, each linked back to where it is explained.</p>
+    </div>
+    <section class="section">
+    <div class="gloss">
+      <div class="gloss__row">
+        <div class="gloss__term">acceptance rate (alpha)<br><a href="../modules/speculative-decoding.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 08</a></div>
+        <div class="gloss__def">Probability a drafted token survives verification. Equals sum min(p, q), i.e. 1 minus the total variation distance between draft and target.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">achieved bandwidth<br><a href="../modules/roofline.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 04</a></div>
+        <div class="gloss__def">The fraction of peak HBM bandwidth a real kernel reaches. Typically 70-85%.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">admission control<br><a href="../modules/batching.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 05</a></div>
+        <div class="gloss__def">Deciding how many sequences to admit given that their eventual lengths, and therefore memory needs, are unknown.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">all-reduce<br><a href="../modules/distributed-inference.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 09</a></div>
+        <div class="gloss__def">Collective that sums a tensor across all GPUs and returns the result to all. Ring implementation moves 2(N-1)/N of the data per GPU.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">arithmetic intensity<br><a href="../modules/autoregressive-loop.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 01</a></div>
+        <div class="gloss__def">FLOPs performed per byte moved from memory. Compare it against the hardware ratio to find your bottleneck.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">attention hybrid<br><a href="../modules/attention-kernels.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 07</a></div>
+        <div class="gloss__def">A stack mixing mostly SSM or linear-attention layers with a few full-attention layers, trading some memory saving for exact recall.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">attention sink<br><a href="../modules/memory-optimization.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 06</a></div>
+        <div class="gloss__def">The first few tokens of a sequence, which receive large attention weight regardless of content. Keeping them enables indefinite streaming.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">AWQ<br><a href="../modules/memory-optimization.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 06</a></div>
+        <div class="gloss__def">Activation-aware weight quantization: scale up the ~1% of channels identified as salient from activation magnitude, then quantize.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">batch invariance<br><a href="../modules/decoding-and-sampling.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 03</a></div>
+        <div class="gloss__def">The property that a kernel produces bit-identical results regardless of batch composition. Required for true determinism; costs performance.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">block table<br><a href="../modules/memory-optimization.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 06</a></div>
+        <div class="gloss__def">Per-sequence map from logical token positions to physical KV cache blocks. What allows non-contiguous allocation.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">bonus token<br><a href="../modules/speculative-decoding.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 08</a></div>
+        <div class="gloss__def">The extra token available when all gamma drafts are accepted, since the verification pass already computed p at the final position.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">bytes per token<br><a href="../modules/kv-cache.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 02</a></div>
+        <div class="gloss__def">2 x n_layers x n_kv_heads x head_dim x dtype_bytes. The most useful derived number in inference planning.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">capacity factor<br><a href="../modules/distributed-inference.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 09</a></div>
+        <div class="gloss__def">A cap on tokens routed to any single MoE expert, bounding load imbalance at the cost of dropping or rerouting overflow.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">chunked prefill<br><a href="../modules/batching.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 05</a></div>
+        <div class="gloss__def">Splitting a long prefill into fixed-size pieces processed one per iteration, mixed with ongoing decode.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">closed-loop load<br><a href="../modules/systems-and-frontier.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 10</a></div>
+        <div class="gloss__def">Fixed concurrency; a new request is sent only when one finishes. Self-throttling, so it hides the capacity cliff.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">column-parallel / row-parallel<br><a href="../modules/distributed-inference.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 09</a></div>
+        <div class="gloss__def">Megatron's arrangement: split the first matmul by columns and the second by rows, so the nonlinearity between them needs no communication.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">constrained decoding<br><a href="../modules/decoding-and-sampling.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 03</a></div>
+        <div class="gloss__def">Masking logits each step so only tokens consistent with a grammar or schema can be sampled.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">continuous batching<br><a href="../modules/batching.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 05</a></div>
+        <div class="gloss__def">Iteration-level scheduling: evict finished sequences and admit waiting ones at every decode step. From Orca.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">copy-on-write<br><a href="../modules/memory-optimization.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 06</a></div>
+        <div class="gloss__def">Sequences sharing a prefix point at the same physical blocks; a block is duplicated only when one of them writes to it.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">crossover point<br><a href="../modules/kv-cache.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 02</a></div>
+        <div class="gloss__def">The number of cached tokens in flight at which KV traffic overtakes weight traffic. About 114k tokens for Llama-3-8B at fp16.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">CUDA Graph<br><a href="../modules/autoregressive-loop.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 01</a></div>
+        <div class="gloss__def">A captured, replayable sequence of kernel launches. Removes per-launch CPU overhead, which is significant when a decode step is hundreds of tiny kernels.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">decode<br><a href="../modules/autoregressive-loop.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 01</a></div>
+        <div class="gloss__def">The per-token forward passes that follow prefill, one position at a time. Memory-bound; sets TPOT.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">degeneration<br><a href="../modules/decoding-and-sampling.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 03</a></div>
+        <div class="gloss__def">The repetitive-loop failure mode of likelihood-maximizing decoders. Named and diagnosed by Holtzman et al.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">dense vs sparse FLOPs<br><a href="../modules/roofline.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 04</a></div>
+        <div class="gloss__def">Vendors quote 2:4 structured sparsity figures that are double the dense number. Production LLMs use dense.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">disaggregation<br><a href="../modules/distributed-inference.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 09</a></div>
+        <div class="gloss__def">Running prefill and decode on separate machine pools, transferring the KV cache between them.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">draft model<br><a href="../modules/speculative-decoding.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 08</a></div>
+        <div class="gloss__def">A small, cheap model that proposes candidate tokens for the target model to verify.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">EAGLE<br><a href="../modules/speculative-decoding.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 08</a></div>
+        <div class="gloss__def">Self-speculation by autoregressing over the target's hidden features rather than tokens. The strongest general method.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">expert parallelism (EP)<br><a href="../modules/distributed-inference.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 09</a></div>
+        <div class="gloss__def">Distributing MoE experts across GPUs. Requires all-to-all routing and suffers from load imbalance.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">external fragmentation<br><a href="../modules/kv-cache.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 02</a></div>
+        <div class="gloss__def">Free memory that exists but is broken into pieces too small to satisfy a contiguous allocation.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">FlashAttention<br><a href="../modules/attention-kernels.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 07</a></div>
+        <div class="gloss__def">Tiled exact attention that never materializes the N x N score matrix in HBM. Cuts HBM accesses to O(N^2 d^2 / M).</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">FlashDecoding<br><a href="../modules/attention-kernels.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 07</a></div>
+        <div class="gloss__def">Decode-phase attention that parallelizes along the KV dimension (split-K) because query-length-1 offers no query parallelism.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">frequency penalty<br><a href="../modules/decoding-and-sampling.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 03</a></div>
+        <div class="gloss__def">Subtracts a term proportional to how many times a token has appeared. Additive in logit space, better behaved than division.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">gamma<br><a href="../modules/speculative-decoding.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 08</a></div>
+        <div class="gloss__def">Draft length: how many tokens are proposed before each verification pass.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">goodput<br><a href="../modules/roofline.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 04</a></div>
+        <div class="gloss__def">Throughput counting only requests that met their latency SLO. The metric that matches what you are actually selling.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">GPTQ<br><a href="../modules/memory-optimization.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 06</a></div>
+        <div class="gloss__def">Post-training weight quantization using approximate second-order information, layer by layer. Works to 3-4 bits.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">GQA<br><a href="../modules/transformer-fundamentals.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 00</a></div>
+        <div class="gloss__def">Grouped-query attention. Fewer K/V heads than Q heads, with each K/V head shared by a group of query heads. Shrinks the KV cache proportionally.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">head_dim<br><a href="../modules/transformer-fundamentals.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 00</a></div>
+        <div class="gloss__def">The width of one attention head. Usually d_model / n_heads, though it can be set independently.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">hidden state<br><a href="../modules/transformer-fundamentals.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 00</a></div>
+        <div class="gloss__def">One d_model-length slice of the residual stream, at one position and one layer.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">internal fragmentation<br><a href="../modules/kv-cache.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 02</a></div>
+        <div class="gloss__def">Memory reserved inside a sequence allocation that the sequence never uses. The dominant waste in naive allocators.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">kernel fusion<br><a href="../modules/attention-kernels.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 07</a></div>
+        <div class="gloss__def">Combining adjacent operations into one kernel so intermediates never round-trip to HBM.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">knee<br><a href="../modules/batching.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 05</a></div>
+        <div class="gloss__def">The batch size beyond which throughput gains become small relative to the latency cost. The right default operating point.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">KV cache<br><a href="../modules/kv-cache.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 02</a></div>
+        <div class="gloss__def">The stored key and value tensors for all previous positions, kept so they are not recomputed each step. Per-sequence, and it grows with every token.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">linear attention<br><a href="../modules/attention-kernels.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 07</a></div>
+        <div class="gloss__def">Replacing softmax with a kernel feature map so attention can be reassociated into O(N d^2). Constant state, weaker exact recall.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">Little's Law<br><a href="../modules/autoregressive-loop.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 01</a></div>
+        <div class="gloss__def">concurrency = arrival rate x latency. Tells you how many requests must be in flight to hit a throughput target.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">llama.cpp<br><a href="../modules/systems-and-frontier.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 10</a></div>
+        <div class="gloss__def">Local-inference engine optimized for the weight-dominated regime: aggressive weight quantization, CPU and partial-offload support.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">logits<br><a href="../modules/transformer-fundamentals.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 00</a></div>
+        <div class="gloss__def">The unnormalized [.., vocab_size] scores produced by the LM head, before any softmax or sampling.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">Medusa<br><a href="../modules/speculative-decoding.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 08</a></div>
+        <div class="gloss__def">Self-speculation with multiple independent decoding heads predicting several positions ahead, verified as a tree.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">min-p<br><a href="../modules/decoding-and-sampling.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 03</a></div>
+        <div class="gloss__def">Keep tokens with probability at least min_p times the top token's probability. Fixed ratio, adaptive to confidence.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">MLA<br><a href="../modules/memory-optimization.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 06</a></div>
+        <div class="gloss__def">Multi-head latent attention. Compresses K and V into a shared low-rank latent per token; the up-projections are absorbed into neighbouring matrices.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">modified rejection sampling<br><a href="../modules/speculative-decoding.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 08</a></div>
+        <div class="gloss__def">Accept with probability min(1, p/q); on rejection sample from normalized max(0, p - q). Provably yields p.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">MQA<br><a href="../modules/kv-cache.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 02</a></div>
+        <div class="gloss__def">Multi-query attention: a single KV head shared by all query heads. Maximum cache savings, largest quality cost.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">n-gram lookup<br><a href="../modules/speculative-decoding.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 08</a></div>
+        <div class="gloss__def">Drafting by searching the context for the current suffix and proposing what followed it. Free, and excellent on repetitive text.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">NVLink<br><a href="../modules/distributed-inference.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 09</a></div>
+        <div class="gloss__def">High-bandwidth GPU-to-GPU interconnect, ~900 GB/s on H100. Roughly 14x faster than PCIe Gen5.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">online softmax<br><a href="../modules/attention-kernels.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 07</a></div>
+        <div class="gloss__def">Computing softmax incrementally with a running max and sum, rescaling earlier partials when a larger value appears. Exact, not approximate.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">open-loop load<br><a href="../modules/systems-and-frontier.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 10</a></div>
+        <div class="gloss__def">Arrivals follow an external schedule (usually Poisson) regardless of server state. The only way to observe overload.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">PagedAttention<br><a href="../modules/memory-optimization.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 06</a></div>
+        <div class="gloss__def">Fixed-size block allocation for the KV cache with per-sequence block tables, borrowed from OS virtual memory. Cuts fragmentation waste from 60-80% to under 4%.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">per-channel quantization<br><a href="../modules/memory-optimization.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 06</a></div>
+        <div class="gloss__def">A separate scale for each channel of a tensor. Necessary for keys, which have strong per-channel outliers.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">pipeline bubble<br><a href="../modules/distributed-inference.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 09</a></div>
+        <div class="gloss__def">Idle stage time while the pipeline fills and drains. Fraction is (N-1)/(M+N-1) for M microbatches and N stages.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">pipeline parallelism (PP)<br><a href="../modules/distributed-inference.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 09</a></div>
+        <div class="gloss__def">Assigning different layers to different GPUs. One activation hand-off per stage boundary. Tolerates slow links.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">pre-norm<br><a href="../modules/transformer-fundamentals.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 00</a></div>
+        <div class="gloss__def">Normalizing the input to each block rather than its output, leaving the residual path unbroken. Required in practice for deep transformers.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">preemption<br><a href="../modules/batching.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 05</a></div>
+        <div class="gloss__def">Reclaiming a running sequence's KV memory, either by swapping it to host memory or discarding and recomputing it.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">prefill<br><a href="../modules/autoregressive-loop.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 01</a></div>
+        <div class="gloss__def">The forward pass over the entire prompt, done in one shot. Compute-bound; sets TTFT.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">prefill/decode interference<br><a href="../modules/batching.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 05</a></div>
+        <div class="gloss__def">A long compute-bound prefill blocking every decoding sequence, spiking their inter-token latency.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">prefix caching<br><a href="../modules/kv-cache.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 02</a></div>
+        <div class="gloss__def">Reusing cached KV state across requests that share a leading token sequence. Exact, not approximate.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">RadixAttention<br><a href="../modules/kv-cache.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 02</a></div>
+        <div class="gloss__def">SGLang's radix-tree index over cached prefixes, enabling automatic longest-prefix reuse across arbitrary sharing patterns.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">reasoning workload<br><a href="../modules/systems-and-frontier.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 10</a></div>
+        <div class="gloss__def">Requests that generate thousands of hidden chain-of-thought tokens, shifting nearly all wall-clock into memory-bound decode.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">repetition penalty<br><a href="../modules/decoding-and-sampling.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 03</a></div>
+        <div class="gloss__def">Divides logits of already-seen tokens by r &gt; 1. Blunt, and harmful for code and structured output.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">residual distribution<br><a href="../modules/speculative-decoding.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 08</a></div>
+        <div class="gloss__def">The normalized positive part of p - q. The mass the target wanted that the draft undersupplied.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">residual stream<br><a href="../modules/transformer-fundamentals.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 00</a></div>
+        <div class="gloss__def">The [batch, seq, d_model] tensor that every block reads from and adds back into. Its width is constant through the network.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">ridge point<br><a href="../modules/autoregressive-loop.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 01</a></div>
+        <div class="gloss__def">The arithmetic intensity at which a machine transitions from memory-bound to compute-bound. About 295 FLOP/byte for an H100.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">RMSNorm<br><a href="../modules/transformer-fundamentals.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 00</a></div>
+        <div class="gloss__def">Normalization by root-mean-square only, with no mean subtraction and no bias. Cheaper than LayerNorm and works as well.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">roofline model<br><a href="../modules/roofline.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 04</a></div>
+        <div class="gloss__def">attainable = min(peak FLOP/s, intensity x bandwidth). A two-line model that identifies your bottleneck.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">RoPE<br><a href="../modules/transformer-fundamentals.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 00</a></div>
+        <div class="gloss__def">Rotary position embedding. Rotates Q and K by an angle proportional to absolute position so their dot product depends only on relative distance.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">RULER<br><a href="../modules/memory-optimization.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 06</a></div>
+        <div class="gloss__def">A long-context benchmark testing multi-needle retrieval, aggregation and tracing. Far more informative than perplexity for evaluating KV compression.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">selective batching<br><a href="../modules/batching.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 05</a></div>
+        <div class="gloss__def">Batch the position-independent operations across sequences while handling attention per-sequence. What makes continuous batching implementable.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">self-speculation<br><a href="../modules/speculative-decoding.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 08</a></div>
+        <div class="gloss__def">Generating drafts from the target model itself via extra heads or a small feature-level head, avoiding a separate draft model.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">sequence / context parallelism<br><a href="../modules/distributed-inference.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 09</a></div>
+        <div class="gloss__def">Splitting the sequence dimension across devices, as in Ring Attention. Used when one sequence exceeds a single GPU.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">SGLang<br><a href="../modules/systems-and-frontier.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 10</a></div>
+        <div class="gloss__def">Serving engine organized around structured, prefix-sharing workloads: RadixAttention plus a frontend programming language.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">shared memory / SRAM<br><a href="../modules/attention-kernels.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 07</a></div>
+        <div class="gloss__def">On-chip memory, ~228 KB per SM on Hopper, with roughly 6x the bandwidth of HBM. The tier FlashAttention keeps its tiles in.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">SmoothQuant<br><a href="../modules/memory-optimization.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 06</a></div>
+        <div class="gloss__def">Migrates activation outliers into the weights via per-channel scaling, enabling int8 for both operands.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">split-K<br><a href="../modules/attention-kernels.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 07</a></div>
+        <div class="gloss__def">Partitioning a reduction across parallel workers and combining their partial results afterward.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">SSM<br><a href="../modules/attention-kernels.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 07</a></div>
+        <div class="gloss__def">State space model. Maintains a fixed-size recurrent state, so there is no KV cache; Mamba is the leading example.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">static batching<br><a href="../modules/batching.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 05</a></div>
+        <div class="gloss__def">Fixed batch that runs to completion. Utilization collapses when sequence lengths vary, and gets worse as batch grows.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">SwiGLU<br><a href="../modules/transformer-fundamentals.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 00</a></div>
+        <div class="gloss__def">The gated feed-forward block used by Llama-family models: down(silu(gate(x)) * up(x)). Three weight matrices instead of two.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">teacher forcing<br><a href="../modules/transformer-fundamentals.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 00</a></div>
+        <div class="gloss__def">Training on the known target sequence so all positions are computed in one parallel pass. The reason training is far more hardware-efficient than generation.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">temperature<br><a href="../modules/decoding-and-sampling.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 03</a></div>
+        <div class="gloss__def">Divisor applied to logits before softmax. Below 1 sharpens, above 1 flattens.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">tensor parallelism (TP)<br><a href="../modules/distributed-inference.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 09</a></div>
+        <div class="gloss__def">Splitting weight matrices within a layer across GPUs. Two all-reduces per transformer layer. Needs NVLink.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">TensorRT-LLM<br><a href="../modules/systems-and-frontier.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 10</a></div>
+        <div class="gloss__def">NVIDIA serving engine that compiles a model into a hardware-specific engine ahead of time. Fastest and least flexible.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">token budget<br><a href="../modules/batching.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 05</a></div>
+        <div class="gloss__def">The cap on tokens processed per scheduler iteration. Decode tokens are admitted first, prefill chunks fill the rest.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">top-k<br><a href="../modules/decoding-and-sampling.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 03</a></div>
+        <div class="gloss__def">Keep the k highest-probability tokens. Fixed count, does not adapt to the distribution.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">top-p / nucleus<br><a href="../modules/decoding-and-sampling.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 03</a></div>
+        <div class="gloss__def">Keep the smallest set whose cumulative probability reaches p. Fixed mass, adaptive count.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">TPOT / ITL<br><a href="../modules/autoregressive-loop.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 01</a></div>
+        <div class="gloss__def">Time per output token / inter-token latency. The gap between successive tokens once streaming starts.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">tree attention<br><a href="../modules/speculative-decoding.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 08</a></div>
+        <div class="gloss__def">Verifying many candidate continuations in one pass using a mask where each node attends only to its ancestors.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">TTFT<br><a href="../modules/autoregressive-loop.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 01</a></div>
+        <div class="gloss__def">Time to first token. How long the user waits before anything appears.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">vLLM<br><a href="../modules/systems-and-frontier.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 10</a></div>
+        <div class="gloss__def">Serving engine organized around memory management: PagedAttention, continuous batching, broad model support.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">warp specialization<br><a href="../modules/attention-kernels.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 07</a></div>
+        <div class="gloss__def">Assigning different warps within a block to different roles (producer/consumer) so data movement overlaps computation. Central to FlashAttention-3.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">workspace<br><a href="../modules/kv-cache.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 02</a></div>
+        <div class="gloss__def">GPU memory reserved for activations, temporary buffers, and communication. Typically 10-20 GB, and easy to forget when budgeting.</div>
+      </div>
+    </div>
+  </section>
+  </main>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <p class="foot__h">LEVELS</p>
+        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">&nbsp;</p>
+        <ul><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">REFERENCE</p>
+        <ul>
+          <li><a href="../reference/timeline.html">Timeline</a></li>
+          <li><a href="../reference/hardware.html">GPU spec table</a></li>
+          <li><a href="../reference/engines.html">Serving engines</a></li>
+          <li><a href="../reference/frontier.html">Open problems</a></li>
+          <li><a href="../reference/glossary.html">Glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="foot__h">SOURCE</p>
+        <ul>
+          <li><a href="https://github.com/tushar-amrit-6/inference">GitHub repository</a></li>
+          <li><a href="../reference/how-to-use.html">How to work through this</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
+    do the arithmetic yourself.</p>
+  </div>
+</footer>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

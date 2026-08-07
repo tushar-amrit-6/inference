@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10 · SYSTEMS AND THE FRONTIER — LLM INFERENCE</title>
+<meta name="description" content="How the engines differ, how to benchmark without lying to yourself, and what is still unsolved.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="10 · SYSTEMS AND THE FRONTIER — LLM INFERENCE">
+<meta property="og:description" content="How the engines differ, how to benchmark without lying to yourself, and what is still unsolved.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/arcade.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20fill%3D%22%23000%22%2F%3E%3Cpath%20d%3D%22M16%2C16%20L29%2C9%20A15%2C15%200%201%200%2029%2C23%20Z%22%20fill%3D%22%23FFE800%22%2F%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="scorebar">
+  <a class="scorebar__home" href="../index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="var(--pac)" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
+  <span class="scorebar__item"><span class="scorebar__label">LEVEL</span><span class="scorebar__value scorebar__value--pac">10</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/11</span></span>
+  <span class="scorebar__spacer"></span>
+  <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
+</header>
+<div class="wrap">
+  <div class="shell">
+    <nav class="rail" aria-label="Module contents">
+  <p class="rail__head">ON THIS LEVEL</p>
+  <ul class="rail__list">
+    <li><a class="rail__link" href="#big-idea" data-kind="dot"><span class="rail__dot"></span><span>The big idea</span></a></li><li><a class="rail__link" href="#concept-0" data-kind="dot"><span class="rail__dot"></span><span>What actually distinguishes the serving engines</span></a></li><li><a class="rail__link" href="#concept-1" data-kind="dot"><span class="rail__dot"></span><span>How to benchmark without misleading yourself</span></a></li><li><a class="rail__link" href="#concept-2" data-kind="dot"><span class="rail__dot"></span><span>Evaluating optimized models</span></a></li><li><a class="rail__link" href="#concept-3" data-kind="dot"><span class="rail__dot"></span><span>Reasoning models changed the workload</span></a></li><li><a class="rail__link" href="#concept-4" data-kind="dot"><span class="rail__dot"></span><span>The open problems</span></a></li><li><a class="rail__link" href="#concept-5" data-kind="dot"><span class="rail__dot"></span><span>What to do next</span></a></li><li><a class="rail__link" href="#math-lab" data-kind="dot"><span class="rail__dot"></span><span>Math by hand</span></a></li><li><a class="rail__link" href="#code-lab" data-kind="dot"><span class="rail__dot"></span><span>Code lab</span></a></li><li><a class="rail__link" href="#papers" data-kind="dot"><span class="rail__dot"></span><span>Papers</span></a></li><li><a class="rail__link" href="#pitfalls" data-kind="dot"><span class="rail__dot"></span><span>Pitfalls</span></a></li><li><a class="rail__link" href="#checkpoint" data-kind="power"><span class="rail__dot"></span><span>Checkpoint</span></a></li><li><a class="rail__link" href="#glossary" data-kind="dot"><span class="rail__dot"></span><span>Glossary</span></a></li>
+  </ul>
+  <div class="rail__nav">
+    <a class="rail__step" href="distributed-inference.html">◀ 09 DISTRIBUTED INFERENCE</a>
+    <a class="rail__step" href="../index.html">▲ ALL LEVELS</a>
+    
+  </div>
+</nav>
+    <main id="main">
+
+      <div class="mod-head">
+        <p class="mod-head__level">LEVEL 10</p>
+        <h1 class="mod-head__title">SYSTEMS AND THE FRONTIER</h1>
+        <p class="mod-head__tag">How the engines differ, how to benchmark without lying to yourself, and what is still unsolved.</p>
+        <div class="mod-head__meta">
+          <span>⏱ 6–8 hours</span>
+          <span>● 6 concepts</span>
+          <span>📄 5 papers</span>
+          <span>▸ needs: All previous modules</span>
+        </div>
+      </div>
+
+      <section class="section ghost ghost--pinky" id="big-idea">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--pinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>PINKY · THE BIG IDEA</p>
+        <div class="prose"><p>You now have the analytical machinery. This module is about using it on real systems and real measurements — and about knowing where the machinery runs out.</p>
+<p>Three things.</p>
+<p><strong>Engine design philosophy.</strong> vLLM, SGLang, TensorRT-LLM and llama.cpp have converged on the same feature list, which means features no longer distinguish them. What distinguishes them is what each was built to optimize and what it gave up. Understanding that tells you which one fits your problem better than any benchmark table will.</p>
+<p><strong>Benchmarking honestly.</strong> Almost every published LLM inference benchmark is misleading, usually not deliberately. The failure modes are systematic and learnable: wrong load model, means instead of percentiles, no SLO, unrepresentative length distributions, and comparing systems at different operating points. You should be able to look at a benchmark and say what it does not tell you.</p>
+<p><strong>The frontier.</strong> What is genuinely open. Long context is still unaffordable, reasoning models inverted the workload, speculation and batching fight each other, and we still cannot evaluate a quantized model honestly. Knowing the open problems is how you tell a real advance from a repackaged one.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="concepts">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>PELLETS · CONCEPTS</p>
+        <article class="concept" id="concept-0">
+  <div class="concept__head">
+    <span class="concept__n">01</span>
+    <h3 class="concept__title">What actually distinguishes the serving engines</h3>
+  </div>
+  <div class="prose"><p>Start with the convergence, because it is the more informative fact. Every serious engine now has: continuous batching, paged KV cache, prefix caching, chunked prefill, CUDA graphs, fused kernels, FlashAttention-family kernels, weight quantization, increasingly KV quantization, and speculative decoding.</p>
+<p><strong>Those are table stakes, not differentiators.</strong> Four independently designed systems converging on the same list is good evidence the list is correct — and it means a feature-comparison table tells you almost nothing.</p>
+<p>What differs is the organizing bet.</p>
+<p><strong>vLLM — memory management as the foundation.</strong> The thesis is that if you fix KV fragmentation, everything else follows: recovered memory becomes batch size, which becomes arithmetic intensity, which becomes throughput. PagedAttention drove the whole architecture, and continuous batching depends on it. The V1 engine rewrite moved scheduling out of the Python hot path, which was the main remaining overhead. What it gives up: peak single-request latency, and some raw kernel performance relative to a compiled engine, because it optimizes for generality across a very large model zoo.</p>
+<p><strong>SGLang — the workload is structured, not a stream of independent requests.</strong> Real traffic shares system prompts, few-shot examples, documents, and conversation history. RadixAttention makes prefix reuse the default rather than a special case, and the frontend language lets you express branching, parallel calls and constrained generation as a program. Structured output is first-class, not a wrapper. What it gives up: simplicity, and some generality — the benefits concentrate in workloads that genuinely share prefixes.</p>
+<p><strong>TensorRT-LLM — decide everything at build time.</strong> The bet is that the last 20–30% lives in kernel selection, fusion and layout choices that are only correct for a specific model on specific hardware at a specific batch size, so make them ahead of time with full knowledge of the deployment. Typically the fastest option on NVIDIA hardware with the tightest tail latency. What it gives up: a great deal of flexibility. The engine is tied to the GPU it was built for; changing max batch size or context length means recompiling; new architectures land later.</p>
+<p><strong>llama.cpp — the weight-dominated regime, taken seriously.</strong> One user, short context, not enough memory. That is Module 2's weight-dominated regime, where weight bytes are essentially the whole decode cost — so aggressive weight quantization is not one optimization among many, it is <em>the</em> optimization. Hence the k-quant family, CPU inference, partial GPU offload, and a zero-dependency build. What it gives up: throughput at scale. Serving hundreds of concurrent users is not the design centre.</p>
+<p>The pattern worth extracting: <strong>each engine is right about a different operating point.</strong> Most arguments about which is &quot;best&quot; are two people in different regimes talking past each other — the same failure mode as the weight-versus-KV-quantization argument in Module 6. Ask what batch size and context length someone is running before taking their recommendation.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Every engine now implements the same techniques, so the real differences are in what each optimizes for and what it deliberately gives up.</p>
+</article>
+<article class="concept" id="concept-1">
+  <div class="concept__head">
+    <span class="concept__n">02</span>
+    <h3 class="concept__title">How to benchmark without misleading yourself</h3>
+  </div>
+  <div class="prose"><p><strong>Error 1: closed-loop load generation.</strong> The most common and most damaging. A closed-loop harness keeps <code>N</code> requests in flight, sending a new one only when an old one finishes. That is not how users behave, and it has a specific pathology: <strong>it cannot show you overload.</strong> If the system slows down, the harness sends fewer requests, so the queue never grows and latency degrades gracefully — hiding exactly the behaviour you needed to see.</p>
+<p>Real traffic is <strong>open-loop</strong>: requests arrive on their own schedule, typically Poisson, whether or not you are ready. Under open-loop load a system past its capacity shows queue growth and latency blowup, which is the honest picture. Benchmark open-loop, sweep the arrival rate, and find where it breaks.</p>
+<p><strong>Error 2: means instead of percentiles.</strong> Serving latency distributions are heavily right-skewed. A mean TPOT of 30 ms is entirely compatible with a p99 of 400 ms — preempted requests, long prefills, unlucky scheduling. Users experience the tail. Report p50, p95, p99, and report them for TTFT and TPOT separately, since they have different causes.</p>
+<p><strong>Error 3: no SLO, so no goodput.</strong> Throughput without a latency constraint is maximized by an absurd batch size that violates every latency target. Define the SLO first — &quot;TTFT under 500 ms and p95 TPOT under 50 ms&quot; — then measure <strong>goodput</strong>: requests per second that met it. That number is what you are actually selling. A system at 20,000 tok/s aggregate with 80 ms TPOT against a 50 ms budget has excellent throughput and zero goodput.</p>
+<p><strong>Error 4: unrepresentative length distributions.</strong> Results depend enormously on input and output lengths, and fixed-length synthetic workloads (every request exactly 512 in, 128 out) produce numbers that do not transfer. Real distributions are heavy-tailed, and the tail is what stresses the scheduler. Use a real trace if you have one; failing that, a lognormal with a long tail.</p>
+<p><strong>Error 5: no warmup.</strong> First requests pay CUDA context creation, kernel autotuning, CUDA graph capture, memory pool growth, and cold prefix caches. Discard the first 10–20% of measurements.</p>
+<p><strong>Error 6: comparing at different operating points.</strong> Engine A at batch 256 versus engine B at batch 32 is not a comparison of engines. Fix the SLO, let each system choose its own best configuration under that constraint, and compare goodput. That is the only comparison that answers a real question.</p>
+<p>A checklist worth keeping:</p>
+<pre><code>[ ] open-loop arrivals, Poisson, sweep the rate
+[ ] realistic length distribution, heavy-tailed
+[ ] warmup discarded
+[ ] p50 / p95 / p99 for TTFT and TPOT separately
+[ ] an explicit SLO, and goodput measured against it
+[ ] each system tuned for the SLO, not copied settings
+[ ] the same model, precision, and hardware -- state all three
+[ ] enough duration to reach steady state</code></pre>
+<p>And when reading someone else's benchmark, the fastest tell: <strong>if it does not state batch size, context length distribution, and percentiles, it is not a measurement, it is a claim.</strong></p></div>
+  <pre class="ascii" aria-label="diagram">  CLOSED-LOOP (misleading)        OPEN-LOOP (honest)
+
+  keep 64 in flight               arrivals ~ Poisson(rate)
+  finish one -&gt; send one          send regardless of state
+
+  system slows -&gt; fewer sent      system slows -&gt; queue GROWS
+  -&gt; latency degrades gently      -&gt; latency blows up
+  -&gt; you never find the cliff     -&gt; you find the cliff
+
+  reported: &quot;64 concurrent,       reported: &quot;meets SLO up to
+  p50 42ms, looks fine&quot;           18 req/s, collapses at 22&quot;</pre>
+  <p class="keypoint"><b>REMEMBER</b>Closed-loop load testing, means instead of percentiles, and no SLO are the three errors that make most published numbers uninterpretable.</p>
+</article>
+<article class="concept" id="concept-2">
+  <div class="concept__head">
+    <span class="concept__n">03</span>
+    <h3 class="concept__title">Evaluating optimized models</h3>
+  </div>
+  <div class="prose"><p>Module 6 made this point; it deserves expanding, because it is the weakest link in most production optimization work.</p>
+<p><strong>Why perplexity fails.</strong> It is the average negative log-likelihood over a corpus, dominated by common tokens in ordinary contexts — precisely what a quantized model reproduces almost perfectly. Damage concentrates in the tail. A 4-bit model can match fp16 perplexity to two decimals and fail visibly at 20-step arithmetic. Worse, perplexity is usually measured at 2k–4k tokens, exactly the regime where KV quantization looks harmless.</p>
+<p><strong>Why MMLU-style benchmarks are weak too.</strong> Multiple choice with four options is forgiving: the model needs the right answer to be marginally more likely than three alternatives, not to be confidently right. Degradation that would be obvious in open generation is invisible. Useful as a regression check, weak as a quality signal.</p>
+<p><strong>What to measure</strong>, in rough order of information per unit effort:</p>
+<ol><li><strong>Long-context retrieval.</strong> RULER is the good one — multi-needle, aggregation, variable tracking, at configurable lengths. Needle-in-a-haystack is easier and less informative but better than nothing. This is where KV quantization and eviction damage shows first.</li><li><strong>Multi-step reasoning.</strong> GSM8K, MATH, or your own chain-of-thought tasks. Errors compound, so small per-token degradation becomes visible.</li><li><strong>Your actual task.</strong> A few hundred real prompts, graded against the fp16 baseline by a human or a strong judge model. Unglamorous, and the most informative item here.</li><li><strong>Distributional divergence.</strong> KL between the optimized model's logits and the baseline's on a fixed prompt set. Cheap, sensitive, and catches problems before task metrics move.</li><li><strong>Standard suites.</strong> As a regression gate only.</li></ol>
+<p><strong>Control the comparison.</strong> Same prompts, same sampling parameters, same seed. Evaluating a quantized model at different settings than the baseline measures nothing, and it happens constantly.</p>
+<p><strong>Test at your operating point.</strong> If you serve 32k contexts at batch 64, evaluating at 2k context and batch 1 tells you very little. Batch composition itself can shift outputs (Module 3), so evaluate under batching.</p>
+<p><strong>Watch for the specific failure shapes.</strong> Quantization damage is not uniform noise. Common patterns: degradation that appears only past some context length; failures concentrated on rare tokens, numbers, and non-English text; loss of instruction-following precision while fluency is preserved; and reasoning that stays plausible while becoming wrong. Fluent-but-wrong is the dangerous one, because it survives casual inspection.</p>
+<p>The honest position on most published quantization results is that they show the method does not catastrophically fail — not that it is free. Whether it is free <em>for your workload</em> is a question only your own evaluation answers.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Quantization damage concentrates in long context, rare tokens and multi-step reasoning — exactly what perplexity and multiple-choice benchmarks average away.</p>
+</article>
+<article class="concept" id="concept-3">
+  <div class="concept__head">
+    <span class="concept__n">04</span>
+    <h3 class="concept__title">Reasoning models changed the workload</h3>
+  </div>
+  <div class="prose"><p>The largest recent shift in inference is not a technique, it is a change in what the workload looks like.</p>
+<p>A conventional request might be 2,000 prompt tokens and 200 output tokens. A reasoning request is 2,000 prompt tokens and 20,000 output tokens, most of which are thinking the user never sees.</p>
+<p>Every consequence follows from Module 1's asymmetry:</p>
+<p><strong>Almost all wall-clock becomes decode.</strong> Prefill was already a small fraction; now it is negligible. For Llama-3-8B on an H100, 2k prefill is ~35 ms and 20,000 decode tokens are ~90 seconds. <strong>Prefill is 0.04% of the request.</strong> All optimization effort belongs on the memory-bound side.</p>
+<p><strong>TTFT stops mattering.</strong> The user waits 90 seconds regardless; whether the first thinking token appears at 35 ms or 300 ms is irrelevant. This weakens the case for chunked prefill and strengthens the case for large prefill batches — the opposite of the conventional-chat conclusion.</p>
+<p><strong>Batch slots are held far longer.</strong> A sequence occupying a slot for 20,000 steps instead of 200 means 100× less slot turnover. Continuous batching's advantage over static batching shrinks, because there is less variance to exploit. Admission control matters more, because a bad admission decision costs you for minutes.</p>
+<p><strong>KV cache grows much larger per request.</strong> 20,000 tokens of cache per sequence rather than 2,200. At 128 KiB/token that is 2.5 GiB per sequence for an 8B model — so concurrency falls sharply, and every technique in Module 6 becomes more valuable.</p>
+<p><strong>Speculation becomes more attractive.</strong> Thinking tokens are often highly predictable — self-consistent reasoning has a lot of structure — and since the user never sees them, per-token latency is irrelevant; only total time matters. That combination favours aggressive speculation even at moderate batch, and n-gram lookup can do well on repetitive reasoning patterns.</p>
+<p><strong>New questions with no settled answers.</strong> Should thinking tokens use a cheaper decode path, or a smaller model, or more aggressive quantization, given they are never displayed? Can you detect a reasoning trace that is going nowhere and prune it mid-flight? Should reasoning requests be scheduled on a separate pool given their radically different profile? Is there a principled way to trade thinking length against answer quality at serve time?</p>
+<p>The honest summary: the field's serving infrastructure was designed for a workload that no longer describes a growing share of traffic, and the adaptation is very much in progress.</p></div>
+  <pre class="ascii" aria-label="diagram">  CONVENTIONAL CHAT              REASONING
+  prompt  2,000 tokens          prompt   2,000 tokens
+  output    200 tokens          output  20,000 tokens (mostly hidden)
+
+  prefill    35 ms  (15%)       prefill     35 ms  (0.04%)
+  decode    900 ms  (85%)       decode  90,000 ms  (99.96%)
+
+  slot held for 200 steps       slot held for 20,000 steps
+  KV grows to 275 MB            KV grows to 2.5 GB
+  TTFT matters                  TTFT is noise
+  speculation marginal          speculation strongly favoured</pre>
+  <p class="keypoint"><b>REMEMBER</b>Long chain-of-thought moves nearly all wall-clock into decode, holds batch slots far longer, and makes TTFT almost irrelevant.</p>
+</article>
+<article class="concept" id="concept-4">
+  <div class="concept__head">
+    <span class="concept__n">05</span>
+    <h3 class="concept__title">The open problems</h3>
+  </div>
+  <div class="prose"><p>Where the machinery in this course runs out.</p>
+<p><strong>1. Long context is still fundamentally unaffordable.</strong> The arithmetic does not improve with cleverness: Llama-3-70B at 128k context needs 40 GiB of cache per sequence, which is three concurrent users on four H100s. Every attack trades something real — eviction is lossy in ways you cannot bound in advance, compression concentrates its damage on exactly the long-context tasks you bought the context for, architectural fixes need training from scratch, and offload runs into a 50× bandwidth cliff. There is no approach that is simultaneously lossless, architecture-agnostic and cheap.</p>
+<p><strong>2. We cannot evaluate optimized models honestly.</strong> Arguably the most important unglamorous problem in the field. There is no standard, trusted suite that answers &quot;is this quantized model still the model I tested?&quot;, which means a great deal of production quantization is deployed on faith and spot-checks.</p>
+<p><strong>3. Speculation and batching fight each other.</strong> Both spend the same idle arithmetic (Module 8), so speculation stops paying around the batch size where you approach the ridge point. Adaptive schemes — choosing draft length per request per step from current occupancy and observed acceptance — are the obvious answer, and doing it well, with a scheduler that models the interaction, is unsolved.</p>
+<p><strong>4. Agentic workloads are a cache-policy problem nobody has solved.</strong> An agent re-sends its whole growing trajectory every step, so prefix caching turns quadratic prefill work into linear. That makes the cache the working set of the system, and the hard questions become: what do you evict when holding hundreds of partially-shared trajectories? Should you keep a trajectory warm while its agent waits on a slow external tool call, paying memory for latency you do not control? How do you schedule fairly when one agent's cache is worth 50× another's? Under-explored relative to its importance.</p>
+<p><strong>5. Disaggregation at scale is awkward in practice.</strong> Clearly right in principle (Module 9), but placement across heterogeneous pools, sizing the two pools as traffic mix shifts, and hiding the KV transfer are all open engineering problems.</p>
+<p><strong>6. The memory wall keeps widening.</strong> Compute has grown faster than bandwidth for a decade — the ridge point went from 153 on an A100 to 295 on an H100. Every generation makes decode relatively worse. FP4 and FP8 help by shrinking bytes and larger HBM helps capacity, but the structural fix would be a memory-centric architecture with far more bandwidth per FLOP, or compute placed nearer memory. Several companies are betting on variants of this. Whether any displaces GPUs at scale is genuinely uncertain, and it is the question that would most change everything else in this course.</p>
+<p><strong>7. The economics have no shared vocabulary.</strong> Inference is now the dominant cost of operating a model, and the field has no common language for cost-quality trade-offs. What is the right price for a token that took 20,000 thinking tokens to produce? How do you expose the latency/throughput dial to customers who do not know they want it? Not technical questions, but they increasingly determine which technical work gets done.</p>
+<p><em>A note on currency: this course was written from the author's knowledge and not verified against live sources at build time. Points 3, 4 and 6 move fastest. Before relying on any specific claim, search for recent work — and if something here has been solved since, that is a good sign.</em></p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Long context, evaluation, adaptive speculation, agentic cache policy and the widening memory wall are the areas where no approach has clearly won.</p>
+</article>
+<article class="concept" id="concept-5">
+  <div class="concept__head">
+    <span class="concept__n">06</span>
+    <h3 class="concept__title">What to do next</h3>
+  </div>
+  <div class="prose"><p>You have the framework. The way to convert it into understanding is to use it on something real.</p>
+<p><strong>Reproduce a published benchmark and account for the gap.</strong> This is the highest-value exercise in the course, and it is the one in the original outline for good reason. Pick a published number — a vLLM blog post, an engine comparison, a model card's throughput claim. Reproduce it. You will not match it. Then find out why.</p>
+<p>The discrepancies are where the understanding is, and the list of causes is a summary of this whole course: different hardware SKU, different achieved bandwidth, different length distribution, closed-loop versus open-loop load, mean versus percentile, different batch size, warmup included, different precision, speculative decoding silently enabled, chunked prefill settings, or a prefix-cache hit rate you did not have. Working through that list on a real discrepancy will teach you more than re-reading any of these modules.</p>
+<p><strong>Then, in rough order of value:</strong></p>
+<p><strong>Instrument something you run.</strong> Measure TTFT and TPOT percentiles on a real workload. Compute the roofline floor. Calculate your gap. If it is over 2×, find out which item from Module 4's list is responsible. This is a genuinely useful skill and few people have it.</p>
+<p><strong>Read the code.</strong> vLLM's block manager and scheduler are readable and are the clearest expression of Modules 2, 5 and 6 in practice. Read <code>v1/core/</code> and follow one request through admission, scheduling and eviction.</p>
+<p><strong>Pick one module and go deeper than this course did.</strong> Each of these has a substantial literature behind it: KV compression, speculative decoding variants, MoE serving, long-context attention, structured decoding. Depth in one is worth more than breadth across all.</p>
+<p><strong>Build the small thing.</strong> A KV cache calculator you actually use. A roofline planner. A batching simulator. The labs in this course are starting points — the versions you extend for your own hardware and models are the ones you will keep.</p>
+<p><strong>Stay current deliberately.</strong> This field moves fast enough that specific numbers age within months. What does not age is the framework: bytes moved per unit of useful work, and which side of the ridge point you are on. When you meet a new technique, ask what term of the cost model it attacks and at what operating point. If the answer is not clear, the technique probably is not either.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Reproducing a published benchmark and explaining the discrepancy is the single most instructive exercise available.</p>
+</article>
+      </section>
+
+      <section class="section ghost ghost--inky" id="math-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--inky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>INKY · MATH BY HAND</p>
+        <h2 class="section__title">Math by hand</h2>
+        <div class="prose"><p>This one is a design exercise rather than pure arithmetic. Show your reasoning with numbers throughout.</p>
+<p><strong>The brief.</strong> You are asked to serve <strong>Llama-3-70B</strong> for two products on the same hardware budget. You have <strong>8× H100 80GB</strong> in one NVLink node.</p>
+<pre><code>Product A -- interactive chat
+   prompt   ~1,500 tokens (lognormal, p99 ~8,000)
+   output     ~300 tokens (lognormal, p99 ~1,500)
+   SLO: TTFT p95 &lt; 800 ms,  TPOT p95 &lt; 40 ms
+   load: 12 requests/second at peak
+
+Product B -- document summarization
+   prompt  ~24,000 tokens
+   output     ~600 tokens
+   SLO: end-to-end p95 &lt; 60 s
+   load: 0.4 requests/second</code></pre>
+<p><strong>Part 1 — feasibility.</strong> At fp16, weights are 141.2 GB against 640 GB of node memory. Compute per-GPU weights, per-GPU KV per token, and available KV budget at TP-8. How many 1,500-token sequences fit? How many 24,000-token ones?</p>
+<p><strong>Part 2 — the latency budget.</strong> At TP-8, aggregate bandwidth is 26.8 TB/s. Assume 70% achieved. a) TPOT floor at batch 32 with 2,000-token average context. b) Largest batch that keeps TPOT under the 40 ms SLO. c) TTFT for a 1,500-token prefill and for a 24,000-token prefill, at 989 TFLOP/s per GPU and 70% efficiency. d) Does the 24,000-token prefill fit inside Product A's 800 ms TTFT budget if it runs unchunked? What does that tell you?</p>
+<p><strong>Part 3 — capacity.</strong> Using Little's Law, what concurrency does Product A need at 12 req/s? What does Product B need? Do they both fit in your answer to Part 1?</p>
+<p><strong>Part 4 — the design.</strong> Choose and justify, with numbers: a) One pool or two? Co-located or disaggregated? b) TP degree, and whether to replicate. c) Chunked prefill on or off, and at what token budget. d) KV precision. e) Speculative decoding on or off, and for which product.</p>
+<p><strong>Part 5 — the benchmark.</strong> Write the benchmark plan that would validate your design. What load model, what distributions, what metrics, what would falsify it?</p></div>
+        <details class="spoiler">
+          <summary>SHOW THE WORKED SOLUTION</summary>
+          <div class="spoiler__body prose"><p><strong>Part 1 — feasibility</strong></p>
+<pre><code>TP-8, fp16:
+  weights per GPU  = 141.2 / 8            = 17.65 GB
+  KV per token per GPU (8 KV heads, TP-8, so 1 head each):
+                   = 2 x 80 x 1 x 128 x 2 = 40,960 B = 40 KiB
+  workspace        ~ 10 GB per GPU
+  KV budget/GPU    = 80 x 0.95 - 17.65 - 10 = 48.35 GB
+  node KV budget   = 48.35 x 8            = 386.8 GB</code></pre>
+<p>Per sequence (using the full-model figure of 320 KiB/token, since the cache is split across GPUs and the node total is what matters):</p>
+<pre><code>1,500 tokens:  327,680 x 1,500  = 0.49 GB   -&gt;  386.8 / 0.49  = 787 sequences
+24,000 tokens: 327,680 x 24,000 = 7.86 GB   -&gt;  386.8 / 7.86  =  49 sequences</code></pre>
+<p>Plenty of headroom on paper. Memory is not the binding constraint here — which is unusual and worth noticing.</p>
+<p><strong>Part 2 — the latency budget</strong></p>
+<p>Effective bandwidth: <code>26,800 × 0.70 = 18,760 GB/s</code>.</p>
+<p>a) Batch 32, 2,000-token context:</p>
+<pre><code>bytes = 141.2 GB (weights) + 327,680 x 2,000 x 32 = 141.2 + 21.0 = 162.2 GB
+TPOT  = 162.2 / 18,760 = 8.6 ms</code></pre>
+<p>Comfortably inside the 40 ms budget.</p>
+<p>b) Solve for batch at 40 ms:</p>
+<pre><code>bytes_at_40ms = 0.040 x 18,760 = 750.4 GB
+750.4 = 141.2 + batch x 0.655 GB       (327,680 x 2,000 = 0.655 GB per sequence)
+batch = (750.4 - 141.2) / 0.655 = 930</code></pre>
+<p>But memory caps us at <code>386.8 / 0.655 = 590</code> sequences. <strong>Memory binds before latency</strong> — at maximum batch you would be at <code>(141.2 + 386.8)/18,760 = 28 ms</code>, still inside the SLO.</p>
+<p>c) Prefill, 8 GPUs at 989 TFLOP/s × 70% = 5,538 TFLOP/s aggregate:</p>
+<pre><code> 1,500 tokens: 2 x 70.6e9 x 1,500  = 2.118e14 / 5.538e15 =  38 ms
+24,000 tokens: 2 x 70.6e9 x 24,000 = 3.389e15 / 5.538e15 = 612 ms</code></pre>
+<p>d) A 612 ms unchunked prefill against Product A's 800 ms TTFT budget: it <em>technically</em> fits for the request itself. <strong>But that is the wrong question.</strong> The problem is what it does to everyone else: for 612 ms, every decoding Product A sequence produces nothing. Their TPOT for that step is 612 ms against a 40 ms SLO — a <strong>15× violation</strong> — and at ~500 concurrent sequences that is roughly 300 seconds of aggregate stall from a single Product B request.</p>
+<p>At 0.4 req/s, a Product B request arrives every 2.5 seconds, so roughly <strong>25% of all wall-clock time</strong> would be spent in a state where Product A is completely stalled. That is fatal, and it is the central finding of this exercise.</p>
+<p><strong>Part 3 — capacity via Little's Law</strong></p>
+<pre><code>Product A: latency ~ TTFT + 300 x TPOT = 0.04 + 300 x 0.0086 = 2.62 s
+           concurrency = 12 req/s x 2.62 s = 31 sequences
+
+Product B: latency ~ 0.61 + 600 x 0.0086 = 5.8 s
+           concurrency = 0.4 x 5.8 = 2.3 -&gt; 3 sequences</code></pre>
+<p>Total concurrency needed: about <strong>34 sequences</strong>, against capacity for hundreds. <strong>You are not capacity-constrained at all</strong> — you are interference-constrained. That reframes the entire design problem, and it is why doing Part 1 and Part 3 before Part 4 matters.</p>
+<p><strong>Part 4 — the design</strong></p>
+<p><strong>a) Two pools, disaggregated by product.</strong> Not by prefill/decode — by <em>product</em>, which is the sharper split here. Product B's 24k prefills are the entire problem and they must not touch Product A's decode.</p>
+<p>A reasonable allocation given the tiny concurrency requirements:</p>
+<pre><code>6 GPUs -&gt; Product A  (TP-6 is awkward; use 2 replicas of TP-4? see (b))
+2 GPUs -&gt; Product B</code></pre>
+<p>But 2 GPUs cannot hold 141.2 GB of fp16 weights. So either quantize Product B's copy to fp8 (70.6 GB, fits in 2×80 GB with ~80 GB left for its 3-sequence KV requirement of 24 GB — workable), or use a 4/4 split.</p>
+<p><strong>Recommended: 4 GPUs each, TP-4, fp8 weights on both.</strong> fp8 halves weights to 70.6 GB, so TP-4 gives 17.65 GB/GPU and leaves ample KV room. This also doubles decode speed.</p>
+<p><strong>b) TP-4 per pool, two pools.</strong> TP-8 in one pool would give lower latency per request, but we established we are not latency-constrained — Product A's TPOT floor is 8.6 ms against a 40 ms budget. Spending GPUs on latency we do not need, at the cost of leaving Product B co-located, is the wrong trade. TP-4 also keeps both pools within NVLink and preserves the 8-KV-head split cleanly.</p>
+<p><strong>c) Chunked prefill: on for both, token budget 2,048.</strong></p>
+<p>For Product A it bounds the p99 TTFT spike from the occasional 8,000-token prompt:</p>
+<pre><code>8,000-token prefill unchunked at TP-4: 2 x 70.6e9 x 8000 / 2,769e12 = 408 ms
+chunked at 2,048: 4 iterations, ~104 ms each -&gt; worst ITL ~104 ms</code></pre>
+<p>Still above the 40 ms TPOT SLO, so drop the budget to <strong>1,024</strong> for Product A: ~52 ms worst ITL, close enough that with real overlap it lands inside budget. Measure and tune.</p>
+<p>For Product B, chunking barely matters since it has its own pool, but leave it on at 2,048 to keep its own concurrent requests from blocking each other.</p>
+<p><strong>d) KV precision: fp16 for both.</strong> We have enormous memory headroom — 386.8 GB against a need of about 25 GB. <strong>There is no reason to spend quality on memory we are not short of.</strong> This is the discipline from Module 6: do not reach for lossy optimizations to solve a problem you do not have. Revisit if load grows 10×.</p>
+<p><strong>e) Speculative decoding: on for Product A, off for Product B.</strong></p>
+<p>Product A runs at concurrency ~31 per pool — well below the ridge point, so there is idle arithmetic to spend. With EAGLE-style self-speculation (<code>c ≈ 0.1</code>, <code>α ≈ 0.7</code>) at <code>γ = 4</code>, expect around 1.9×, taking TPOT from 8.6 ms to roughly 4.5 ms. Not needed for the SLO, but it buys headroom for load growth.</p>
+<p>Product B has concurrency 3 and is dominated by prefill; speculation would help its 600 decode tokens marginally and adds complexity. Leave it off.</p>
+<p><strong>Summary of the design:</strong></p>
+<pre><code>Pool A: 4x H100, TP-4, fp8 weights, fp16 KV, chunked prefill @1024,
+        EAGLE speculation, target batch ~32
+Pool B: 4x H100, TP-4, fp8 weights, fp16 KV, chunked prefill @2048,
+        no speculation, target batch ~3</code></pre>
+<p>The single most important decision was <strong>separating the pools</strong>, and it came from Part 2(d) — not from a memory calculation or a throughput calculation, but from noticing that one product's prefill destroys the other product's SLO.</p>
+<p><strong>Part 5 — the benchmark plan</strong></p>
+<pre><code>LOAD MODEL
+  open-loop, Poisson arrivals, two independent streams
+  Product A: sweep 4 -&gt; 24 req/s
+  Product B: fixed 0.4 req/s, then sweep to 1.5 to find the breaking point
+  run both streams SIMULTANEOUSLY -- testing them separately would
+  miss the interference this design exists to prevent
+
+DISTRIBUTIONS
+  A: prompt lognormal median 1500 p99 8000; output lognormal median 300 p99 1500
+  B: prompt normal around 24000 +/- 6000; output around 600
+  ideally replayed from a real trace instead
+
+PROCEDURE
+  5 min warmup, discarded
+  20 min steady state
+  3 repetitions, report variance
+
+METRICS
+  per product: TTFT p50/p95/p99, TPOT p50/p95/p99, end-to-end p95
+  GOODPUT: A-requests/s meeting (TTFT&lt;800ms AND TPOT p95&lt;40ms)
+           B-requests/s meeting (e2e &lt; 60 s)
+  GPU utilization and KV occupancy per pool
+  realized speculation acceptance rate on Pool A
+
+WHAT WOULD FALSIFY THE DESIGN
+  - A's TPOT p95 exceeds 40 ms at 12 req/s
+      -&gt; chunk budget too high, or batch too large; lower budget, re-measure
+  - A's TPOT p99 spikes correlate in time with B's arrivals
+      -&gt; the pools are not actually isolated (shared NVLink? shared host?)
+  - B's e2e p95 exceeds 60 s
+      -&gt; Pool B is under-provisioned; rebalance 5/3
+  - KV occupancy above ~70% on either pool
+      -&gt; the fp16-KV decision was wrong; revisit fp8
+  - speculation acceptance below 0.5 on real traffic
+      -&gt; speculation is near break-even; measure whether it still pays
+
+CONTROL
+  same model, same precision, same hardware, stated explicitly
+  compare against a single-pool co-located baseline -- that comparison
+  is the whole justification for the design</code></pre>
+<p>That last line matters. A benchmark that only measures your chosen design tells you whether it meets the SLO, not whether it was the right design. Always measure the alternative you rejected.</p></div>
+        </details>
+      </section>
+
+      <section class="section ghost ghost--clyde" id="code-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--clyde)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>CLYDE · CODE LAB</p>
+        <h2 class="section__title">Code lab</h2>
+        <div class="prose"><p>Build an open-loop load generator and a goodput measurement harness — the tool that would let you actually run the benchmark plan from the math lab.</p>
+<p>Then run it against the simulated serving model from Module 5 and reproduce the closed-loop versus open-loop discrepancy for yourself. Seeing a closed-loop harness fail to detect overload is the most convincing possible argument for open-loop testing.</p></div>
+        <div class="prose" style="max-width:none"><pre><code class="lang-python">&quot;&quot;&quot;
+Open-loop load generation and goodput measurement.
+
+The point: closed-loop harnesses cannot show you overload. This demonstrates it.
+
+    pip install numpy
+&quot;&quot;&quot;
+import heapq
+import numpy as np
+
+rng = np.random.default_rng(23)
+
+# --- a simple serving model (Llama-3-8B on one H100) ----------------------
+WEIGHT_GB = 15.0
+KV_GB_PER_TOKEN = 131072 / 1e9
+BW = 3350 * 0.70
+FLOPS = 989e12 * 0.70
+N_PARAMS = 8.03e9
+MAX_BATCH = 64
+CHUNK_BUDGET = 2048
+
+
+def decode_step_time(cached_tokens):
+    return (WEIGHT_GB + cached_tokens * KV_GB_PER_TOKEN) / BW
+
+
+def prefill_time(n_tokens):
+    return (2 * N_PARAMS * n_tokens) / FLOPS
+
+
+class Server:
+    &quot;&quot;&quot;Continuous batching with chunked prefill. Simplified but structurally honest.&quot;&quot;&quot;
+
+    def __init__(self, max_batch=MAX_BATCH, chunk=CHUNK_BUDGET):
+        self.max_batch = max_batch
+        self.chunk = chunk
+        self.t = 0.0
+        self.running = []          # decoding
+        self.prefilling = []       # [tokens_left, req]
+        self.queue = []            # admitted but not started
+        self.done = []
+
+    def submit(self, req):
+        self.queue.append(req)
+
+    def _admit(self):
+        while (self.queue
+               and len(self.running) + len(self.prefilling) &lt; self.max_batch):
+            r = self.queue.pop(0)
+            self.prefilling.append([r[&quot;prompt&quot;], r])
+
+    def step(self):
+        self._admit()
+        if not self.running and not self.prefilling:
+            return None
+
+        decode_n = len(self.running)
+        cached = sum(r[&quot;cached&quot;] for r in self.running)
+        step_t = decode_step_time(cached) if decode_n else 0.0
+
+        if self.prefilling:
+            take = min(self.prefilling[0][0], max(0, self.chunk - decode_n))
+            if take &gt; 0:
+                step_t = max(step_t, prefill_time(take))
+                self.prefilling[0][0] -= take
+                if self.prefilling[0][0] &lt;= 0:
+                    _, r = self.prefilling.pop(0)
+                    r[&quot;cached&quot;] = r[&quot;prompt&quot;]
+                    r[&quot;ttft&quot;] = self.t + step_t - r[&quot;arrival&quot;]
+                    self.running.append(r)
+
+        if step_t &lt;= 0:
+            return None
+        self.t += step_t
+
+        for r in list(self.running):
+            r[&quot;itls&quot;].append(step_t)
+            r[&quot;remaining&quot;] -= 1
+            r[&quot;cached&quot;] += 1
+            if r[&quot;remaining&quot;] &lt;= 0:
+                r[&quot;finish&quot;] = self.t
+                self.done.append(r)
+                self.running.remove(r)
+        return step_t
+
+
+def make_request(arrival, rng):
+    return {
+        &quot;arrival&quot;: arrival,
+        &quot;prompt&quot;: int(np.clip(rng.lognormal(7.3, 0.9), 32, 32000)),
+        &quot;remaining&quot;: 0, &quot;output&quot;: 0, &quot;cached&quot;: 0,
+        &quot;ttft&quot;: None, &quot;itls&quot;: [], &quot;finish&quot;: None,
+    }
+
+
+def run_open_loop(rate, duration=120.0, seed=0):
+    &quot;&quot;&quot;Poisson arrivals at the given rate, regardless of server state.&quot;&quot;&quot;
+    r = np.random.default_rng(seed)
+    srv = Server()
+
+    # pre-generate the arrival schedule -- arrivals do NOT depend on the server
+    arrivals, t = [], 0.0
+    while t &lt; duration:
+        t += r.exponential(1.0 / rate)
+        if t &lt; duration:
+            req = make_request(t, r)
+            req[&quot;output&quot;] = int(np.clip(r.lognormal(5.2, 1.0), 1, 3000))
+            req[&quot;remaining&quot;] = req[&quot;output&quot;]
+            arrivals.append(req)
+
+    i = 0
+    guard = 0
+    while (i &lt; len(arrivals) or srv.queue or srv.running or srv.prefilling):
+        guard += 1
+        if guard &gt; 500_000:
+            break
+        while i &lt; len(arrivals) and arrivals[i][&quot;arrival&quot;] &lt;= srv.t:
+            srv.submit(arrivals[i]); i += 1
+        if srv.step() is None:
+            if i &lt; len(arrivals):
+                srv.t = arrivals[i][&quot;arrival&quot;]
+            else:
+                break
+    return srv.done, len(arrivals), srv.t
+
+
+def run_closed_loop(concurrency, duration=120.0, seed=0):
+    &quot;&quot;&quot;Keep N requests in flight. Send a new one only on completion.&quot;&quot;&quot;
+    r = np.random.default_rng(seed)
+    srv = Server()
+    completed = []
+
+    for _ in range(concurrency):
+        req = make_request(0.0, r)
+        req[&quot;output&quot;] = int(np.clip(r.lognormal(5.2, 1.0), 1, 3000))
+        req[&quot;remaining&quot;] = req[&quot;output&quot;]
+        srv.submit(req)
+
+    guard = 0
+    while srv.t &lt; duration:
+        guard += 1
+        if guard &gt; 500_000:
+            break
+        n_before = len(srv.done)
+        if srv.step() is None:
+            break
+        for r_done in srv.done[n_before:]:
+            completed.append(r_done)
+            new = make_request(srv.t, r)                 # replace immediately
+            new[&quot;output&quot;] = int(np.clip(r.lognormal(5.2, 1.0), 1, 3000))
+            new[&quot;remaining&quot;] = new[&quot;output&quot;]
+            srv.submit(new)
+    return completed, srv.t
+
+
+def report(done, wall, label, submitted=None,
+           ttft_slo=1.0, tpot_slo=0.050):
+    if not done:
+        print(f&quot;  {label}: no completions&quot;); return
+    ttft = np.array([r[&quot;ttft&quot;] for r in done if r[&quot;ttft&quot;] is not None])
+    tpot = np.array([np.mean(r[&quot;itls&quot;]) for r in done if r[&quot;itls&quot;]])
+    tpot_p95_each = np.array([np.percentile(r[&quot;itls&quot;], 95) for r in done if r[&quot;itls&quot;]])
+    e2e = np.array([r[&quot;finish&quot;] - r[&quot;arrival&quot;] for r in done])
+    out_tokens = sum(r[&quot;output&quot;] for r in done)
+
+    met = sum(1 for r in done
+              if r[&quot;ttft&quot;] is not None and r[&quot;ttft&quot;] &lt; ttft_slo
+              and r[&quot;itls&quot;] and np.percentile(r[&quot;itls&quot;], 95) &lt; tpot_slo)
+
+    print(f&quot;  {label}&quot;)
+    print(f&quot;    completed {len(done):&gt;5}&quot;
+          + (f&quot; / {submitted} submitted&quot; if submitted else &quot;&quot;))
+    print(f&quot;    TTFT  p50 {np.percentile(ttft,50)*1000:&gt;7.0f}ms  &quot;
+          f&quot;p95 {np.percentile(ttft,95)*1000:&gt;7.0f}ms  &quot;
+          f&quot;p99 {np.percentile(ttft,99)*1000:&gt;8.0f}ms&quot;)
+    print(f&quot;    TPOT  p50 {np.percentile(tpot,50)*1000:&gt;7.1f}ms  &quot;
+          f&quot;p95 {np.percentile(tpot_p95_each,95)*1000:&gt;7.1f}ms&quot;)
+    print(f&quot;    e2e   p95 {np.percentile(e2e,95):&gt;7.1f}s&quot;)
+    print(f&quot;    throughput {out_tokens/wall:&gt;7.0f} tok/s   &quot;
+          f&quot;GOODPUT {met/wall:&gt;5.2f} req/s ({100*met/len(done):.0f}% met SLO)&quot;)
+
+
+print(&quot;=&quot; * 74)
+print(&quot;OPEN-LOOP: sweep the arrival rate. Watch for the cliff.&quot;)
+print(&quot;=&quot; * 74)
+for rate in (2, 4, 6, 8, 10, 14):
+    done, submitted, wall = run_open_loop(rate, duration=90.0, seed=1)
+    report(done, wall, f&quot;arrival rate {rate} req/s&quot;, submitted)
+    print()
+
+print(&quot;=&quot; * 74)
+print(&quot;CLOSED-LOOP: fix concurrency. Note that latency degrades GENTLY&quot;)
+print(&quot;and nothing ever looks broken -- the harness throttles itself.&quot;)
+print(&quot;=&quot; * 74)
+for conc in (8, 16, 32, 64, 128):
+    done, wall = run_closed_loop(conc, duration=90.0, seed=1)
+    report(done, wall, f&quot;concurrency {conc}&quot;)
+    print()
+
+print(&quot;=&quot; * 74)
+print(&quot;The open-loop sweep shows where the system BREAKS.&quot;)
+print(&quot;The closed-loop sweep shows a smooth curve that never breaks,&quot;)
+print(&quot;because it stops sending load exactly when the system slows down.&quot;)
+print(&quot;Only one of these tells you your capacity.&quot;)
+print(&quot;=&quot; * 74)
+
+# --- TODO for you ---
+#   1. Add an SLO-aware admission controller: reject requests when the
+#      predicted TTFT would violate the SLO. Does goodput improve?
+#   2. Add a second traffic class with 24k prompts at 0.4 req/s and measure
+#      what it does to the first class's TPOT p99. Then separate the pools
+#      and measure again. That is the math lab's central finding, reproduced.
+#   3. Report the FULL ITL distribution, not the mean per request. The tail
+#      within a single request is what users perceive as stuttering.
+</code></pre></div>
+        <div class="prose"><h3>What you should see</h3><p>The open-loop sweep should show a <strong>cliff</strong>. At low rates TTFT p95 is a few hundred milliseconds and goodput tracks the arrival rate closely. Somewhere in the middle — the exact rate depends on your sampled distributions — the queue starts growing faster than it drains, TTFT p95 jumps by an order of magnitude, and goodput <em>stops rising and then falls</em>. That inflection is your capacity, and it is the single number the benchmark exists to find.</p>
+<p>The closed-loop sweep shows something entirely different: a smooth, well-behaved curve. Latency rises gradually with concurrency, throughput rises and flattens, and <strong>nothing ever looks broken</strong> — because when the server slows down, the harness sends fewer requests. There is no cliff to find because the load adapts to the system.</p>
+<p>That contrast is the whole lesson. A closed-loop benchmark reporting &quot;concurrency 128, p50 42 ms, looks healthy&quot; and an open-loop benchmark reporting &quot;collapses above 9 req/s&quot; can describe the same system on the same hardware. Only the second answers &quot;can I deploy this?&quot;</p>
+<p>Note also that closed-loop throughput numbers are often <em>higher</em> — which is why they get published.</p>
+<p>The simulator is deliberately simplified: no KV memory limit, no preemption, an approximate overlap model. It gets the shape right, not the absolute numbers.</p></div>
+        <div class="prose"><h3>Stretch</h3><p>Do TODO 2 — it reproduces the math lab's central finding empirically. Add a second traffic class with 24,000-token prompts at 0.4 req/s and watch what it does to the first class's TPOT p99. You should see the p99 spike badly even though the <em>mean</em> barely moves, which is exactly why percentiles matter. Then run the two classes on separate simulated servers and measure again. The difference between those two numbers is the entire justification for disaggregation, derived from your own measurement rather than from a paper.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pac" id="papers">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>THE KEY · PAPERS</p>
+        <h2 class="section__title">Papers, with a reading frame</h2>
+        <div class="papers">
+          <article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2401.09670" target="_blank" rel="noopener">DistServe: Disaggregating Prefill and Decoding for Goodput-optimized LLM Serving</a></h3>
+            <p class="paper__by">Zhong et al., OSDI 2024</p>
+            <p class="paper__why">The clearest argument in the literature for goodput as the correct metric, with the measurement methodology to back it.</p>
+            <div class="paper__frame"><p>Re-read <strong>Section 2</strong> specifically for the goodput definition and why SLO-constrained measurement changes conclusions. Their experimental setup in Section 6 is a good model for how to describe a benchmark honestly — note how much configuration detail they state.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2309.06180" target="_blank" rel="noopener">Efficient Memory Management for LLM Serving with PagedAttention</a></h3>
+            <p class="paper__by">Kwon et al., SOSP 2023</p>
+            <p class="paper__why">The vLLM paper. Worth a final re-read now that you have the full picture — the design decisions read differently once you understand what each is trading against.</p>
+            <div class="paper__frame"><p>Read the whole thing again quickly. This time pay attention to what they chose <em>not</em> to do and why, and to the evaluation methodology: request rate sweeps, real trace-derived length distributions, and normalized latency. That is what a careful benchmark looks like.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2312.07104" target="_blank" rel="noopener">SGLang: Efficient Execution of Structured Language Model Programs</a></h3>
+            <p class="paper__by">Zheng et al., 2023</p>
+            <p class="paper__why">The strongest statement of the view that real workloads are structured and shared rather than independent — which is increasingly correct as agentic traffic grows.</p>
+            <div class="paper__frame"><p>Focus on RadixAttention and the cache-aware scheduling policy. The scheduling interaction — that cache hit rate and batch size compete for the same memory — is the subtle part and the one most relevant to Module 6.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2404.06654" target="_blank" rel="noopener">RULER: What's the Real Context Size of Your Long-Context Language Models?</a></h3>
+            <p class="paper__by">Hsieh et al., 2024</p>
+            <p class="paper__why">The benchmark to use when evaluating anything that touches the KV cache. Shows that claimed context lengths substantially exceed effective ones.</p>
+            <div class="paper__frame"><p>Read Sections 2 and 3 for the task categories — multi-needle retrieval, variable tracking, aggregation. The finding that models degrade well before their advertised context limit is directly relevant to evaluating KV quantization and eviction, and it is the benchmark to reach for instead of perplexity.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2403.02310" target="_blank" rel="noopener">Taming Throughput-Latency Tradeoff in LLM Inference with Sarathi-Serve</a></h3>
+            <p class="paper__by">Agrawal et al., OSDI 2024</p>
+            <p class="paper__why">Read alongside DistServe. Two careful papers, same diagnosed problem, opposite architectural conclusions — a good exercise in evaluating systems arguments.</p>
+            <div class="paper__frame"><p>Compare the two directly: which workload assumptions favour chunked prefill over disaggregation, and vice versa? Neither is universally right, and working out the conditions under which each wins is more valuable than picking a side.</p></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--blinky" id="pitfalls">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--blinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>BLINKY · PITFALLS</p>
+        <h2 class="section__title">What people get wrong</h2>
+        <div class="pitfall">
+          <p class="pitfall__wrong"><span>Benchmarking with a closed-loop load generator.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>It cannot show overload, because it throttles itself exactly when the system slows down. Latency degrades smoothly, throughput flattens, and there is never a cliff — so you learn nothing about capacity. Use open-loop Poisson arrivals and sweep the rate until goodput stops rising. That inflection is the number you needed.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Reporting mean latency.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>Serving latency distributions are heavily right-skewed: a 30 ms mean TPOT is compatible with a 400 ms p99 caused by preemption, long prefills, or unlucky scheduling. Users experience the tail, not the mean. Report p50, p95 and p99, separately for TTFT and TPOT since they have different causes.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Choosing an engine from a feature comparison table.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>Every serious engine now implements continuous batching, paged KV, prefix caching, chunked prefill, CUDA graphs, quantization and speculation. Features no longer distinguish them. What differs is the operating point each was designed for — and most disagreements about which is best are two people in different regimes talking past each other.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Assuming a technique that helped someone else will help you.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>Almost every optimization in this course is regime-dependent. Weight quantization is transformative at batch 1 and nearly useless at batch 64 with long context. Speculation is a 3× win at low concurrency and a net loss at high. Chunked prefill matters for chat and barely matters for reasoning workloads. Always ask what term of the cost model a technique attacks, and whether that term dominates <em>your</em> deployment.</p></div></div>
+        </div>
+      </section>
+
+      <section class="section" id="checkpoint">
+        <div class="wall checkpoint">
+          <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>POWER PELLET · CHECKPOINT</p>
+          <p class="checkpoint__claim">You can read a published inference benchmark and say what it does not tell you; you
+can design a serving deployment from an SLO; and you can name what is genuinely unsolved rather
+than merely unimplemented.</p>
+          <details class="qa">
+            <summary>Why can a closed-loop benchmark never show you your capacity?</summary>
+            <div class="qa__a prose"><p>Because the load adapts to the system. A closed-loop harness keeps <code>N</code> requests in flight and only sends a new one when an old one completes — so if the server slows down, the harness automatically sends fewer requests. The queue never grows, latency degrades smoothly, and there is no cliff to find. Real traffic is open-loop: requests arrive on their own schedule whether or not you are ready, so an overloaded system shows queue growth and latency blowup. The same system can look &quot;healthy at concurrency 128, p50 42 ms&quot; under closed-loop testing and &quot;collapses above 9 req/s&quot; under open-loop. Only the second answers whether you can deploy it.</p></div>
+          </details>
+<details class="qa">
+            <summary>What is goodput, and why is optimizing throughput without it a mistake?</summary>
+            <div class="qa__a prose"><p>Goodput counts only requests that met their latency SLO; throughput counts every token delivered. They diverge because throughput rises monotonically with batch size while latency degrades with it — so maximizing throughput alone reliably lands you at a configuration that violates the SLO for everyone. A system reporting 20,000 tok/s at batch 256 with an 80 ms TPOT against a 50 ms budget has excellent throughput and zero goodput: every token it produced is worth nothing to the product. Stating the SLO first and maximizing goodput under it is the formulation that matches what you are actually selling.</p></div>
+          </details>
+<details class="qa">
+            <summary>Your quantized model matches fp16 perplexity to two decimals. What have you learned?</summary>
+            <div class="qa__a prose"><p>Very little. Perplexity is the average negative log-likelihood over a corpus, dominated by common tokens in ordinary contexts — exactly what a quantized model reproduces almost perfectly. Damage concentrates in the tail: rare tokens, long dependencies, precise arithmetic, multi-step reasoning where errors compound. It is also usually measured at 2k–4k sequence lengths, which is precisely where KV quantization looks harmless. You would need long-context retrieval (RULER), multi-step reasoning tasks, KL divergence against the baseline's logits, and a few hundred prompts from your real workload graded against the fp16 baseline — all evaluated at your actual serving context length and batch size.</p></div>
+          </details>
+<details class="qa">
+            <summary>How do reasoning models change what you should optimize?</summary>
+            <div class="qa__a prose"><p>They move essentially all wall-clock into decode. A 2,000-token prompt with 20,000 output tokens spends about 35 ms on prefill and 90 seconds on decode — prefill is 0.04% of the request. Consequences: TTFT stops mattering, which weakens the case for chunked prefill; batch slots are held 100× longer, so slot turnover falls and continuous batching's advantage over static batching shrinks while admission control matters more; KV cache per sequence grows roughly 10×, so concurrency collapses and every Module 6 technique becomes more valuable; and speculation becomes more attractive, because thinking tokens are predictable and the user never sees them, so only total time matters rather than per-token latency.</p></div>
+          </details>
+<details class="qa">
+            <summary>A colleague says vLLM is better than TensorRT-LLM. What is the missing information?</summary>
+            <div class="qa__a prose"><p>Their operating point, and what they are optimizing. The two are right about different things. TensorRT-LLM compiles ahead of time for a specific model, GPU, precision and batch range, so it typically wins on raw speed and tail-latency predictability on NVIDIA hardware — at the cost of a compilation step, an engine tied to its GPU, and slower support for new architectures. vLLM optimizes for generality and operational simplicity across a large model zoo, with memory management as its organizing principle. If you serve one fixed model at scale and 25% matters, TensorRT-LLM. If you serve many models, iterate quickly, or want to deploy today, vLLM. Since both now implement the same technique list, a feature comparison answers nothing.</p></div>
+          </details>
+<details class="qa">
+            <summary>Name three genuinely open problems and say why each is hard.</summary>
+            <div class="qa__a prose"><p><strong>Long context affordability</strong> — Llama-3-70B at 128k needs 40 GiB per sequence, and every attack trades something real: eviction is lossy in ways you cannot bound because you cannot know which token a future query needs; compression concentrates damage on the long-context tasks you bought the context for; architectural fixes require training from scratch. <strong>Evaluating optimized models</strong> — there is no trusted standard for &quot;is this quantized model still the model I tested?&quot;, because damage is non-uniform and concentrates in capabilities that are hardest to measure, so much production quantization ships on faith. <strong>Adaptive speculation under batching</strong> — speculation and batching spend the same idle arithmetic, so speculation stops paying near the ridge point; choosing draft length per step from live occupancy and acceptance rate is the obvious fix and nobody does it well, because it requires a scheduler that models the interaction.</p></div>
+          </details>
+          <p style="margin-top:var(--s7)">
+            <button class="done-toggle" type="button" data-complete="10" aria-pressed="false">
+              MARK LEVEL 10 CLEARED
+            </button>
+          </p>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="glossary">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>GLOSSARY</p>
+        <h2 class="section__title">Glossary</h2>
+        <div class="gloss">
+          <div class="gloss__row"><div class="gloss__term">goodput</div><div class="gloss__def">Requests per second that met their latency SLO. The metric that matches what a serving product actually delivers.</div></div><div class="gloss__row"><div class="gloss__term">open-loop load</div><div class="gloss__def">Arrivals follow an external schedule (usually Poisson) regardless of server state. The only way to observe overload.</div></div><div class="gloss__row"><div class="gloss__term">closed-loop load</div><div class="gloss__def">Fixed concurrency; a new request is sent only when one finishes. Self-throttling, so it hides the capacity cliff.</div></div><div class="gloss__row"><div class="gloss__term">RULER</div><div class="gloss__def">A long-context benchmark with multi-needle retrieval, variable tracking and aggregation. What to use instead of perplexity for KV compression.</div></div><div class="gloss__row"><div class="gloss__term">vLLM</div><div class="gloss__def">Serving engine organized around memory management: PagedAttention, continuous batching, broad model support.</div></div><div class="gloss__row"><div class="gloss__term">SGLang</div><div class="gloss__def">Serving engine organized around structured, prefix-sharing workloads: RadixAttention plus a frontend programming language.</div></div><div class="gloss__row"><div class="gloss__term">TensorRT-LLM</div><div class="gloss__def">NVIDIA serving engine that compiles a model into a hardware-specific engine ahead of time. Fastest and least flexible.</div></div><div class="gloss__row"><div class="gloss__term">llama.cpp</div><div class="gloss__def">Local-inference engine optimized for the weight-dominated regime: aggressive weight quantization, CPU and partial-offload support.</div></div><div class="gloss__row"><div class="gloss__term">reasoning workload</div><div class="gloss__def">Requests that generate thousands of hidden chain-of-thought tokens, shifting nearly all wall-clock into memory-bound decode.</div></div>
+        </div>
+      </section>
+
+      <nav class="pagenav">
+        <a href="distributed-inference.html" data-nav="prev"><span>◀ PREVIOUS LEVEL</span>09 DISTRIBUTED INFERENCE</a>
+        <span></span>
+      </nav>
+
+    </main>
+  </div>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <p class="foot__h">LEVELS</p>
+        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">&nbsp;</p>
+        <ul><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">REFERENCE</p>
+        <ul>
+          <li><a href="../reference/timeline.html">Timeline</a></li>
+          <li><a href="../reference/hardware.html">GPU spec table</a></li>
+          <li><a href="../reference/engines.html">Serving engines</a></li>
+          <li><a href="../reference/frontier.html">Open problems</a></li>
+          <li><a href="../reference/glossary.html">Glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="foot__h">SOURCE</p>
+        <ul>
+          <li><a href="https://github.com/tushar-amrit-6/inference">GitHub repository</a></li>
+          <li><a href="../reference/how-to-use.html">How to work through this</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
+    do the arithmetic yourself.</p>
+  </div>
+</footer>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

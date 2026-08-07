@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>06 · MEMORY OPTIMIZATION — LLM INFERENCE</title>
+<meta name="description" content="Paging, prefix reuse, architectural KV reduction, and quantization — four attacks on the same denominator.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="06 · MEMORY OPTIMIZATION — LLM INFERENCE">
+<meta property="og:description" content="Paging, prefix reuse, architectural KV reduction, and quantization — four attacks on the same denominator.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/arcade.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20fill%3D%22%23000%22%2F%3E%3Cpath%20d%3D%22M16%2C16%20L29%2C9%20A15%2C15%200%201%200%2029%2C23%20Z%22%20fill%3D%22%23FFE800%22%2F%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="scorebar">
+  <a class="scorebar__home" href="../index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="var(--pac)" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
+  <span class="scorebar__item"><span class="scorebar__label">LEVEL</span><span class="scorebar__value scorebar__value--pac">06</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/11</span></span>
+  <span class="scorebar__spacer"></span>
+  <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
+</header>
+<div class="wrap">
+  <div class="shell">
+    <nav class="rail" aria-label="Module contents">
+  <p class="rail__head">ON THIS LEVEL</p>
+  <ul class="rail__list">
+    <li><a class="rail__link" href="#big-idea" data-kind="dot"><span class="rail__dot"></span><span>The big idea</span></a></li><li><a class="rail__link" href="#concept-0" data-kind="dot"><span class="rail__dot"></span><span>PagedAttention: virtual memory for the KV cache</span></a></li><li><a class="rail__link" href="#concept-1" data-kind="dot"><span class="rail__dot"></span><span>Prefix caching and radix trees</span></a></li><li><a class="rail__link" href="#concept-2" data-kind="dot"><span class="rail__dot"></span><span>MQA to GQA to MLA: attacking the formula itself</span></a></li><li><a class="rail__link" href="#concept-3" data-kind="dot"><span class="rail__dot"></span><span>Weight quantization: where the bytes actually are</span></a></li><li><a class="rail__link" href="#concept-4" data-kind="dot"><span class="rail__dot"></span><span>KV cache quantization, and why K and V want different treatment</span></a></li><li><a class="rail__link" href="#concept-5" data-kind="dot"><span class="rail__dot"></span><span>Measuring quality honestly</span></a></li><li><a class="rail__link" href="#math-lab" data-kind="dot"><span class="rail__dot"></span><span>Math by hand</span></a></li><li><a class="rail__link" href="#code-lab" data-kind="dot"><span class="rail__dot"></span><span>Code lab</span></a></li><li><a class="rail__link" href="#papers" data-kind="dot"><span class="rail__dot"></span><span>Papers</span></a></li><li><a class="rail__link" href="#pitfalls" data-kind="dot"><span class="rail__dot"></span><span>Pitfalls</span></a></li><li><a class="rail__link" href="#checkpoint" data-kind="power"><span class="rail__dot"></span><span>Checkpoint</span></a></li><li><a class="rail__link" href="#glossary" data-kind="dot"><span class="rail__dot"></span><span>Glossary</span></a></li>
+  </ul>
+  <div class="rail__nav">
+    <a class="rail__step" href="batching.html">◀ 05 BATCHING</a>
+    <a class="rail__step" href="../index.html">▲ ALL LEVELS</a>
+    <a class="rail__step" href="attention-kernels.html">07 ATTENTION KERNELS ▶</a>
+  </div>
+</nav>
+    <main id="main">
+
+      <div class="mod-head">
+        <p class="mod-head__level">LEVEL 06</p>
+        <h1 class="mod-head__title">MEMORY OPTIMIZATION</h1>
+        <p class="mod-head__tag">Paging, prefix reuse, architectural KV reduction, and quantization — four attacks on the same denominator.</p>
+        <div class="mod-head__meta">
+          <span>⏱ 8–10 hours</span>
+          <span>● 6 concepts</span>
+          <span>📄 6 papers</span>
+          <span>▸ needs: Module 2, Module 4, Module 5</span>
+        </div>
+      </div>
+
+      <section class="section ghost ghost--pinky" id="big-idea">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--pinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>PINKY · THE BIG IDEA</p>
+        <div class="prose"><p>Module 2 gave you the master equation:</p>
+<pre><code>max_batch = (GPU_memory - weights - workspace) / kv_bytes_per_sequence</code></pre>
+<p>Module 4 established that batch size <em>is</em> your arithmetic intensity, and Module 5 gave you the scheduler that keeps the batch full. This module is about the equation's two variable terms — making the numerator bigger and the denominator smaller — and it is where most of the practical engineering in LLM serving lives.</p>
+<p>There are exactly four ways to attack it, and they compose:</p>
+<ol><li><strong>Stop wasting what you allocate.</strong> PagedAttention. Recovers 60–80% of memory that naive allocators throw away. Free — no quality cost at all.</li><li><strong>Stop storing the same thing twice.</strong> Prefix caching. Also free and also exact.</li><li><strong>Store less per token, by design.</strong> MQA, GQA, MLA. Requires training the model that way.</li><li><strong>Store the same thing in fewer bits.</strong> Quantization of weights and of the cache. Cheap, and the only one of the four that costs quality.</li></ol>
+<p>The ordering is deliberate: do the free ones first. A surprising amount of production tuning consists of reaching for quantization — which has a quality cost you then have to measure and defend — when the system is still throwing away two thirds of its cache to fragmentation.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="concepts">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>PELLETS · CONCEPTS</p>
+        <article class="concept" id="concept-0">
+  <div class="concept__head">
+    <span class="concept__n">01</span>
+    <h3 class="concept__title">PagedAttention: virtual memory for the KV cache</h3>
+  </div>
+  <div class="prose"><p>Module 2 established the waste: a naive allocator reserves <code>max_seq_len</code> contiguously per sequence, and the vLLM authors measured that only <strong>20.4% to 38.2%</strong> of allocated KV memory actually held tokens. Between 60% and 80% was fragmentation.</p>
+<p>Operating systems solved exactly this problem in the 1960s, and the solution transfers almost without modification.</p>
+<p><strong>The mechanism.</strong> Divide the KV cache into fixed-size <strong>blocks</strong> — typically 16 tokens' worth. Each sequence gets a <strong>block table</strong> mapping its logical positions to physical block numbers. Blocks are allocated on demand as the sequence grows, from a shared pool, and returned when it finishes. Physical blocks belonging to one sequence need not be adjacent.</p>
+<pre><code>sequence A, 35 tokens, block size 16:
+  block table: [ 7, 2, 19 ]          3 blocks = 48 slots, 35 used
+
+  physical pool:
+    block 0  [ free    ]
+    block 1  [ seq B   ]
+    block 2  [ seq A   ]  &lt;- logical positions 16..31
+    block 3  [ seq C   ]
+    ...
+    block 7  [ seq A   ]  &lt;- logical positions 0..15
+    ...
+    block 19 [ seq A   ]  &lt;- logical positions 32..34, 13 slots spare</code></pre>
+<p><strong>Waste drops to at most one partial block per sequence</strong> — on average half a block, so 8 tokens. Against 128 KiB/token on Llama-3-8B that is about 1 MiB per sequence, versus gigabytes under reservation. vLLM reports waste below 4%.</p>
+<p>The attention kernel has to change to match: instead of reading a contiguous <code>[seq_len, head_dim]</code> tensor, it gathers through the block table. That indirection costs a little, and the gain vastly outweighs it.</p>
+<p><strong>Copy-on-write falls out for free</strong>, and this is the elegant part. Two sequences sharing a prefix can point their block tables at the <em>same physical blocks</em>. Nothing is copied. When one of them writes to a shared block — which only happens at the boundary block where they diverge — that block is copied and the writer's table updated. Parallel sampling with <code>n=4</code> from one prompt therefore costs one copy of the prompt's cache, not four. Beam search gets the same treatment.</p>
+<p><strong>Choosing the block size</strong> is a real trade-off. Small blocks (8) minimize internal fragmentation but mean more block-table entries and more indirection per attention call. Large blocks (32+) reduce overhead but waste more on partial blocks and make prefix sharing coarser — two sequences must share a whole block to share anything. 16 is the common default and is a reasonable compromise rather than a derived optimum.</p></div>
+  <pre class="ascii" aria-label="diagram">  NAIVE                              PAGED
+  reserve max_seq_len contiguously   16-token blocks from a shared pool
+
+  A [####·······················]    A -&gt; [7][2][19]
+  B [#########··················]    B -&gt; [1][4][11][3]
+  C [##·························]    C -&gt; [0]
+    ^ used  ^ reserved, unlendable
+                                     free pool: [5][6][8][9][10][12]...
+  utilization 20-38%                 utilization &gt; 96%
+                                     and A,B can SHARE a block if they
+                                     share a prefix -- no copy</pre>
+  <p class="keypoint"><b>REMEMBER</b>Allocate the cache in small fixed-size blocks with a per-sequence block table, so physical memory need not be contiguous and nothing is reserved for tokens that may never exist.</p>
+</article>
+<article class="concept" id="concept-1">
+  <div class="concept__head">
+    <span class="concept__n">02</span>
+    <h3 class="concept__title">Prefix caching and radix trees</h3>
+  </div>
+  <div class="prose"><p>Module 2 introduced the idea; here is how it is actually built.</p>
+<p>The naive version handles one fixed system prompt: hash it, cache its KV blocks, reuse them. Useful, but it only catches the case you anticipated.</p>
+<p><strong>RadixAttention</strong> — SGLang's contribution — generalises it. Maintain a radix tree (a compressed trie) whose edges are token sequences and whose nodes hold the corresponding KV blocks. For each incoming request, walk the tree to find the <strong>longest matching prefix</strong>, reuse those blocks, and prefill only the remainder. Insert the new suffix as you go. Evict by LRU when memory is short.</p>
+<p>This catches sharing you did not design for:</p>
+<table><thead><tr><th>workload</th><th>what is shared</th></tr></thead><tbody><tr><td>chat, turn N</td><td>everything before the newest user message</td></tr><tr><td>few-shot prompting</td><td>the entire example block</td></tr><tr><td>RAG over one document</td><td>the document, across every question about it</td></tr><tr><td>agent loop, step N</td><td>the whole trajectory so far</td></tr><tr><td>parallel sampling</td><td>the prompt, across all <code>n</code> samples</td></tr><tr><td>tree search / self-consistency</td><td>every common ancestor in the tree</td></tr></tbody></table>
+<p>The agentic case is the one that changes the economics. An agent taking 20 steps re-sends its growing history every step, so without prefix caching the total prefill work is quadratic in step count. With it, each step prefills only the newest action and observation. For long-running agents this is not an optimization, it is the difference between viable and not.</p>
+<p>Three implementation realities:</p>
+<p><strong>RoPE positions must be handled.</strong> Cached keys were rotated by their absolute position. Reuse a prefix at a different offset without accounting for this and attention is silently wrong — no crash, just degraded output. This is the most common prefix-caching bug.</p>
+<p><strong>Block granularity limits matching.</strong> With 16-token blocks you can only share whole blocks, so two prompts differing at token 5 share nothing even though the first 5 tokens match. Prefixes that matter should be block-aligned, which is one reason system prompts are often padded.</p>
+<p><strong>Eviction is a genuine trade-off, not a detail.</strong> Cached prefixes occupy memory that running sequences need. Keeping a prefix costs you batch size <em>now</em> against a possible hit <em>later</em>. LRU is the usual answer and it is a heuristic; the right policy depends on your traffic's reuse distribution, which most operators have never measured.</p>
+<p>There is also a security consideration worth naming: cache is shared derived state across users. Hits require an exact token-prefix match, so content does not leak directly, but hit/miss timing can in principle reveal whether another user has submitted a given prefix. For most deployments this is acceptable; for multi-tenant systems with sensitive prompts it is worth an explicit decision rather than a default.</p></div>
+  <pre class="ascii" aria-label="diagram">  radix tree over cached prefixes
+
+              [ &quot;You are a helpful assistant.&quot; ]        &lt;- 1 copy, shared by all
+                     /                    \
+        [ &quot;Summarize:&quot; ]              [ &quot;Translate to French:&quot; ]
+           /        \                        |
+    [ doc A ]   [ doc B ]              [ sentence 1 ]
+        |
+   [ &quot;What is the main point?&quot; ]   &lt;- only this is prefilled on a new request</pre>
+  <p class="keypoint"><b>REMEMBER</b>Requests that share a leading token sequence share its KV state exactly, so it should be computed once and pointed at, not recomputed.</p>
+</article>
+<article class="concept" id="concept-2">
+  <div class="concept__head">
+    <span class="concept__n">03</span>
+    <h3 class="concept__title">MQA to GQA to MLA: attacking the formula itself</h3>
+  </div>
+  <div class="prose"><p>Paging and prefix caching stop you wasting memory. Architecture changes how much you need in the first place.</p>
+<p>Recall the formula: <code>2 × n_layers × n_kv_heads × head_dim × dtype_bytes</code>. Two of those terms are architectural choices.</p>
+<p><strong>MHA → MQA → GQA</strong> attack <code>n_kv_heads</code>, and Module 2 has the numbers: on Llama-3-70B, MHA needs 2.5 MiB/token, GQA-8 needs 320 KiB, MQA needs 40 KiB. GQA at 4–8 groups is where the field settled, because MQA's single shared KV head costs measurably more quality than the memory is worth for most models.</p>
+<p><strong>MLA</strong> — multi-head latent attention, from DeepSeek-V2 — attacks the problem differently and more aggressively. Instead of reducing the <em>number</em> of KV heads, it compresses K and V jointly into a single low-rank <strong>latent vector</strong> per token, and caches only that.</p>
+<pre><code>standard GQA, per token per layer:
+    K: n_kv_heads x head_dim  = 8 x 128 = 1024 values
+    V: n_kv_heads x head_dim  = 8 x 128 = 1024 values
+                                          ---- 2048 values
+
+MLA, per token per layer:
+    c_kv: kv_lora_rank        = 512 values      (compressed K and V together)
+    k_rope: rope dim          =  64 values      (decoupled positional part)
+                                 ---- 576 values</code></pre>
+<p>At inference, the per-head K and V are reconstructed from the latent by up-projection. The trick that makes this cheap is <strong>absorption</strong>: the up-projection matrices can be folded into the adjacent query and output projections algebraically, so you never actually materialize the full K and V — you compute attention directly against the latent.</p>
+<p>The decoupled RoPE part exists because rotation does not commute with the low-rank projection. Applying RoPE to a compressed latent and then decompressing does not give the same answer as compressing rotated keys, so MLA keeps a small separate rotary component. It is an implementation-forced wrinkle rather than an elegant piece of design, and it is where most of the complexity of MLA lives.</p>
+<p>DeepSeek report a KV reduction of roughly <strong>93% versus MHA</strong>, and — the part that made people pay attention — <em>better</em> benchmark quality than the MHA baseline, not worse. The plausible explanation is that the low-rank bottleneck acts as a regularizer. Whether that generalises beyond their models is not yet established.</p>
+<p>The catch for all three: <strong>these are training-time decisions.</strong> You cannot convert a deployed MHA model to MLA. GQA has an uptraining recipe (mean-pool the KV heads within a group, fine-tune on ~5% of original compute), but MLA requires training from scratch. If you are choosing a model to serve, its attention architecture is one of the most consequential facts about its inference cost, and it is fixed before you get involved.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>The cache formula has n_kv_heads and head_dim as factors, so architectures that shrink either one shrink the cache proportionally.</p>
+</article>
+<article class="concept" id="concept-3">
+  <div class="concept__head">
+    <span class="concept__n">04</span>
+    <h3 class="concept__title">Weight quantization: where the bytes actually are</h3>
+  </div>
+  <div class="prose"><p>Recall the two regimes from Module 2. In the <strong>weight-dominated</strong> regime — small batch, short context, single-user local inference — weight bytes are your step time, so halving them roughly halves your latency.</p>
+<p><strong>Weight-only quantization</strong> stores weights at low precision and dequantizes to fp16 on the fly for the matmul. The arithmetic still happens in fp16; the saving is purely in bytes moved, which is exactly what you want when you are memory-bound.</p>
+<p><strong>GPTQ</strong> (Frantar et al., 2022) quantizes layer by layer, using approximate second-order information from a small calibration set to choose quantization points that minimize the layer's output error. It works down to 3–4 bits on large models with modest perplexity loss.</p>
+<p><strong>AWQ</strong> (Lin et al., 2023) starts from the observation that not all weights matter equally: a small fraction of channels — around 1% — are salient, identifiable from <em>activation</em> magnitude rather than weight magnitude. Scale those channels up before quantizing so they land on finer grid points. Simple, no backpropagation, and generally more robust than GPTQ at 4 bits.</p>
+<p><strong>Weight+activation quantization</strong> is a different game. <strong>SmoothQuant</strong> (Xiao et al., 2022) addresses the fact that activations have severe outliers that make them hard to quantize, by migrating the difficulty into the weights via a per-channel scaling that cancels out mathematically. This enables int8 for both operands, which speeds up the <em>arithmetic</em> too — worth it only when you are compute-bound, which for decode you are not.</p>
+<p><strong>FP8</strong> on Hopper and later is the pragmatic modern default for datacenter serving: hardware support, roughly half the bytes, and quality loss small enough that many deployments accept it without extensive validation. <strong>FP4</strong> on Blackwell extends the same idea further.</p>
+<p>A rough guide:</p>
+<table><thead><tr><th>precision</th><th>size (8B model)</th><th>typical quality cost</th></tr></thead><tbody><tr><td>fp16 / bf16</td><td>16.1 GB</td><td>baseline</td></tr><tr><td>fp8</td><td>8.0 GB</td><td>small, often negligible</td></tr><tr><td>int4 (GPTQ/AWQ)</td><td>~4.5 GB with scales</td><td>small but real; task-dependent</td></tr><tr><td>int3</td><td>~3.5 GB</td><td>noticeable</td></tr><tr><td>int2</td><td>~2.5 GB</td><td>severe without special methods</td></tr></tbody></table>
+<p>Two cautions. First, <strong>the speedup is not the compression ratio</strong> — you also move activations and KV cache, and dequantization costs some arithmetic. 4-bit weights typically give 2.5–3.5×, not 4×. Second, and more important: <strong>in the cache-dominated regime, weight quantization does much less than you expect.</strong> At batch 32 with 8k context on Llama-3-8B, the KV cache is 2.3× the weights, so even eliminating weight bytes entirely would cut your step time by only about 30%. Check which regime you are in before choosing.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>At small batch and short context, weight bytes are essentially the whole decode cost, so 4-bit weights approach a 4x speedup.</p>
+</article>
+<article class="concept" id="concept-4">
+  <div class="concept__head">
+    <span class="concept__n">05</span>
+    <h3 class="concept__title">KV cache quantization, and why K and V want different treatment</h3>
+  </div>
+  <div class="prose"><p>In the cache-dominated regime, quantizing the cache is the lever that matters. It halves (fp8/int8) or quarters (int4) the denominator of the batch equation directly.</p>
+<p>The naive approach — quantize everything per-tensor — degrades quality more than you would expect from the bit count. The reason is a real structural asymmetry, documented in the KIVI work and others:</p>
+<p><strong>Keys have strong per-channel outliers.</strong> Certain channels of the key vectors consistently carry much larger magnitudes than others, across tokens. Quantizing a key tensor per-tensor means those outlier channels dominate the scale and every other channel is crushed into a few quantization levels.</p>
+<p><strong>Values do not show this pattern.</strong> Value distributions are comparatively uniform across channels.</p>
+<p>So the correct treatment is asymmetric:</p>
+<pre><code>K: quantize PER CHANNEL   -- each channel gets its own scale, so an outlier
+                             channel does not ruin the others
+
+V: quantize PER TOKEN     -- each token's value vector gets its own scale</code></pre>
+<p>Per-channel quantization of K has an awkward consequence: the cache grows one token at a time, so a per-channel scale computed over the tokens seen so far changes as you append. Implementations handle this by quantizing in groups and keeping a small recent window in full precision.</p>
+<p>Practical guidance:</p>
+<ul><li><strong>fp8 KV is close to free</strong> on hardware with fp8 support. It is a reasonable default for production serving and doubles your batch capacity.</li><li><strong>int8 KV</strong> with the per-channel/per-token split is also reliable.</li><li><strong>int4 KV</strong> is where quality starts to show, and it shows <em>specifically</em> on long-context tasks — which is a problem, because long context is exactly when you wanted the savings. Test on retrieval and long-context benchmarks, not perplexity.</li></ul>
+<p>There is a related family that reduces the cache without changing its precision: <strong>eviction and compression</strong>.</p>
+<ul><li><strong>StreamingLLM</strong> observed that models allocate large attention weight to the first few tokens regardless of content — &quot;attention sinks&quot; — and that keeping those plus a sliding window lets a model stream indefinitely without collapse. Cheap and effective for streaming; it does discard the middle, so it is not suitable when you need recall over the full context.</li><li><strong>H2O</strong> keeps &quot;heavy hitter&quot; tokens identified by accumulated attention score, plus recent tokens. Better recall than a pure window.</li><li><strong>SnapKV</strong> compresses the prompt's cache at the end of prefill by observing which positions the final query attends to.</li></ul>
+<p>All of these are <strong>lossy in a way that is hard to bound</strong>. You cannot know at eviction time which token some future query will need. They work well on benchmarks that resemble their design assumptions and can fail sharply outside them. Treat them as workload-specific tools, not defaults.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Keys have per-channel outliers and values do not, so quantizing keys per-channel and values per-token works far better than treating them alike.</p>
+</article>
+<article class="concept" id="concept-5">
+  <div class="concept__head">
+    <span class="concept__n">06</span>
+    <h3 class="concept__title">Measuring quality honestly</h3>
+  </div>
+  <div class="prose"><p>Every technique in this module except paging and prefix caching costs something. The discipline that separates good work from bad here is measurement, and the field is not good at it.</p>
+<p><strong>Why perplexity is insufficient.</strong> Perplexity is the average negative log-likelihood over a corpus. It is dominated by common tokens in ordinary contexts, and a quantized model reproduces those nearly perfectly. Damage concentrates in the tail: rare tokens, unusual contexts, long dependencies, precise arithmetic. A 4-bit model can match fp16 perplexity to two decimal places and fail visibly at 20-step reasoning.</p>
+<p>There is a second problem: perplexity is measured on short sequences, usually 2k–4k tokens. If your concern is a quantized KV cache, that is exactly the regime where it looks fine.</p>
+<p><strong>What to measure instead</strong>, roughly in order of value per unit effort:</p>
+<ol><li><strong>Long-context retrieval.</strong> Needle-in-a-haystack and, better, RULER — which tests multi-needle, aggregation and tracing rather than a single lookup. This is where KV quantization damage shows first and clearest.</li><li><strong>Multi-step reasoning.</strong> GSM8K, MATH, or your own chain-of-thought tasks. Errors compound across steps, so small per-token degradation becomes visible.</li><li><strong>Your actual task.</strong> A few hundred real prompts with a human or model-graded comparison against the fp16 baseline. Unglamorous and the most informative thing on this list.</li><li><strong>Output distribution divergence.</strong> KL divergence between quantized and baseline logits on a fixed prompt set. Sensitive, cheap, and catches problems before they show in task metrics.</li><li><strong>Standard benchmark suites.</strong> MMLU and friends. Useful as a regression check, weak as a quality signal — they are multiple-choice and forgiving.</li></ol>
+<p><strong>The comparison must be controlled.</strong> Same prompts, same sampling parameters, same seed where possible. It is remarkably common to see quantization &quot;evaluated&quot; against a baseline that used different sampling settings, which measures nothing.</p>
+<p><strong>Test at the operating point.</strong> If you serve at 32k context, evaluating at 2k tells you almost nothing about KV quantization. If you serve at batch 64, evaluate under batching — batch-dependent kernel selection can itself shift outputs, as Module 3 discussed.</p>
+<p>The honest position on most published quantization results is that they demonstrate the method does not catastrophically fail, not that it is free. Whether it is free <em>for your workload</em> is a question only your evaluation can answer.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Perplexity is not sufficient: quantization damage concentrates in long context, rare tokens, and multi-step reasoning — exactly what perplexity averages away.</p>
+</article>
+      </section>
+
+      <section class="section ghost ghost--inky" id="math-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--inky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>INKY · MATH BY HAND</p>
+        <h2 class="section__title">Math by hand</h2>
+        <div class="prose"><p><strong>Llama-3-70B</strong>: 80 layers, 64 query heads, 8 KV heads, head_dim 128, 70.6 B parameters. Serving on <strong>4× H100 80GB</strong> = 320 GB, with 20 GB reserved for workspace. Context 8,192 tokens throughout.</p>
+<p><strong>Part 1 — the baseline.</strong> Recompute from Module 2: KV bytes per token at fp16, per-sequence cost at 8k, weight bytes, and how many sequences fit.</p>
+<p><strong>Part 2 — stack the optimizations.</strong> For each configuration, compute KV bytes per token, sequences that fit, and the multiplier versus baseline:</p>
+<p>a) baseline: GQA-8, fp16 weights, fp16 KV b) + fp8 KV cache c) + fp8 weights as well d) + int4 weights (assume 4.5 bits effective including scales), fp8 KV e) hypothetical MLA: 576 values per token per layer at fp16, with fp8 weights</p>
+<p><strong>Part 3 — fragmentation.</strong> Your allocator reserves <code>max_seq_len = 32768</code> contiguously per request, but actual sequences average 8,192 tokens. Under configuration (a):</p>
+<p>a) How much memory does each request actually reserve? b) How many sequences fit now? c) What fraction of allocated KV memory holds real tokens? d) PagedAttention with 16-token blocks: what is the average waste per sequence, and how many sequences fit?</p>
+<p><strong>Part 4 — turn it into throughput.</strong> Decode arithmetic intensity equals batch size and the H100 ridge point is 295. For configurations (a) through (e), state the intensity reached and whether you cross the ridge. Which single change buys the most?</p>
+<p><strong>Part 5 — the ordering question.</strong> You have time to implement exactly one thing. Your system currently uses naive contiguous allocation, GQA-8, fp16 everything. What do you do first, and why?</p></div>
+        <details class="spoiler">
+          <summary>SHOW THE WORKED SOLUTION</summary>
+          <div class="spoiler__body prose"><p><strong>Part 1 — baseline</strong></p>
+<pre><code>kv/token = 2 x 80 x 8 x 128 x 2      = 327,680 B = 320 KiB
+per 8k sequence = 327,680 x 8,192    = 2.684 GB  (2.5 GiB)
+weights = 70.6e9 x 2                 = 141.2 GB
+available = 320 - 141.2 - 20         = 158.8 GB
+sequences = 158.8 / 2.684            = 59</code></pre>
+<p><strong>Part 2 — stacking</strong></p>
+<p><strong>(a) baseline:</strong> 320 KiB/token, <strong>59 sequences</strong>, 1.0×</p>
+<p><strong>(b) + fp8 KV:</strong></p>
+<pre><code>kv/token = 2 x 80 x 8 x 128 x 1 = 163,840 B = 160 KiB
+per sequence = 1.342 GB
+available unchanged at 158.8 GB
+sequences = 158.8 / 1.342 = 118        (2.0x)</code></pre>
+<p><strong>(c) + fp8 weights:</strong></p>
+<pre><code>weights = 70.6e9 x 1 = 70.6 GB
+available = 320 - 70.6 - 20 = 229.4 GB
+sequences = 229.4 / 1.342 = 170        (2.9x)</code></pre>
+<p><strong>(d) int4 weights (4.5 bits effective), fp8 KV:</strong></p>
+<pre><code>weights = 70.6e9 x 4.5/8 = 39.7 GB
+available = 320 - 39.7 - 20 = 260.3 GB
+sequences = 260.3 / 1.342 = 193        (3.3x)</code></pre>
+<p><strong>(e) MLA, fp16 latent, fp8 weights:</strong></p>
+<pre><code>kv/token = 80 layers x 576 values x 2 bytes = 92,160 B = 90 KiB
+   (note: no factor of 2 -- the latent already encodes both K and V)
+per sequence = 92,160 x 8,192 = 0.755 GB
+available = 229.4 GB
+sequences = 229.4 / 0.755 = 303        (5.1x)</code></pre>
+<p>MLA versus GQA-8 on the cache alone: <code>320 / 90 = 3.6×</code>. Against a hypothetical MHA baseline of 2.5 MiB/token it is <code>2560 / 90 = 28×</code>, consistent with DeepSeek's ~93% reduction claim.</p>
+<p><strong>Part 3 — fragmentation</strong></p>
+<p>a) Each request reserves <code>327,680 × 32,768 = 10.74 GB</code>, and uses 2.684 GB.</p>
+<p>b) <code>158.8 / 10.74 = 14 sequences</code>. Down from 59 — a <strong>4.2× loss</strong> to reservation alone.</p>
+<p>c) <code>2.684 / 10.74 = 25.0%</code> of allocated KV memory holds real tokens. This sits squarely inside the 20.4–38.2% range vLLM measured in the wild, which is a good sign the model is realistic.</p>
+<p>d) With 16-token blocks, waste is at most one partial block per sequence, averaging 8 tokens:</p>
+<pre><code>waste = 8 x 327,680 = 2.62 MB per sequence
+per sequence = 2.684 GB + 0.0026 GB = 2.687 GB
+sequences = 158.8 / 2.687 = 59
+utilization = 2.684 / 2.687 = 99.9%</code></pre>
+<p><strong>Paging alone takes you from 14 sequences to 59 — a 4.2× improvement — at zero quality cost.</strong> That is the single largest win available, and it is free.</p>
+<p><strong>Part 4 — throughput</strong></p>
+<pre><code>config                        batch   intensity   vs ridge (295)
+(a) baseline paged              59        59        20%   memory-bound
+(b) + fp8 KV                   118       118        40%   memory-bound
+(c) + fp8 weights              170       170        58%   memory-bound
+(d) + int4 weights             193       193        65%   memory-bound
+(e) MLA + fp8 weights          303       303       103%   AT THE RIDGE</code></pre>
+<p>Marginal gains per step:</p>
+<pre><code>naive -&gt; paged:        14 -&gt; 59     +45 sequences   (free)
+paged -&gt; fp8 KV:       59 -&gt; 118    +59 sequences   (small quality cost)
+fp8 KV -&gt; fp8 weights:118 -&gt; 170    +52 sequences   (small quality cost)
+fp8 w -&gt; int4 w:      170 -&gt; 193    +23 sequences   (real quality cost)
+GQA -&gt; MLA:           170 -&gt; 303   +133 sequences   (requires a different model)</code></pre>
+<p>The best single change you can <em>make</em> is fp8 KV (+59). The best change overall is architectural (MLA, +133) but you cannot apply it to an existing checkpoint. Note that int4 weights buy the least (+23) while costing the most quality — because at batch 170 you are firmly cache-dominated, so weight bytes are no longer where your problem is. This is the two-regime rule biting.</p>
+<p><strong>Part 5 — what to do first</strong></p>
+<p><strong>PagedAttention, unambiguously.</strong> It is 4.2× — larger than any other single change available — and it costs nothing in quality. Every other option on the list trades accuracy for memory, and it would be perverse to spend accuracy while still discarding 75% of the cache to fragmentation.</p>
+<p>The general principle: <strong>do the free optimizations before the lossy ones.</strong> Paging and prefix caching are exact. Quantization is not. A system that has not exhausted the exact wins has no business reaching for the approximate ones.</p>
+<p>Second priority is prefix caching, also exact, with a payoff that depends entirely on your traffic — negligible for one-shot independent prompts, transformative for chat and agents.</p>
+<p>Only then fp8 KV, and only then weight quantization.</p></div>
+        </details>
+      </section>
+
+      <section class="section ghost ghost--clyde" id="code-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--clyde)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>CLYDE · CODE LAB</p>
+        <h2 class="section__title">Code lab</h2>
+        <div class="prose"><p>Two parts.</p>
+<p><strong>Part A</strong> — implement a block allocator and compare it against a naive reserving allocator over a realistic distribution of sequence lengths. Reproduce the vLLM paper's utilization finding yourself.</p>
+<p><strong>Part B</strong> — build the prefix-sharing structure. A radix tree over token sequences that reports, for a stream of requests, how many prefill tokens you saved.</p></div>
+        <div class="prose" style="max-width:none"><pre><code class="lang-python">&quot;&quot;&quot;
+Part A: paged vs naive KV allocation.
+Part B: a radix tree for prefix cache reuse.
+
+    pip install numpy
+&quot;&quot;&quot;
+import numpy as np
+
+rng = np.random.default_rng(11)
+GB = 10 ** 9
+
+
+# ==========================================================================
+# Part A -- allocators
+# ==========================================================================
+class NaiveAllocator:
+    &quot;&quot;&quot;Reserve max_seq_len contiguously, up front. The pre-vLLM approach.&quot;&quot;&quot;
+
+    def __init__(self, total_bytes, bytes_per_token, max_seq_len):
+        self.total = total_bytes
+        self.bpt = bytes_per_token
+        self.max_seq = max_seq_len
+        self.reserved = 0
+        self.live = {}
+
+    def admit(self, sid):
+        need = self.bpt * self.max_seq
+        if self.reserved + need &gt; self.total:
+            return False
+        self.reserved += need
+        self.live[sid] = 0
+        return True
+
+    def append(self, sid, n=1):
+        self.live[sid] += n                     # already reserved; nothing to do
+
+    def release(self, sid):
+        self.reserved -= self.bpt * self.max_seq
+        del self.live[sid]
+
+    def utilization(self):
+        used = sum(self.live.values()) * self.bpt
+        return used / self.reserved if self.reserved else 0.0
+
+
+class PagedAllocator:
+    &quot;&quot;&quot;Fixed-size blocks from a shared pool, allocated on demand.&quot;&quot;&quot;
+
+    def __init__(self, total_bytes, bytes_per_token, block_tokens=16):
+        self.bpt = bytes_per_token
+        self.block_tokens = block_tokens
+        self.block_bytes = bytes_per_token * block_tokens
+        self.n_blocks = int(total_bytes // self.block_bytes)
+        self.free = list(range(self.n_blocks))
+        self.tables = {}                        # sid -&gt; [physical block ids]
+        self.lengths = {}
+
+    def _blocks_needed(self, n_tokens):
+        return (n_tokens + self.block_tokens - 1) // self.block_tokens
+
+    def admit(self, sid, initial_tokens=0):
+        need = self._blocks_needed(initial_tokens)
+        if need &gt; len(self.free):
+            return False
+        self.tables[sid] = [self.free.pop() for _ in range(need)]
+        self.lengths[sid] = initial_tokens
+        return True
+
+    def append(self, sid, n=1):
+        self.lengths[sid] += n
+        need = self._blocks_needed(self.lengths[sid])
+        while len(self.tables[sid]) &lt; need:
+            if not self.free:
+                return False                    # out of memory -- caller must preempt
+            self.tables[sid].append(self.free.pop())
+        return True
+
+    def release(self, sid):
+        self.free.extend(self.tables.pop(sid))
+        del self.lengths[sid]
+
+    def utilization(self):
+        allocated = sum(len(t) for t in self.tables.values()) * self.block_tokens
+        used = sum(self.lengths.values())
+        return used / allocated if allocated else 0.0
+
+
+def run(alloc, lengths, label):
+    &quot;&quot;&quot;Admit as many as fit, grow them to completion, report peak concurrency.&quot;&quot;&quot;
+    admitted, peak = [], 0
+    for i, L in enumerate(lengths):
+        ok = alloc.admit(i, 1) if isinstance(alloc, PagedAllocator) else alloc.admit(i)
+        if not ok:
+            break
+        admitted.append((i, L))
+        peak = max(peak, len(admitted))
+
+    # grow everyone to their final length
+    for sid, L in admitted:
+        alloc.append(sid, L - 1)
+
+    print(f&quot;  {label:&lt;34} concurrent {len(admitted):&gt;4}   &quot;
+          f&quot;utilization {alloc.utilization()*100:&gt;5.1f}%&quot;)
+    return len(admitted)
+
+
+# --- Llama-3-70B on 4x H100, 20 GB workspace ---
+KV_PER_TOKEN = 2 * 80 * 8 * 128 * 2            # 327,680 bytes = 320 KiB
+AVAILABLE = 320 * GB - 141.2 * GB - 20 * GB
+MAX_SEQ = 32768
+
+lengths = rng.lognormal(mean=8.9, sigma=0.35, size=500).astype(int).clip(512, MAX_SEQ)
+print(f&quot;=== KV allocation: {len(lengths)} requests, mean length &quot;
+      f&quot;{lengths.mean():.0f}, max {lengths.max()} ===&quot;)
+print(f&quot;    budget {AVAILABLE/GB:.1f} GB, {KV_PER_TOKEN/1024:.0f} KiB/token, &quot;
+      f&quot;max_seq_len {MAX_SEQ}\n&quot;)
+
+n_naive = run(NaiveAllocator(AVAILABLE, KV_PER_TOKEN, MAX_SEQ), lengths,
+              f&quot;naive (reserve {MAX_SEQ})&quot;)
+n_paged = run(PagedAllocator(AVAILABLE, KV_PER_TOKEN, 16), lengths,
+              &quot;paged (16-token blocks)&quot;)
+print(f&quot;\n  paging improvement: {n_paged/max(n_naive,1):.1f}x concurrent sequences, &quot;
+      f&quot;at zero quality cost&quot;)
+
+print(&quot;\n=== block size trade-off ===&quot;)
+for bs in (1, 8, 16, 32, 64, 128):
+    a = PagedAllocator(AVAILABLE, KV_PER_TOKEN, bs)
+    n = run(a, lengths, f&quot;block size {bs}&quot;)
+
+
+# ==========================================================================
+# Part B -- radix tree prefix cache
+# ==========================================================================
+class RadixNode:
+    __slots__ = (&quot;children&quot;, &quot;n_tokens&quot;)
+
+    def __init__(self):
+        self.children = {}          # first token -&gt; (edge_tokens tuple, RadixNode)
+        self.n_tokens = 0           # tokens cached along the path to here
+
+
+class PrefixCache:
+    &quot;&quot;&quot;Longest-prefix matching over cached token sequences.&quot;&quot;&quot;
+
+    def __init__(self):
+        self.root = RadixNode()
+        self.cached_tokens = 0
+
+    def match_and_insert(self, tokens):
+        &quot;&quot;&quot;Returns how many leading tokens were already cached.&quot;&quot;&quot;
+        node, i = self.root, 0
+        while i &lt; len(tokens):
+            key = tokens[i]
+            if key not in node.children:
+                break
+            edge, child = node.children[key]
+            # how far along this edge do we agree?
+            j = 0
+            while j &lt; len(edge) and i + j &lt; len(tokens) and edge[j] == tokens[i + j]:
+                j += 1
+            if j == len(edge):
+                node, i = child, i + j          # consumed the whole edge, descend
+                continue
+            # partial match: split the edge
+            mid = RadixNode()
+            node.children[key] = (edge[:j], mid)
+            mid.children[edge[j]] = (edge[j:], child)
+            node, i = mid, i + j
+            break
+
+        matched = i
+        if i &lt; len(tokens):                     # insert the remaining suffix
+            suffix = tuple(tokens[i:])
+            node.children[suffix[0]] = (suffix, RadixNode())
+            self.cached_tokens += len(suffix)
+        return matched
+
+
+def synth_chat(n_turns, sys_len=500):
+    &quot;&quot;&quot;A conversation: shared system prompt, growing history.&quot;&quot;&quot;
+    system = list(range(1000, 1000 + sys_len))
+    history, out = list(system), []
+    for t in range(n_turns):
+        user = list(rng.integers(0, 50000, size=int(rng.integers(20, 120))))
+        history = history + user
+        out.append(list(history))
+        history = history + list(rng.integers(0, 50000, size=int(rng.integers(80, 400))))
+    return out
+
+
+print(&quot;\n=== prefix cache: a 10-turn conversation ===&quot;)
+cache = PrefixCache()
+total, saved = 0, 0
+for turn, req in enumerate(synth_chat(10)):
+    m = cache.match_and_insert(req)
+    total += len(req)
+    saved += m
+    print(f&quot;  turn {turn:&gt;2}: {len(req):&gt;6} tokens, {m:&gt;6} cached, &quot;
+          f&quot;{len(req)-m:&gt;5} to prefill&quot;)
+print(f&quot;\n  total prompt tokens  {total:&gt;8,}&quot;)
+print(f&quot;  served from cache    {saved:&gt;8,}  ({saved/total*100:.1f}%)&quot;)
+
+print(&quot;\n=== prefix cache: 200 requests sharing one system prompt ===&quot;)
+cache = PrefixCache()
+system = list(range(1000, 1500))
+total, saved = 0, 0
+for _ in range(200):
+    req = system + list(rng.integers(0, 50000, size=int(rng.integers(50, 300))))
+    m = cache.match_and_insert(req)
+    total += len(req)
+    saved += m
+print(f&quot;  total prompt tokens  {total:&gt;8,}&quot;)
+print(f&quot;  served from cache    {saved:&gt;8,}  ({saved/total*100:.1f}%)&quot;)
+
+# --- TODO for you ---
+#   1. Add LRU eviction to PrefixCache with a token budget. Measure hit rate
+#      as the budget shrinks -- this is the real operational trade-off.
+#   2. Make the radix tree block-aligned (16-token granularity) and see how
+#      much the hit rate drops. That is the cost of paging the prefix cache.
+#   3. Add copy-on-write to PagedAllocator: let two sequences share blocks
+#      and only copy on divergence. Measure the saving for n=8 parallel sampling.
+</code></pre></div>
+        <div class="prose"><h3>What you should see</h3><p><strong>Part A.</strong> The naive allocator admits around <strong>14 sequences</strong> and reports utilization near <strong>25%</strong> — right inside the 20.4–38.2% band the vLLM paper measured. The paged allocator admits around <strong>59</strong> at over <strong>99%</strong> utilization. A <strong>~4× improvement at zero quality cost</strong>, reproduced from first principles.</p>
+<p>The block-size sweep shows the trade-off directly: block size 1 gives perfect utilization (and would be unusable in practice — one table entry per token), while 128 wastes noticeably more. Everything from 8 to 32 is within a percent or two, which is why 16 is a fine default and not a finely-tuned optimum.</p>
+<p><strong>Part B.</strong> The conversation shows the hit rate climbing every turn — by turn 10, typically <strong>90%+</strong> of the prompt is already cached, so you prefill only the newest message. This is the mechanism that makes multi-turn chat affordable.</p>
+<p>The shared-system-prompt case shows savings around <strong>60–75%</strong>, depending on the sampled user message lengths. With a longer system prompt or shorter user messages it goes higher.</p>
+<p>Note what these numbers mean in latency: a 90% cache hit on a 3,000-token prompt turns a 3,000-token prefill into a 300-token prefill, roughly a 10× TTFT improvement, exactly and with no quality cost.</p></div>
+        <div class="prose"><h3>Stretch</h3><p>Combine the two. Give <code>PagedAllocator</code> copy-on-write block sharing, back the <code>PrefixCache</code> with real blocks, and add LRU eviction under a fixed memory budget. Then simulate a mixed workload — 60% chat with long histories, 40% one-shot prompts — and plot the trade-off curve: as you give more memory to the prefix cache, hit rate rises but concurrent batch size falls. Find the point that maximizes total throughput. That curve is the actual operational decision every serving deployment makes, usually without measuring it.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pac" id="papers">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>THE KEY · PAPERS</p>
+        <h2 class="section__title">Papers, with a reading frame</h2>
+        <div class="papers">
+          <article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2309.06180" target="_blank" rel="noopener">Efficient Memory Management for LLM Serving with PagedAttention</a></h3>
+            <p class="paper__by">Kwon et al., SOSP 2023</p>
+            <p class="paper__why">The vLLM paper. The most influential systems paper in LLM inference, and a model of how to transfer a solved idea from one field to another.</p>
+            <div class="paper__frame"><p>Now read it properly. <strong>Section 3</strong> is the fragmentation analysis (Figure 2 is the 20.4–38.2% figure). <strong>Section 4</strong> is PagedAttention and the block manager — pay attention to <strong>4.3 on copy-on-write sharing</strong>, which is the part that makes parallel sampling and beam search cheap and which most summaries omit. <strong>Section 4.5</strong> covers scheduling and preemption. Skim the evaluation, but note the ablation on block size.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2312.07104" target="_blank" rel="noopener">SGLang: Efficient Execution of Structured Language Model Programs</a></h3>
+            <p class="paper__by">Zheng et al., 2023</p>
+            <p class="paper__why">RadixAttention — generalizing prefix reuse from a special case to the default structure of the workload.</p>
+            <div class="paper__frame"><p>The RadixAttention section is the payload: the radix tree, longest-prefix matching, and the LRU eviction policy. Read the frontend language section more quickly — it matters for how the system is used, less for the mechanism. Note the cache-aware scheduling discussion, which is where the real subtlety is.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2405.04434" target="_blank" rel="noopener">DeepSeek-V2: A Strong, Economical, and Efficient Mixture-of-Experts Language Model</a></h3>
+            <p class="paper__by">DeepSeek-AI, 2024</p>
+            <p class="paper__why">Multi-head latent attention. The most aggressive architectural attack on the KV cache, and the one that claims to improve quality rather than trade it.</p>
+            <div class="paper__frame"><p><strong>Section 2.1</strong> is MLA. Work through the low-rank compression and then the <strong>absorption</strong> trick — folding the up-projections into the adjacent query and output matrices is what makes it fast, and it is easy to miss. The decoupled RoPE component in 2.1.3 exists because rotation does not commute with the low-rank projection; understand why before accepting it. The MoE material is Module 9.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2306.00978" target="_blank" rel="noopener">AWQ: Activation-aware Weight Quantization</a></h3>
+            <p class="paper__by">Lin et al., 2023</p>
+            <p class="paper__why">The most practical 4-bit weight quantization method. Simple, no backpropagation, and generally robust.</p>
+            <div class="paper__frame"><p>Read <strong>Section 3</strong>: the observation that ~1% of channels are salient, that saliency is identifiable from <em>activation</em> magnitude rather than weight magnitude, and that scaling those channels before quantization protects them. The whole method is one good idea, clearly explained.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2210.17323" target="_blank" rel="noopener">GPTQ: Accurate Post-Training Quantization for Generative Pre-trained Transformers</a></h3>
+            <p class="paper__by">Frantar et al., 2022</p>
+            <p class="paper__why">The other standard 4-bit method, and the one that showed accurate one-shot quantization of very large models was possible at all.</p>
+            <div class="paper__frame"><p>Read Sections 2 and 3 for the layer-wise objective and the approximate second-order solution. The algorithmic details of the Cholesky reformulation matter less than the framing: quantization as a per-layer reconstruction problem.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2309.17453" target="_blank" rel="noopener">Efficient Streaming Language Models with Attention Sinks</a></h3>
+            <p class="paper__by">Xiao et al., 2023</p>
+            <p class="paper__why">The attention-sink phenomenon: models allocate large attention weight to the first few tokens regardless of content, and keeping them plus a window enables indefinite streaming.</p>
+            <div class="paper__frame"><p>The observation in Section 3 is the interesting part and is genuinely surprising — the sink tokens carry little semantic content but removing them collapses the model. Be clear-eyed that this method discards the middle of the context, so it enables streaming rather than long-context recall.</p></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--blinky" id="pitfalls">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--blinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>BLINKY · PITFALLS</p>
+        <h2 class="section__title">What people get wrong</h2>
+        <div class="pitfall">
+          <p class="pitfall__wrong"><span>Reaching for quantization before fixing fragmentation.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>A naive allocator throws away 60–80% of your KV memory, which is a larger factor than fp8 quantization buys and costs no quality. Paging is exact; quantization is not. Spending accuracy to work around an allocation bug is the wrong trade, and it is common.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Assuming 4-bit weights give a 4x speedup.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>Two reasons it does not. You still move activations and KV cache, and dequantization costs arithmetic, so even in the weight-dominated regime you typically see 2.5–3.5×. And in the cache-dominated regime — large batch, long context — weights are a minority of your bytes, so the speedup can be under 20%. Compute which regime you are in first.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Treating KV eviction methods as safe defaults.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>H2O, SnapKV and sliding-window methods discard tokens based on what has mattered so far, and you cannot know which token a future query will need. They perform well on benchmarks resembling their design assumptions and can fail sharply outside them — particularly on retrieval over the discarded region. They are workload-specific tools, and they need workload-specific evaluation.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Enabling prefix caching and assuming positions take care of themselves.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>Cached keys carry RoPE rotations applied at their original absolute positions. Reusing a prefix at a different offset without handling this breaks the relative-distance property that makes attention work, and it fails silently — no crash, no error, just quietly degraded output. It is the most common prefix-caching bug and the hardest to notice in production.</p></div></div>
+        </div>
+      </section>
+
+      <section class="section" id="checkpoint">
+        <div class="wall checkpoint">
+          <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>POWER PELLET · CHECKPOINT</p>
+          <p class="checkpoint__claim">You can look at a serving deployment and say, in order, which memory optimizations
+would pay and by how much — and you can justify why the exact ones come before the lossy ones.</p>
+          <details class="qa">
+            <summary>Explain PagedAttention to someone who knows operating systems, in three sentences.</summary>
+            <div class="qa__a prose"><p>It is demand paging applied to the KV cache: divide cache memory into fixed-size blocks (typically 16 tokens), give each sequence a block table mapping logical positions to physical blocks, and allocate blocks on demand from a shared pool as the sequence grows. This eliminates the need for contiguous per-sequence allocation, so you no longer reserve <code>max_seq_len</code> for a sequence that may generate 200 tokens — waste drops from 60–80% to under 4%. As with OS paging, copy-on-write falls out for free: sequences sharing a prefix point at the same physical blocks and only copy when one of them writes.</p></div>
+          </details>
+<details class="qa">
+            <summary>Why does weight quantization help much less at batch 64 with 8k context than at batch 1?</summary>
+            <div class="qa__a prose"><p>Because you have crossed into the cache-dominated regime. Bytes per step are <code>weight_bytes + batch × seq_len × kv_per_token</code>. For Llama-3-8B at batch 1 with short context, weights are essentially 100% of the traffic, so 4-bit weights approach a 4× speedup. At batch 64 with 8k context, the KV cache is <code>64 × 8192 × 128 KiB = 67 GB</code> against 16 GB of weights — the cache is over 4× the weights. Eliminating weight bytes entirely would cut step time by under 20%. In that regime you want KV quantization, not weight quantization. Which optimization is correct is a property of your operating point, not of the technique.</p></div>
+          </details>
+<details class="qa">
+            <summary>Why is quantizing keys per-channel but values per-token, rather than treating them alike?</summary>
+            <div class="qa__a prose"><p>Because they have different distributional structure. Key vectors show strong per-channel outliers — certain channels consistently carry much larger magnitudes across all tokens — so a per-tensor or per-token scale is dominated by those outliers and crushes every other channel into a handful of quantization levels. Giving each channel its own scale isolates the outliers. Value vectors do not show that pattern; their magnitudes are comparatively uniform across channels, so per-token scaling is both sufficient and simpler, and it has the practical advantage of not needing to be revised as the cache grows. Applying the same scheme to both is a common shortcut and it costs more quality than the bit count suggests.</p></div>
+          </details>
+<details class="qa">
+            <summary>Your system uses naive allocation, GQA-8, fp16 everything. You have time for one change. What and why?</summary>
+            <div class="qa__a prose"><p>PagedAttention. In the worked example it takes concurrent sequences from 14 to 59 — about 4× — which is larger than any other single change on the table, and it costs <strong>nothing</strong> in quality because it is purely an allocation change. Every alternative (fp8 KV, weight quantization, eviction) trades accuracy for memory, and it would be perverse to spend accuracy while still discarding 75% of your cache to fragmentation. The general rule: exhaust the exact optimizations before reaching for the approximate ones. Prefix caching is the natural second, also exact, with a payoff that depends on how much your traffic actually shares.</p></div>
+          </details>
+<details class="qa">
+            <summary>Why is perplexity a poor way to evaluate a quantized model, and what would you measure instead?</summary>
+            <div class="qa__a prose"><p>Perplexity averages negative log-likelihood over a corpus, so it is dominated by common tokens in ordinary contexts — exactly the cases a quantized model reproduces almost perfectly. Damage concentrates in the tail: rare tokens, long dependencies, precise arithmetic, multi-step reasoning where errors compound. It is also typically measured at 2k–4k sequence lengths, which is precisely the regime where KV quantization looks harmless. Better: long-context retrieval suites like RULER, multi-step reasoning tasks, KL divergence against the fp16 baseline's logits, and a few hundred prompts from your actual workload graded against the baseline. And evaluate at your real operating point — context length and batch size both matter.</p></div>
+          </details>
+<details class="qa">
+            <summary>What does MLA do that GQA cannot, and what is the catch?</summary>
+            <div class="qa__a prose"><p>GQA reduces the <em>number</em> of KV heads, so it is bounded — at one KV head you are at MQA and cannot go further without abandoning per-head structure. MLA instead compresses K and V jointly into a single low-rank latent vector per token, caching 576 values per layer instead of 2,048 for GQA-8, and reconstructing per-head K and V by up-projection at inference. The up-projections can be algebraically absorbed into the adjacent query and output matrices, so the full K and V are never materialized. DeepSeek report ~93% KV reduction versus MHA with <em>better</em> quality, plausibly because the bottleneck regularizes. The catch is twofold: it must be trained in from the start, with no conversion path for existing checkpoints; and rotation does not commute with the low-rank projection, so it needs a separate decoupled RoPE component, which is where most of its implementation complexity lives.</p></div>
+          </details>
+          <p style="margin-top:var(--s7)">
+            <button class="done-toggle" type="button" data-complete="6" aria-pressed="false">
+              MARK LEVEL 06 CLEARED
+            </button>
+          </p>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="glossary">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>GLOSSARY</p>
+        <h2 class="section__title">Glossary</h2>
+        <div class="gloss">
+          <div class="gloss__row"><div class="gloss__term">PagedAttention</div><div class="gloss__def">Fixed-size block allocation for the KV cache with per-sequence block tables, borrowed from OS virtual memory. Cuts fragmentation waste from 60-80% to under 4%.</div></div><div class="gloss__row"><div class="gloss__term">block table</div><div class="gloss__def">Per-sequence map from logical token positions to physical KV cache blocks. What allows non-contiguous allocation.</div></div><div class="gloss__row"><div class="gloss__term">copy-on-write</div><div class="gloss__def">Sequences sharing a prefix point at the same physical blocks; a block is duplicated only when one of them writes to it.</div></div><div class="gloss__row"><div class="gloss__term">RadixAttention</div><div class="gloss__def">A radix tree over cached token prefixes enabling automatic longest-prefix reuse across arbitrary request patterns.</div></div><div class="gloss__row"><div class="gloss__term">MLA</div><div class="gloss__def">Multi-head latent attention. Compresses K and V into a shared low-rank latent per token; the up-projections are absorbed into neighbouring matrices.</div></div><div class="gloss__row"><div class="gloss__term">GPTQ</div><div class="gloss__def">Post-training weight quantization using approximate second-order information, layer by layer. Works to 3-4 bits.</div></div><div class="gloss__row"><div class="gloss__term">AWQ</div><div class="gloss__def">Activation-aware weight quantization: scale up the ~1% of channels identified as salient from activation magnitude, then quantize.</div></div><div class="gloss__row"><div class="gloss__term">SmoothQuant</div><div class="gloss__def">Migrates activation outliers into the weights via per-channel scaling, enabling int8 for both operands.</div></div><div class="gloss__row"><div class="gloss__term">attention sink</div><div class="gloss__def">The first few tokens of a sequence, which receive large attention weight regardless of content. Keeping them enables indefinite streaming.</div></div><div class="gloss__row"><div class="gloss__term">per-channel quantization</div><div class="gloss__def">A separate scale for each channel of a tensor. Necessary for keys, which have strong per-channel outliers.</div></div><div class="gloss__row"><div class="gloss__term">RULER</div><div class="gloss__def">A long-context benchmark testing multi-needle retrieval, aggregation and tracing. Far more informative than perplexity for evaluating KV compression.</div></div>
+        </div>
+      </section>
+
+      <nav class="pagenav">
+        <a href="batching.html" data-nav="prev"><span>◀ PREVIOUS LEVEL</span>05 BATCHING</a>
+        <a href="attention-kernels.html" data-nav="next" style="text-align:right"><span>NEXT LEVEL ▶</span>07 ATTENTION KERNELS</a>
+      </nav>
+
+    </main>
+  </div>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <p class="foot__h">LEVELS</p>
+        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">&nbsp;</p>
+        <ul><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">REFERENCE</p>
+        <ul>
+          <li><a href="../reference/timeline.html">Timeline</a></li>
+          <li><a href="../reference/hardware.html">GPU spec table</a></li>
+          <li><a href="../reference/engines.html">Serving engines</a></li>
+          <li><a href="../reference/frontier.html">Open problems</a></li>
+          <li><a href="../reference/glossary.html">Glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="foot__h">SOURCE</p>
+        <ul>
+          <li><a href="https://github.com/tushar-amrit-6/inference">GitHub repository</a></li>
+          <li><a href="../reference/how-to-use.html">How to work through this</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
+    do the arithmetic yourself.</p>
+  </div>
+</footer>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

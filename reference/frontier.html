@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OPEN PROBLEMS — LLM INFERENCE</title>
+<meta name="description" content="What is genuinely unsolved. Read it last, or read it first to know where you are heading.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="OPEN PROBLEMS — LLM INFERENCE">
+<meta property="og:description" content="What is genuinely unsolved. Read it last, or read it first to know where you are heading.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/arcade.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20fill%3D%22%23000%22%2F%3E%3Cpath%20d%3D%22M16%2C16%20L29%2C9%20A15%2C15%200%201%200%2029%2C23%20Z%22%20fill%3D%22%23FFE800%22%2F%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="scorebar">
+  <a class="scorebar__home" href="../index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="var(--pac)" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
+  
+  <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/11</span></span>
+  <span class="scorebar__spacer"></span>
+  <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
+</header>
+<div class="wrap wrap--narrow">
+  <main id="main">
+    <div class="mod-head">
+      <p class="mod-head__level">REFERENCE</p>
+      <h1 class="mod-head__title">OPEN PROBLEMS</h1>
+      <p class="mod-head__tag">What is genuinely unsolved. Read it last, or read it first to know where you are heading.</p>
+    </div>
+    <section class="section"><div class="prose" style="max-width:none"><p>Every problem below is open in the sense that people are actively publishing on it and no answer has clearly won. Where I name a system or paper, treat it as a pointer to a line of work rather than a settled result.</p>
+<h3>1. Long context is still fundamentally unaffordable</h3>
+<p>The arithmetic from Level 02 does not improve with cleverness. Llama-3-70B at 128k context needs 40 GiB of KV cache <strong>per sequence</strong>. On four H100s that is three concurrent users.</p>
+<p>The attacks all trade something real:</p>
+<ul><li><strong>Eviction</strong> — H2O, SnapKV, StreamingLLM's attention sinks. Drop tokens judged unimportant. Fast and simple, but you cannot know in advance which token a future query will need, so it is lossy in a way that is hard to characterize and worse under adversarial or retrieval-heavy use.</li><li><strong>Compression</strong> — quantize the cache, or project it to a lower rank. Reliable to 8 bits, harder below. Quality loss concentrates in exactly the long-context tasks you bought the context for.</li><li><strong>Architecture</strong> — MLA compresses to a latent; sliding-window and sparse attention bound what must be kept. Requires training the model that way; no help for existing checkpoints.</li><li><strong>Offload</strong> — push cold cache to CPU DRAM or NVMe. PCIe at ~64 GB/s against HBM at 3.35 TB/s is a 50× cliff, so this only works when access is predictable.</li></ul>
+<p>Nobody has an approach that is simultaneously lossless, architecture-agnostic and cheap. The honest state of the art is a menu of trades.</p>
+<h3>2. Reasoning models inverted the workload</h3>
+<p>Long chain-of-thought models spend thousands of tokens thinking before answering. A request that was 2,000 prompt tokens and 200 output tokens becomes 2,000 and 20,000.</p>
+<p>That change is not incremental — it moves nearly all the wall-clock into decode, the memory-bound half. It also means the KV cache grows for far longer per request, so sequences occupy batch slots much longer, and it makes TTFT nearly irrelevant next to total time.</p>
+<p>Open questions: can you batch reasoning traces more aggressively given they are less latency-sensitive? Should thinking tokens use a cheaper decode path, or a smaller model, or aggressive speculation given they are never shown to the user? Can you prune a reasoning trace mid-flight when it is clearly going nowhere? There is no consensus on any of these.</p>
+<h3>3. Speculative decoding at high batch</h3>
+<p>Speculation converts spare compute into throughput, which works beautifully at batch 1 and stops working as batch grows — because at large batch you are approaching the ridge point and no longer have spare compute to convert. Worse, a rejected draft wastes work that a non-speculating batch would have spent usefully.</p>
+<p>The open problem is adaptive speculation: choosing draft length per request, per step, based on current batch occupancy and observed acceptance rate. Some systems do simple versions. Doing it well, with a scheduler that understands the interaction between speculation and batching, is unsolved.</p>
+<h3>4. Agentic and multi-turn workloads</h3>
+<p>An agent re-sends its whole growing trajectory every step. Without prefix caching, total prefill work is quadratic in the number of steps. With it, the cache becomes the working set of the system and the interesting questions are all about cache policy:</p>
+<ul><li>What do you evict when the cache holds hundreds of partially-shared trajectories?</li><li>Should you keep a trajectory's cache warm while the agent waits on a slow external tool call — paying memory for latency you do not control?</li><li>How do you schedule fairly when one agent's cache is worth 50× another's?</li></ul>
+<p>This is a caching and scheduling problem more than a kernels problem, and it is comparatively under-explored.</p>
+<h3>5. Evaluating optimized models honestly</h3>
+<p>We are still not good at this. Perplexity is insufficient — a 4-bit model can match fp16 perplexity and fail badly on multi-step reasoning or long-context retrieval. Quality loss from quantization is not uniform: it concentrates in rare tokens, long contexts, and exactly the capabilities that are hardest to measure.</p>
+<p>There is no standard, trusted evaluation suite for &quot;is this quantized model still the model I tested?&quot; — which means a great deal of production quantization is deployed on faith and spot-checks. This is arguably the most important unglamorous problem in the list.</p>
+<h3>6. Disaggregation at scale</h3>
+<p>Prefill/decode disaggregation is clearly right in principle and awkward in practice. You must move the KV cache between pools, and for a long prompt that is gigabytes over an interconnect. Open: how to place and schedule across heterogeneous pools, how to size the two pools as traffic shifts, and whether the transfer can be overlapped well enough to disappear.</p>
+<h3>7. Hardware and the widening wall</h3>
+<p>Compute has grown far faster than bandwidth for a decade, and the ridge point has drifted from 153 on an A100 to 295 on an H100. Each generation makes decode relatively worse.</p>
+<p>FP4 and FP8 help by shrinking bytes. Larger HBM stacks help capacity. But the structural fix would be a memory-centric architecture — much more bandwidth per FLOP, or compute placed nearer the memory. Several companies are betting on variations of this. Whether any of it displaces GPUs at scale is genuinely uncertain, and it is the question that would most change everything else in this course.</p>
+<h3>8. The economics</h3>
+<p>Inference is now the dominant cost of operating a model, and the field has no shared vocabulary for cost-quality trade-offs. What is the right price for a token that took 20,000 thinking tokens to produce? How should a provider expose the latency/throughput dial to customers who do not know they want it? These are not technical questions, but they increasingly determine which technical work gets done.</p>
+<hr>
+<blockquote><p><strong>A note on currency.</strong> This page reflects the state of things as of the author's knowledge and was not verified against live sources at build time. Inference moves quickly, particularly on points 2, 3 and 7. Before relying on any specific claim here, search for recent work — and if something below has obviously been solved since, that is a good sign the field is healthy.</p></blockquote></div></section>
+  </main>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <p class="foot__h">LEVELS</p>
+        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">&nbsp;</p>
+        <ul><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">REFERENCE</p>
+        <ul>
+          <li><a href="../reference/timeline.html">Timeline</a></li>
+          <li><a href="../reference/hardware.html">GPU spec table</a></li>
+          <li><a href="../reference/engines.html">Serving engines</a></li>
+          <li><a href="../reference/frontier.html">Open problems</a></li>
+          <li><a href="../reference/glossary.html">Glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="foot__h">SOURCE</p>
+        <ul>
+          <li><a href="https://github.com/tushar-amrit-6/inference">GitHub repository</a></li>
+          <li><a href="../reference/how-to-use.html">How to work through this</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
+    do the arithmetic yourself.</p>
+  </div>
+</footer>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

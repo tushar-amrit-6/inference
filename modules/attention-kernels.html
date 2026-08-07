@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>07 · ATTENTION KERNELS — LLM INFERENCE</title>
+<meta name="description" content="Attention performance is decided by the memory hierarchy, not the FLOP count.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="07 · ATTENTION KERNELS — LLM INFERENCE">
+<meta property="og:description" content="Attention performance is decided by the memory hierarchy, not the FLOP count.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/arcade.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20fill%3D%22%23000%22%2F%3E%3Cpath%20d%3D%22M16%2C16%20L29%2C9%20A15%2C15%200%201%200%2029%2C23%20Z%22%20fill%3D%22%23FFE800%22%2F%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="scorebar">
+  <a class="scorebar__home" href="../index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="var(--pac)" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
+  <span class="scorebar__item"><span class="scorebar__label">LEVEL</span><span class="scorebar__value scorebar__value--pac">07</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/11</span></span>
+  <span class="scorebar__spacer"></span>
+  <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
+</header>
+<div class="wrap">
+  <div class="shell">
+    <nav class="rail" aria-label="Module contents">
+  <p class="rail__head">ON THIS LEVEL</p>
+  <ul class="rail__list">
+    <li><a class="rail__link" href="#big-idea" data-kind="dot"><span class="rail__dot"></span><span>The big idea</span></a></li><li><a class="rail__link" href="#concept-0" data-kind="dot"><span class="rail__dot"></span><span>The memory hierarchy, and where attention actually runs</span></a></li><li><a class="rail__link" href="#concept-1" data-kind="dot"><span class="rail__dot"></span><span>Online softmax: the algebra that makes tiling possible</span></a></li><li><a class="rail__link" href="#concept-2" data-kind="dot"><span class="rail__dot"></span><span>FlashAttention: the tiling algorithm</span></a></li><li><a class="rail__link" href="#concept-3" data-kind="dot"><span class="rail__dot"></span><span>Why decode needs a different kernel</span></a></li><li><a class="rail__link" href="#concept-4" data-kind="dot"><span class="rail__dot"></span><span>Kernel fusion and the cost of round trips</span></a></li><li><a class="rail__link" href="#concept-5" data-kind="dot"><span class="rail__dot"></span><span>Where the efficient-attention research line went</span></a></li><li><a class="rail__link" href="#math-lab" data-kind="dot"><span class="rail__dot"></span><span>Math by hand</span></a></li><li><a class="rail__link" href="#code-lab" data-kind="dot"><span class="rail__dot"></span><span>Code lab</span></a></li><li><a class="rail__link" href="#papers" data-kind="dot"><span class="rail__dot"></span><span>Papers</span></a></li><li><a class="rail__link" href="#pitfalls" data-kind="dot"><span class="rail__dot"></span><span>Pitfalls</span></a></li><li><a class="rail__link" href="#checkpoint" data-kind="power"><span class="rail__dot"></span><span>Checkpoint</span></a></li><li><a class="rail__link" href="#glossary" data-kind="dot"><span class="rail__dot"></span><span>Glossary</span></a></li>
+  </ul>
+  <div class="rail__nav">
+    <a class="rail__step" href="memory-optimization.html">◀ 06 MEMORY OPTIMIZATION</a>
+    <a class="rail__step" href="../index.html">▲ ALL LEVELS</a>
+    <a class="rail__step" href="speculative-decoding.html">08 SPECULATIVE DECODING ▶</a>
+  </div>
+</nav>
+    <main id="main">
+
+      <div class="mod-head">
+        <p class="mod-head__level">LEVEL 07</p>
+        <h1 class="mod-head__title">ATTENTION KERNELS</h1>
+        <p class="mod-head__tag">Attention performance is decided by the memory hierarchy, not the FLOP count.</p>
+        <div class="mod-head__meta">
+          <span>⏱ 7–9 hours</span>
+          <span>● 6 concepts</span>
+          <span>📄 5 papers</span>
+          <span>▸ needs: Module 0, Module 4</span>
+        </div>
+      </div>
+
+      <section class="section ghost ghost--pinky" id="big-idea">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--pinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>PINKY · THE BIG IDEA</p>
+        <div class="prose"><p>The roofline model treats memory as one thing. Inside the GPU it is a hierarchy, and attention is where the difference between the tiers becomes decisive.</p>
+<p>Naive attention computes <code>S = QK^T</code>, writes the <code>[N, N]</code> score matrix to HBM, reads it back to softmax it, writes it again, reads it once more to multiply by V. For <code>N = 8192</code> that matrix is 128 MB per head in fp16, and you have moved it four times. The arithmetic is unavoidable; the traffic is not.</p>
+<p><strong>FlashAttention</strong> is the observation that you can compute exact attention without ever materializing that matrix, by tiling the computation so each tile fits in the SM's shared memory — a tier with roughly 6× the bandwidth of HBM — and using an <em>online</em> softmax that updates a running result as tiles stream past. Same arithmetic, same answer to the last bit, a fraction of the traffic.</p>
+<p>The second theme of this module is that <strong>prefill and decode need different kernels</strong>, for the same reason they sit on opposite sides of the roofline. Prefill has thousands of queries to parallelize over. Decode has one. A kernel tuned for the first is badly wrong for the second, and FlashDecoding exists because of it.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="concepts">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>PELLETS · CONCEPTS</p>
+        <article class="concept" id="concept-0">
+  <div class="concept__head">
+    <span class="concept__n">01</span>
+    <h3 class="concept__title">The memory hierarchy, and where attention actually runs</h3>
+  </div>
+  <div class="prose"><p>The roofline's &quot;bandwidth&quot; is HBM bandwidth. On an H100 there are several tiers above it:</p>
+<table><thead><tr><th>tier</th><th>capacity</th><th>bandwidth</th><th>latency</th></tr></thead><tbody><tr><td>registers</td><td>256 KB per SM</td><td>~100 TB/s</td><td>~1 cycle</td></tr><tr><td>shared memory / L1</td><td>228 KB per SM</td><td>~20 TB/s</td><td>~30 cycles</td></tr><tr><td>L2</td><td>50 MB</td><td>~10 TB/s</td><td>~200 cycles</td></tr><tr><td>HBM3</td><td>80 GB</td><td>3.35 TB/s</td><td>~500 cycles</td></tr></tbody></table>
+<p>Shared memory is <strong>about 6× the bandwidth of HBM and 16× lower latency</strong>, but there is only 228 KB of it per SM. That constraint — fast but tiny — is what shapes every high-performance attention kernel.</p>
+<p>Now count what naive attention costs in HBM traffic. For one head, sequence length <code>N</code>, head dimension <code>d</code>, in fp16:</p>
+<pre><code>1. read Q, K                       2 * N * d * 2 bytes
+2. write S = QK^T                  N^2 * 2 bytes
+3. read S                          N^2 * 2 bytes
+4. write P = softmax(S)            N^2 * 2 bytes
+5. read P, read V                  N^2 * 2 + N * d * 2 bytes
+6. write O                         N * d * 2 bytes
+                                   ---------------------
+                                   ~4 N^2 * 2 bytes of traffic for the score matrix</code></pre>
+<p>At <code>N = 8192, d = 128</code>: the <code>N × d</code> terms are about 2 MB each, while each <code>N²</code> term is <strong>134 MB</strong>. The score matrix dominates by roughly 60×, and you move it four times.</p>
+<p>For a full model — 32 heads, 32 layers — that is <code>4 × 134 MB × 32 × 32 = 549 GB</code> of HBM traffic for one 8k-token prefill, just shuttling intermediate scores. At 3.35 TB/s that is 164 ms of pure memory movement, and none of it is arithmetic.</p>
+<p>The FLOPs, meanwhile, are <code>4 N² d</code> per head — real work that must happen. <strong>The problem is not the arithmetic. It is that the intermediate never needed to exist in HBM.</strong></p>
+<p>This is a general lesson worth extracting: the roofline says &quot;minimize bytes from DRAM&quot;, and one of the most powerful ways to do that is to restructure an algorithm so intermediates stay in a faster tier. That is what kernel fusion is, and attention is its most valuable application.</p></div>
+  <pre class="ascii" aria-label="diagram">  NAIVE                              FLASH
+  HBM                                HBM
+   |  Q,K  -&gt;                         |  Q,K,V (tiles) -&gt;
+   |          [S = QK^T]              |
+   |  &lt;- S (134 MB)                   |    SRAM: [tile QK^T]
+   |  S -&gt;                            |          [online softmax]
+   |          [softmax]               |          [accumulate O]
+   |  &lt;- P (134 MB)                   |    (never leaves SRAM)
+   |  P,V -&gt;                          |
+   |          [PV]                    |  &lt;- O only
+   |  &lt;- O                            |
+                                      |
+  4 x N^2 traffic                     O(N) traffic for the scores</pre>
+  <p class="keypoint"><b>REMEMBER</b>Shared memory has roughly 6x the bandwidth of HBM and 16x lower latency, so keeping a computation resident there is worth restructuring the algorithm for.</p>
+</article>
+<article class="concept" id="concept-1">
+  <div class="concept__head">
+    <span class="concept__n">02</span>
+    <h3 class="concept__title">Online softmax: the algebra that makes tiling possible</h3>
+  </div>
+  <div class="prose"><p>The obstacle to tiling attention is softmax. It needs a denominator that sums over <em>every</em> score in the row, so it appears to require the whole row before producing any output.</p>
+<p>The resolution is to compute it incrementally and correct as you go. This is worth deriving, because the exactness of FlashAttention rests entirely on it.</p>
+<p>Standard safe softmax over a vector <code>x</code>:</p>
+<pre><code>m = max(x)                       subtract the max so exp() cannot overflow
+l = sum_i exp(x_i - m)
+y_i = exp(x_i - m) / l</code></pre>
+<p>Now suppose <code>x</code> arrives in two blocks, <code>x1</code> then <code>x2</code>. Process <code>x1</code>:</p>
+<pre><code>m1 = max(x1)
+l1 = sum exp(x1 - m1)</code></pre>
+<p>Then <code>x2</code> arrives and may contain a larger value. The new global max is <code>m = max(m1, m2)</code>, and the correction is one multiplication:</p>
+<pre><code>l = l1 * exp(m1 - m)  +  l2 * exp(m2 - m)</code></pre>
+<p>The factor <code>exp(m1 - m)</code> rescales the old partial sum from base <code>m1</code> to base <code>m</code>. Since <code>exp(a - m1) × exp(m1 - m) = exp(a - m)</code> exactly, <strong>nothing is approximated.</strong> It is the same number, re-expressed.</p>
+<p>The same correction applies to the accumulated output. If you have a partial output <code>O1</code> computed against the old normalization, rescale it the same way before adding the new block's contribution:</p>
+<pre><code>O = O1 * (l1 * exp(m1 - m) / l)  +  (new block's contribution)</code></pre>
+<p>In FlashAttention this is arranged so the division by <code>l</code> happens once at the end, and the inner loop just tracks unnormalized accumulators along with <code>m</code> and <code>l</code>.</p>
+<p><strong>Why exactness matters so much.</strong> There is a long line of approximate attention methods — Linformer, Performer, Reformer, sparse patterns — that reduce complexity by changing what is computed. They all face the same adoption problem: you cannot drop them into a trained model without retraining, and you cannot be sure what capability you gave up. FlashAttention computes <strong>bit-comparable</strong> attention (modulo floating-point reassociation) and is therefore a pure drop-in. You can apply it to any existing checkpoint with no evaluation required.</p>
+<p>That is the whole reason it won. Not the speedup — a 2–4× speedup with an asterisk about quality is a much harder sell than a 2–4× speedup with no asterisk at all.</p></div>
+  <pre class="ascii" aria-label="diagram">  process K/V in blocks, keeping (m, l, O) running:
+
+  block 1:  scores [2.0, 1.0]     m=2.0   l=1+0.368=1.368       O = partial
+
+  block 2:  scores [5.0, 3.0]     m2=5.0
+            new global max        m=5.0
+            rescale old:          l1' = 1.368 * exp(2.0-5.0) = 0.0681
+            add new:              l  = 0.0681 + (1+0.135) = 1.203
+            rescale O the same way, then add block 2's contribution
+
+  exp(a-2.0) * exp(2.0-5.0) == exp(a-5.0)      &lt;- exact, not approximate</pre>
+  <p class="keypoint"><b>REMEMBER</b>A running maximum and a running sum let you rescale a partial softmax when a larger value appears, so the result is exact without ever seeing all the scores at once.</p>
+</article>
+<article class="concept" id="concept-2">
+  <div class="concept__head">
+    <span class="concept__n">03</span>
+    <h3 class="concept__title">FlashAttention: the tiling algorithm</h3>
+  </div>
+  <div class="prose"><p>Put the pieces together. The algorithm splits Q, K and V into blocks sized so a working set fits in shared memory, then loops:</p>
+<pre><code>for each block of K, V:                     # loaded into SRAM once
+    for each block of Q:                    # loaded into SRAM
+        S_ij  = Q_i @ K_j^T                 # in SRAM, small
+        m_new = max(m_i, rowmax(S_ij))
+        P_ij  = exp(S_ij - m_new)           # in SRAM
+        l_new = l_i * exp(m_i - m_new) + rowsum(P_ij)
+        O_i   = O_i * (l_i * exp(m_i - m_new) / l_new) + (P_ij @ V_j) / l_new
+        m_i, l_i = m_new, l_new
+    # O_i, m_i, l_i live in registers/SRAM across the inner loop
+write O                                     # the only large HBM write</code></pre>
+<p>The <code>[N, N]</code> score matrix is never assembled. Only <code>[block, block]</code> tiles exist, in shared memory, and they are discarded as soon as they are consumed.</p>
+<p>The traffic analysis: HBM accesses drop from <code>O(N² + Nd)</code> to <code>O(N²d²/M)</code>, where <code>M</code> is the SRAM size. With <code>d = 128</code> and <code>M ≈ 100 KB</code>, the factor <code>d²/M</code> is well under 1, so the reduction is substantial — the paper reports 9× fewer HBM accesses on GPT-2 and 2–4× end-to-end speedups.</p>
+<p>Memory goes from <strong>quadratic to linear</strong> in sequence length, because you only ever hold blocks. This is what made long-context training practical at all.</p>
+<p><strong>The trade is recomputation.</strong> During the backward pass you need the attention probabilities, which you did not store. FlashAttention recomputes them from Q, K, V on the fly. That is <em>more</em> FLOPs than the naive version — and it is still faster, because the FLOPs were never the bottleneck. It is the clearest possible demonstration of this course's thesis: trading arithmetic for bandwidth is a winning trade, even at a large arithmetic premium.</p>
+<p><strong>FlashAttention-2</strong> (2023) reworked the same algorithm around GPU scheduling rather than the memory hierarchy: reduce non-matmul FLOPs (rescaling operations are much slower per FLOP than tensor-core matmuls on modern GPUs), swap the loop order so the query block is outer, and parallelize over sequence length as well as batch and heads. Roughly another 2×, reaching 50–73% of theoretical peak matmul throughput.</p>
+<p><strong>FlashAttention-3</strong> (2024) targets Hopper specifically: warp specialization (separate warps produce and consume data), asynchronous TMA copies overlapped with computation, interleaving the matmul and softmax so the non-tensor-core softmax work hides behind tensor-core work, and FP8 support. The trend across all three is instructive — the first was an algorithmic insight, the next two were about exploiting specific hardware asynchrony. Extracting the last factor of two now requires knowing the machine intimately.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Loop over K/V blocks in the outer loop and Q blocks in the inner, keeping a tile of the computation in shared memory and never writing scores to HBM.</p>
+</article>
+<article class="concept" id="concept-3">
+  <div class="concept__head">
+    <span class="concept__n">04</span>
+    <h3 class="concept__title">Why decode needs a different kernel</h3>
+  </div>
+  <div class="prose"><p>FlashAttention parallelizes over batch, heads, and <strong>query blocks</strong>. At decode time the query length is 1, so the third source of parallelism disappears.</p>
+<p>Concretely: batch 8, 32 heads, query length 1, KV length 8192. You have <code>8 × 32 = 256</code> independent work units for a GPU with 132 SMs — and each unit must sequentially scan 8,192 keys. Occupancy is poor and the long serial scan dominates. Meanwhile at batch 1 you have only 32 work units for 132 SMs: <strong>the GPU is more than 75% idle.</strong></p>
+<p>The fix is <strong>FlashDecoding</strong>, and it is a split-K reduction. Partition the KV sequence into chunks, compute a partial attention result for each chunk in parallel, then combine.</p>
+<pre><code>1. split the 8192 keys into, say, 16 chunks of 512
+2. each chunk computes, independently and in parallel:
+      - partial output O_c
+      - its running max m_c and sum l_c
+3. combine the 16 partials using exactly the online-softmax rescaling
+   from earlier -- the same algebra, applied across chunks instead of
+   within a loop</code></pre>
+<p>Parallelism goes from <code>batch × heads</code> to <code>batch × heads × chunks</code> — a 16× increase in this example, which is the difference between an idle GPU and a busy one. Reported speedups for long-context decode are substantial, up to several times for large KV lengths.</p>
+<p>Note how neatly the online softmax pays off twice. It was introduced to allow sequential tiling within one kernel; the identical algebra allows <em>parallel</em> partial results to be combined afterwards. That is a sign the abstraction was the right one.</p>
+<p>Three further decode-specific realities:</p>
+<p><strong>GQA changes the arithmetic.</strong> With 8 KV heads serving 32 query heads, the 4 query heads sharing a KV head can read it once from HBM and use it four times. A GQA-aware decode kernel gets 4× the arithmetic intensity on the attention step. A kernel that naively replicates KV heads to match query heads throws that away — and this is a real and common performance bug.</p>
+<p><strong>Paged KV changes the memory access pattern.</strong> Under PagedAttention the cache is not contiguous, so the kernel must gather through a block table. vLLM's paged attention kernels handle this; a stock FlashAttention kernel cannot read a paged cache directly. The two features have to be co-designed, which is why they arrived together.</p>
+<p><strong>Attention at decode is memory-bound no matter what.</strong> Each cached key element is read and used in one multiply-accumulate, so intensity is O(1) — and unlike weights, batching does not amortize it, because every sequence has its own cache. No kernel fixes this. The only fixes are storing less (Module 6) or reading it less often.</p></div>
+  <pre class="ascii" aria-label="diagram">  PREFILL: parallelize over query blocks
+    Q [2048, 128]  x  K [2048, 128]
+    -&gt; 2048/64 = 32 query blocks x 32 heads x batch = plenty of work
+
+  DECODE, naive: query length 1
+    Q [1, 128]  x  K [8192, 128]
+    -&gt; 1 x 32 heads x batch 8 = 256 units, each scanning 8192 keys
+       132 SMs, poor occupancy, long serial scan
+
+  DECODE, FlashDecoding: split along K
+    chunk 0   chunk 1   chunk 2  ...  chunk 15    (parallel)
+    (O_0,m,l) (O_1,m,l) (O_2,m,l)     (O_15,m,l)
+         \        |         /            /
+          +-------+---------+-----------+
+                  |
+          online-softmax combine  -&gt;  O
+    -&gt; 256 x 16 = 4096 units. GPU busy.</pre>
+  <p class="keypoint"><b>REMEMBER</b>At decode the query length is 1, so there is nothing to parallelize over unless you split along the KV dimension instead.</p>
+</article>
+<article class="concept" id="concept-4">
+  <div class="concept__head">
+    <span class="concept__n">05</span>
+    <h3 class="concept__title">Kernel fusion and the cost of round trips</h3>
+  </div>
+  <div class="prose"><p>FlashAttention is the most valuable instance of a general principle: <strong>if two operations are performed back to back, do not send the intermediate to HBM.</strong></p>
+<p>Consider RMSNorm followed by a linear projection at decode time, batch 1, <code>d_model = 4096</code>, fp16:</p>
+<pre><code>unfused:
+  RMSNorm kernel:  read 8 KB, ~3 FLOPs/element, write 8 KB
+  matmul kernel:   read 8 KB + weights, write output
+                   -&gt; the 8 KB intermediate makes a full HBM round trip
+
+fused:
+  one kernel:      read 8 KB, normalize in registers, matmul, write output
+                   -&gt; intermediate never leaves the chip</code></pre>
+<p>8 KB sounds negligible, and per operation it is. The problem is the count. A decode step for a 32-layer model has, per layer: two RMSNorms, RoPE on Q and K, two residual adds, and a SiLU-and- multiply. That is roughly 7 elementwise operations × 32 layers ≈ <strong>224 kernel launches</strong>, each with a round trip and each with ~5 µs of launch overhead.</p>
+<pre><code>launch overhead:  224 x 5 us          = 1.12 ms
+against a theoretical step of         = 4.5 ms
+                                        -&gt; 25% of the budget</code></pre>
+<p>Plus the memory traffic, which is small per operation but adds up, and — often worse — each tiny kernel fails to saturate the memory system at all, so its effective bandwidth is far below peak.</p>
+<p>The standard remedies:</p>
+<p><strong>Fusion.</strong> Combine adjacent operations into one kernel. Fuse the norm into the following matmul, fuse SiLU and the elementwise multiply in SwiGLU, fuse the residual add into whatever precedes it. Every serving engine ships hand-written fused kernels for the common patterns, and <code>torch.compile</code> generates them automatically for many cases.</p>
+<p><strong>CUDA Graphs.</strong> Capture the whole sequence of launches once and replay it as a single unit. This does not reduce memory traffic but eliminates nearly all the per-launch CPU cost. For decode — where the shape of every step is identical — it is close to free and is standard practice. It is frequently the single largest fix when a naive PyTorch loop is 3× off the roofline.</p>
+<p><strong>Persistent kernels.</strong> One kernel that loops internally over layers, avoiding launches entirely. Highest performance, least flexibility, hardest to write.</p>
+<p>The reason this module comes after Module 4 is that the roofline tells you <em>whether</em> fusion will help. If you are compute-bound, an extra HBM round trip may hide behind arithmetic and fusion buys little. At decode you are never compute-bound, so every round trip is exposed and every fusion pays.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Every unfused elementwise operation is a full HBM round trip for almost no arithmetic, and a decode step is full of them.</p>
+</article>
+<article class="concept" id="concept-5">
+  <div class="concept__head">
+    <span class="concept__n">06</span>
+    <h3 class="concept__title">Where the efficient-attention research line went</h3>
+  </div>
+  <div class="prose"><p>FlashAttention makes exact attention fast, but it does not make it sub-quadratic — the FLOPs are still <code>O(N²d)</code> and the KV cache still grows linearly. A parallel research line tried to change the asymptotics.</p>
+<p><strong>Linear attention.</strong> Replace <code>softmax(QK^T)V</code> with a kernel feature map <code>φ</code> so that <code>φ(Q)(φ(K)^T V)</code> can be computed by associativity in <code>O(Nd²)</code> instead of <code>O(N²d)</code>. The state is a fixed <code>[d, d]</code> matrix — constant size, no growing cache. The cost is that softmax's sharp, content-addressable selectivity is replaced by something smoother, and exact retrieval suffers.</p>
+<p><strong>State space models.</strong> Mamba (2023) is the most successful. It maintains a fixed-size recurrent state updated per token, with input-dependent (selective) state transitions, and a parallel scan that makes training efficient. <strong>There is no KV cache at all</strong> — decode memory is constant in sequence length, which is an enormous inference advantage.</p>
+<p>The trouble is a genuine capability gap. Attention can look up any previous token exactly; a fixed-size state cannot store an arbitrary amount of detail. Empirically, pure SSMs underperform on tasks requiring precise recall from long context — copying, retrieval, in-context learning from many examples. This is not an implementation shortfall, it is information-theoretic: a constant-size state cannot losslessly summarize an unbounded history.</p>
+<p><strong>Hybrids won.</strong> The field's answer was to interleave: mostly SSM or linear-attention layers, with a few full-attention layers to provide exact recall. Jamba, Zamba and Samba are examples, and the approach is now common in production models. You get most of the memory saving with most of the recall.</p>
+<p><strong>Sparse attention</strong> is the other direction: keep softmax attention but restrict which positions attend to which. Sliding-window attention (Mistral) bounds the cache at the window size. Global plus local patterns give some long-range connectivity cheaply. DeepSeek's Native Sparse Attention (2025) trains the sparsity pattern rather than fixing it in advance, which addresses the main objection to earlier sparse methods — that a hand-designed pattern is a guess about what the model needs.</p>
+<p>The honest summary as of now: <strong>full attention with FlashAttention kernels remains the default for quality-critical work</strong>, hybrids are a real and growing production option where long context matters more than exact recall, and the sub-quadratic line has not displaced attention so much as found a complementary role. Anyone claiming attention is obsolete is ahead of the evidence.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Sub-quadratic architectures trade exact recall for a constant-size state, and the field settled on hybrids rather than picking a side.</p>
+</article>
+      </section>
+
+      <section class="section ghost ghost--inky" id="math-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--inky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>INKY · MATH BY HAND</p>
+        <h2 class="section__title">Math by hand</h2>
+        <div class="prose"><p><strong>Part 1 — the cost of materializing scores.</strong> Llama-3-8B prefill: 32 layers, 32 heads, head_dim 128, fp16. Sequence length <code>N = 8192</code>, batch 1.</p>
+<p>a) Size in bytes of the <code>[N, N]</code> score matrix for <strong>one head</strong>. b) Naive attention touches that matrix 4 times (write S, read S, write P, read P). Total HBM traffic for the score matrix across all heads and all layers. c) At 3.35 TB/s, how long is that? d) The attention FLOPs are <code>4 × N² × d</code> per head. Total across the model, and time at 989 TFLOP/s. Compare to (c) — which dominates? e) Repeat (a)–(c) for <code>N = 32768</code>. What happens to the ratio?</p>
+<p><strong>Part 2 — trace the online softmax.</strong> Scores arrive in two blocks: <code>x1 = [2.0, 1.0]</code> then <code>x2 = [5.0, 3.0]</code>.</p>
+<p>a) Compute <code>m1</code> and <code>l1</code> for block 1 alone. b) Compute <code>m2</code> and <code>l2</code> for block 2 alone. c) Combine to get the global <code>m</code> and <code>l</code> using the rescaling rule. d) Compute the standard softmax over all four values directly and confirm the denominators match. State why the agreement is exact and not approximate.</p>
+<p><strong>Part 3 — FlashDecoding parallelism.</strong> Decode on an H100 (132 SMs). Batch 8, 32 query heads, 8 KV heads, KV length 8192.</p>
+<p>a) Without split-K, how many independent work units does the attention kernel have? What fraction of the SMs can be occupied? b) With FlashDecoding splitting KV into chunks of 512, how many work units? c) Repeat both for batch 1. Which case does FlashDecoding help more, and why? d) A GQA-aware kernel reads each KV head once and uses it for 4 query heads. What does that do to the arithmetic intensity of the attention step?</p>
+<p><strong>Part 4 — fusion overhead.</strong> A 32-layer model, decode, batch 1. Per layer: 2 RMSNorms, RoPE on Q and K (count as 2), 2 residual adds, 1 SiLU-multiply.</p>
+<p>a) Unfused kernel launches per decode step, at 5 µs each. Total overhead. b) The roofline floor for this model is 4.5 ms/token. What fraction is launch overhead? c) CUDA graphs cut per-launch cost to ~0.5 µs. New overhead and new fraction. d) Perfect fusion reduces the count to ~3 launches per layer. Combined with CUDA graphs, what is the overhead now?</p></div>
+        <details class="spoiler">
+          <summary>SHOW THE WORKED SOLUTION</summary>
+          <div class="spoiler__body prose"><p><strong>Part 1</strong></p>
+<p>a) <code>8192 × 8192 × 2 bytes = 134,217,728 = 134.2 MB</code> per head.</p>
+<p>b)</p>
+<pre><code>4 touches x 134.2 MB x 32 heads x 32 layers = 549,755,813,888 bytes = 550 GB</code></pre>
+<p>c) <code>550 / 3350 = 0.164 s = 164 ms</code> of pure HBM traffic for intermediates.</p>
+<p>d)</p>
+<pre><code>FLOPs per head = 4 x 8192^2 x 128 = 3.436e10
+total = 3.436e10 x 32 heads x 32 layers = 3.518e13 = 35.2 TFLOP
+time  = 35.2e12 / 989e12 = 35.6 ms</code></pre>
+<p><strong>Memory traffic (164 ms) is 4.6× the arithmetic (35.6 ms).</strong> Naive attention is memory-bound because of an intermediate that did not need to exist. FlashAttention removes essentially all of the 164 ms.</p>
+<p>e) At <code>N = 32768</code>:</p>
+<pre><code>score matrix = 32768^2 x 2 = 2.147 GB per head
+traffic = 4 x 2.147 x 32 x 32 = 8,796 GB = 8.8 TB
+time    = 8796 / 3350 = 2.63 s
+
+FLOPs = 4 x 32768^2 x 128 x 32 x 32 = 5.63e14 = 563 TFLOP
+time  = 563e12 / 989e12 = 0.569 s</code></pre>
+<p>Ratio: <code>2.63 / 0.569 = 4.6×</code> — <strong>unchanged</strong>. Both terms are <code>O(N²)</code>, so the ratio is scale-invariant; it is set by the constant <code>4 touches × 2 bytes</code> against <code>4d</code> FLOPs per element. The absolute numbers get catastrophic (2.6 seconds of intermediate shuffling) but the <em>shape</em> of the problem is the same at every length. This is why FlashAttention helps at all lengths, not just long ones.</p>
+<p><strong>Part 2</strong></p>
+<p>a) <code>m1 = 2.0</code>; <code>l1 = exp(0) + exp(-1) = 1 + 0.367879 = 1.367879</code></p>
+<p>b) <code>m2 = 5.0</code>; <code>l2 = exp(0) + exp(-2) = 1 + 0.135335 = 1.135335</code></p>
+<p>c) Global max <code>m = max(2.0, 5.0) = 5.0</code>. Rescale:</p>
+<pre><code>l = l1 * exp(m1 - m) + l2 * exp(m2 - m)
+  = 1.367879 * exp(-3.0) + 1.135335 * exp(0)
+  = 1.367879 * 0.0497871 + 1.135335
+  = 0.0681015 + 1.135335
+  = 1.2034365</code></pre>
+<p>d) Direct softmax over <code>[2.0, 1.0, 5.0, 3.0]</code> with <code>m = 5.0</code>:</p>
+<pre><code>exp(2-5) = 0.0497871
+exp(1-5) = 0.0183156
+exp(5-5) = 1.0
+exp(3-5) = 0.1353353
+                     sum = 1.2034380</code></pre>
+<p>The two agree to seven significant figures (the residual is fp rounding in my arithmetic, not the method). The agreement is <strong>exact</strong> because <code>exp(a - m1) × exp(m1 - m) = exp(a - m1 + m1 - m) = exp(a - m)</code> is an algebraic identity. The rescaling re-expresses the same quantity in a different base; it does not approximate it. This is the entire reason FlashAttention is a drop-in replacement requiring no re-evaluation.</p>
+<p><strong>Part 3</strong></p>
+<p>a) Work units = <code>batch × heads = 8 × 32 = 256</code>. With 132 SMs that is about 1.9 units per SM — occupancy is nominally fine, but each unit serially scans 8,192 keys, so the kernel is latency-bound on a long dependent scan rather than throughput-bound. In practice utilization is poor.</p>
+<p>b) Chunks = <code>8192 / 512 = 16</code>. Work units = <code>8 × 32 × 16 = 4,096</code>, a <strong>16× increase</strong>, and each unit now scans only 512 keys.</p>
+<p>c) At batch 1:</p>
+<pre><code>without split-K:  1 x 32 = 32 units for 132 SMs  -&gt;  76% of the GPU is IDLE
+with split-K:     1 x 32 x 16 = 512 units        -&gt;  fully occupied</code></pre>
+<p><strong>FlashDecoding helps far more at small batch.</strong> At large batch you already have enough units to fill the machine; at batch 1 you cannot fill it at all without splitting the KV dimension. Since small batch is exactly the latency-sensitive regime people care about, this is where the technique earns its place.</p>
+<p>d) The attention step reads the KV cache. Without GQA awareness you read each KV head once per query head that uses it — 4 redundant reads. With awareness you read once and reuse from registers/SRAM:</p>
+<pre><code>naive:      1 MAC per KV element read           I = ~1 FLOP/byte
+GQA-aware:  4 MACs per KV element read          I = ~4 FLOP/byte</code></pre>
+<p>A <strong>4× improvement in the arithmetic intensity of the attention step</strong>. Since attention at decode is memory-bound, that translates fairly directly into a 4× faster attention step. A kernel that materializes replicated KV heads to make the shapes match throws this away entirely — a real and easily-made performance bug.</p>
+<p><strong>Part 4</strong></p>
+<p>a)</p>
+<pre><code>per layer: 2 norms + 2 RoPE + 2 residual + 1 SiLU-mul = 7
+total: 7 x 32 = 224 elementwise launches
+overhead: 224 x 5 us = 1,120 us = 1.12 ms</code></pre>
+<p>(Plus the matmul launches — 7 per layer — so the true count is higher; 224 is the elementwise portion alone.)</p>
+<p>b) <code>1.12 / 4.5 = 24.9%</code> of the theoretical step budget, spent launching work rather than doing it.</p>
+<p>c) With CUDA graphs at 0.5 µs: <code>224 × 0.5 = 112 µs = 0.112 ms</code>, which is <code>2.5%</code>. <strong>A 10× reduction from one change that requires no kernel work at all</strong> — which is why it is the first thing to check when a naive loop is far off the roofline.</p>
+<p>d) Fusion to ~3 launches per layer = 96 launches; with CUDA graphs, <code>96 × 0.5 = 48 µs = 0.048 ms</code>, or <strong>1.1%</strong> of the budget. Overhead has gone from a quarter of your step time to a rounding error.</p>
+<p>The lesson: <strong>CUDA graphs are the cheap 10×, fusion is the expensive further 2×.</strong> Do them in that order.</p></div>
+        </details>
+      </section>
+
+      <section class="section ghost ghost--clyde" id="code-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--clyde)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>CLYDE · CODE LAB</p>
+        <h2 class="section__title">Code lab</h2>
+        <div class="prose"><p>You do not need to write CUDA. You need to convince yourself the online softmax is exact, and to see the memory-traffic argument in numbers.</p>
+<p><strong>Part A</strong> — implement tiled attention with online softmax in NumPy and verify it matches naive attention to floating-point precision.</p>
+<p><strong>Part B</strong> — count HBM traffic for both, and reproduce the ratio from the math lab.</p>
+<p><strong>Part C</strong> — implement the FlashDecoding split-K combine and confirm the parallel partials merge exactly.</p></div>
+        <div class="prose" style="max-width:none"><pre><code class="lang-python">&quot;&quot;&quot;
+FlashAttention on paper, in NumPy. The point is to prove exactness to yourself.
+
+    pip install numpy
+&quot;&quot;&quot;
+import numpy as np
+
+rng = np.random.default_rng(3)
+
+
+# ==========================================================================
+# Part A -- naive vs tiled
+# ==========================================================================
+def attention_naive(Q, K, V, causal=True):
+    &quot;&quot;&quot;Materializes the full [N, N] score matrix. The thing we are avoiding.&quot;&quot;&quot;
+    N, d = Q.shape
+    S = (Q @ K.T) / np.sqrt(d)
+    if causal:
+        S = np.where(np.triu(np.ones((N, N), dtype=bool), 1), -np.inf, S)
+    S = S - S.max(axis=-1, keepdims=True)
+    P = np.exp(S)
+    P = P / P.sum(axis=-1, keepdims=True)
+    return P @ V
+
+
+def attention_flash(Q, K, V, block_q=64, block_k=64, causal=True):
+    &quot;&quot;&quot;Tiled, with online softmax. Never builds the [N, N] matrix.
+
+    Follows the FlashAttention-2 loop order: query blocks outer, key blocks inner.
+    &quot;&quot;&quot;
+    N, d = Q.shape
+    scale = 1.0 / np.sqrt(d)
+    O = np.zeros_like(Q)
+
+    for i0 in range(0, N, block_q):
+        i1 = min(i0 + block_q, N)
+        Qi = Q[i0:i1]                                    # -&gt; SRAM
+
+        # running state, held in registers across the inner loop
+        m = np.full((i1 - i0, 1), -np.inf)               # running max
+        l = np.zeros((i1 - i0, 1))                       # running sum
+        acc = np.zeros((i1 - i0, d))                     # running UNNORMALIZED output
+
+        for j0 in range(0, N, block_k):
+            j1 = min(j0 + block_k, N)
+            if causal and j0 &gt; i1 - 1:
+                break                                     # whole block is masked out
+            Kj, Vj = K[j0:j1], V[j0:j1]                   # -&gt; SRAM
+
+            S = (Qi @ Kj.T) * scale                       # [bq, bk], stays in SRAM
+            if causal:
+                qi = np.arange(i0, i1)[:, None]
+                kj = np.arange(j0, j1)[None, :]
+                S = np.where(kj &gt; qi, -np.inf, S)
+
+            m_blk = S.max(axis=-1, keepdims=True)
+            m_new = np.maximum(m, m_blk)
+            # guard the all-masked row case: -inf - -inf is nan
+            m_new = np.where(np.isneginf(m_new), 0.0, m_new)
+
+            correction = np.exp(m - m_new)                # rescale factor for old state
+            correction = np.where(np.isnan(correction), 0.0, correction)
+
+            P = np.exp(S - m_new)                         # [bq, bk]
+            P = np.where(np.isnan(P), 0.0, P)
+
+            l = l * correction + P.sum(axis=-1, keepdims=True)
+            acc = acc * correction + P @ Vj               # accumulate unnormalized
+            m = m_new
+
+        O[i0:i1] = acc / np.where(l == 0, 1, l)           # single divide at the end
+
+    return O
+
+
+print(&quot;=== Part A: is the tiled version exact? ===&quot;)
+for N, d in [(128, 64), (512, 64), (1024, 128)]:
+    Q = rng.standard_normal((N, d)).astype(np.float64)
+    K = rng.standard_normal((N, d)).astype(np.float64)
+    V = rng.standard_normal((N, d)).astype(np.float64)
+
+    ref = attention_naive(Q, K, V)
+    for bq, bk in [(32, 32), (64, 64), (128, 256)]:
+        got = attention_flash(Q, K, V, bq, bk)
+        err = np.abs(ref - got).max()
+        print(f&quot;  N={N:&gt;5} d={d:&gt;4} blocks {bq:&gt;3}x{bk:&lt;4} max abs error {err:.3e}&quot;
+              f&quot;   {'EXACT (fp roundoff only)' if err &lt; 1e-12 else 'MISMATCH'}&quot;)
+
+
+# ==========================================================================
+# Part B -- HBM traffic
+# ==========================================================================
+def traffic_naive(N, d, n_heads, n_layers, dtype_bytes=2):
+    per_head = (
+        2 * N * d * dtype_bytes          # read Q, K
+        + N * N * dtype_bytes            # write S
+        + N * N * dtype_bytes            # read S
+        + N * N * dtype_bytes            # write P
+        + N * N * dtype_bytes            # read P
+        + N * d * dtype_bytes            # read V
+        + N * d * dtype_bytes            # write O
+    )
+    return per_head * n_heads * n_layers
+
+
+def traffic_flash(N, d, n_heads, n_layers, dtype_bytes=2, sram_blocks=1):
+    # Q, K, V read (K and V re-read once per query block), O written.
+    per_head = (N * d * dtype_bytes) * (2 + 2 * sram_blocks)
+    return per_head * n_heads * n_layers
+
+
+def attn_flops(N, d, n_heads, n_layers):
+    return 4 * N * N * d * n_heads * n_layers
+
+
+print(&quot;\n=== Part B: HBM traffic, Llama-3-8B prefill (32 heads, 32 layers, d=128) ===&quot;)
+print(f&quot;  {'N':&gt;7} {'naive GB':&gt;10} {'flash GB':&gt;10} {'ratio':&gt;8} &quot;
+      f&quot;{'naive ms':&gt;9} {'flash ms':&gt;9} {'flop ms':&gt;8}&quot;)
+BW, PEAK = 3350e9, 989e12
+for N in (2048, 8192, 32768, 131072):
+    tn = traffic_naive(N, 128, 32, 32)
+    tf = traffic_flash(N, 128, 32, 32, sram_blocks=max(1, N // 4096))
+    fl = attn_flops(N, 128, 32, 32)
+    print(f&quot;  {N:&gt;7} {tn/1e9:&gt;10.1f} {tf/1e9:&gt;10.2f} {tn/tf:&gt;7.0f}x &quot;
+          f&quot;{tn/BW*1000:&gt;9.1f} {tf/BW*1000:&gt;9.1f} {fl/PEAK*1000:&gt;8.1f}&quot;)
+
+print(&quot;\n  -&gt; naive is memory-bound (traffic time &gt;&gt; flop time)&quot;)
+print(&quot;     flash is compute-bound (flop time &gt;&gt; traffic time). Same arithmetic.&quot;)
+
+
+# ==========================================================================
+# Part C -- FlashDecoding split-K combine
+# ==========================================================================
+def decode_attention_split(q, K, V, n_splits=8):
+    &quot;&quot;&quot;One query vs a long KV cache, computed as parallel partials then merged.
+
+    Each split is independent -- on a GPU these run on different SMs.
+    &quot;&quot;&quot;
+    d = q.shape[0]
+    scale = 1.0 / np.sqrt(d)
+    n = K.shape[0]
+    bounds = np.linspace(0, n, n_splits + 1).astype(int)
+
+    partials = []
+    for a, b in zip(bounds[:-1], bounds[1:]):
+        if a == b:
+            continue
+        s = (q @ K[a:b].T) * scale
+        m = s.max()
+        p = np.exp(s - m)
+        partials.append((m, p.sum(), p @ V[a:b]))       # (max, sum, unnormalized out)
+
+    # combine with exactly the online-softmax rescaling
+    m_all = max(p[0] for p in partials)
+    l_all = sum(p[1] * np.exp(p[0] - m_all) for p in partials)
+    o_all = sum(p[2] * np.exp(p[0] - m_all) for p in partials)
+    return o_all / l_all
+
+
+print(&quot;\n=== Part C: FlashDecoding split-K combine ===&quot;)
+d, n = 128, 8192
+q = rng.standard_normal(d)
+K = rng.standard_normal((n, d))
+V = rng.standard_normal((n, d))
+
+s = (q @ K.T) / np.sqrt(d)
+p = np.exp(s - s.max())
+ref = (p / p.sum()) @ V
+
+for splits in (1, 2, 8, 16, 64, 256):
+    got = decode_attention_split(q, K, V, splits)
+    print(f&quot;  {splits:&gt;4} splits  max abs error {np.abs(ref-got).max():.3e}&quot;
+          f&quot;   work units per (batch,head): {splits}&quot;)
+
+print(&quot;\n  -&gt; the answer does not change with the split count. Parallelism is free.&quot;)
+
+# --- TODO for you ---
+#   1. Break the online softmax on purpose: drop the exp(m - m_new) correction
+#      and see how wrong the answer gets. That term is the whole algorithm.
+#   2. Add GQA to decode_attention_split: 8 KV heads, 32 query heads. Count how
+#      many bytes of K you read with and without reusing a KV head across its
+#      4 query heads.
+#   3. Work out, for block_q=64, block_k=64, d=128, fp16, how many bytes one
+#      tile's working set needs. Does it fit in 228 KB of shared memory?
+</code></pre></div>
+        <div class="prose"><h3>What you should see</h3><p><strong>Part A</strong> prints a max absolute error around <code>1e-15</code> to <code>1e-16</code> for every block size — pure float64 rounding. Not &quot;close&quot;, not &quot;within tolerance for a fast approximation&quot;: <strong>identical to machine precision, at every block size</strong>. Changing the tiling does not change the answer. That is the property that made FlashAttention adoptable without re-evaluating any model.</p>
+<p><strong>Part B</strong> reproduces the math lab. At <code>N = 8192</code> naive attention moves ~550 GB against flash's single-digit GB — a ratio in the hundreds. The three timing columns tell the real story: naive's traffic time far exceeds its FLOP time (memory-bound on an intermediate that need not exist), while flash's FLOP time far exceeds its traffic time (compute-bound, which is where you want to be). Same arithmetic, opposite regime.</p>
+<p><strong>Part C</strong> shows the error staying at rounding level from 1 split to 256. The number of parallel chunks has <strong>no effect on the answer</strong>, which is what makes FlashDecoding's parallelism free — you can split as far as you need to fill the GPU without any accuracy consequence.</p>
+<p>If TODO 1 is done, dropping the correction term produces errors of order 1.0 — completely wrong output. Worth doing, because it makes clear that the rescaling is not a numerical nicety but the load-bearing element of the whole algorithm.</p></div>
+        <div class="prose"><h3>Stretch</h3><p>Add a wall-clock comparison. Time <code>attention_naive</code> and <code>attention_flash</code> in NumPy at <code>N</code> from 512 to 8192 and plot both. NumPy will not reproduce GPU behaviour — it has no shared memory to exploit and the tiled version will likely be <em>slower</em> due to Python loop overhead — and that is itself the lesson: FlashAttention is not an algorithmic-complexity win, it is a memory-hierarchy win, and it only pays on hardware with the hierarchy it was designed for.</p>
+<p>Then measure peak memory for both with <code>tracemalloc</code>. Naive should grow quadratically with <code>N</code> while flash stays roughly flat. That part <em>does</em> transfer to any hardware, and it is why long-context training became possible.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pac" id="papers">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>THE KEY · PAPERS</p>
+        <h2 class="section__title">Papers, with a reading frame</h2>
+        <div class="papers">
+          <article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2205.14135" target="_blank" rel="noopener">FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness</a></h3>
+            <p class="paper__by">Dao et al., 2022</p>
+            <p class="paper__why">The paper that reframed attention performance as an IO problem rather than a FLOP problem. Among the most impactful systems contributions in deep learning.</p>
+            <div class="paper__frame"><p><strong>Section 3.1</strong> has the algorithm — work through Algorithm 1 line by line with the online softmax derivation in hand. <strong>Section 3.2</strong> is the IO-complexity analysis giving <code>O(N²d²/M)</code>; understand where the <code>M</code> comes from. Note that the word &quot;exact&quot; is in the title deliberately: the contrast is with the approximate-attention literature the paper was pushing back on. Skim the experiments.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2307.08691" target="_blank" rel="noopener">FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning</a></h3>
+            <p class="paper__by">Tri Dao, 2023</p>
+            <p class="paper__why">Roughly 2x over the original, from scheduling rather than algorithmic changes. Instructive about what actually limits GPU kernels.</p>
+            <div class="paper__frame"><p><strong>Section 3.1</strong> on reducing non-matmul FLOPs is the key insight: on an A100, non-matmul throughput is roughly 16× lower than tensor-core matmul throughput, so the rescaling operations matter far more than their FLOP count suggests. <strong>Section 3.2</strong> covers the loop-order swap and parallelizing over sequence length. Read for the reasoning, not the numbers.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2407.08608" target="_blank" rel="noopener">FlashAttention-3: Fast and Accurate Attention with Asynchrony and Low-precision</a></h3>
+            <p class="paper__by">Shah et al., 2024</p>
+            <p class="paper__why">Hopper-specific: warp specialization, async TMA, and FP8. Shows what extracting the last factor of two now requires.</p>
+            <div class="paper__frame"><p>Read the introduction and Section 3 for the asynchrony techniques. The details are hardware-specific and will date; the durable lesson is that modern kernel performance comes from overlapping heterogeneous units rather than from better asymptotics.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/1805.02867" target="_blank" rel="noopener">Online normalizer calculation for softmax</a></h3>
+            <p class="paper__by">Milakov &amp; Gimelshein, 2018</p>
+            <p class="paper__why">The online softmax itself, four years before FlashAttention used it. Short, and the algebra is the foundation of everything in this module.</p>
+            <div class="paper__frame"><p>Three pages. Read all of it. The rescaling identity in Section 3 is the single most important piece of algebra in modern attention kernels, and seeing it stated on its own — outside the attention context — makes it much clearer.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2312.00752" target="_blank" rel="noopener">Mamba: Linear-Time Sequence Modeling with Selective State Spaces</a></h3>
+            <p class="paper__by">Gu &amp; Dao, 2023</p>
+            <p class="paper__why">The strongest version of the alternative bet: constant-size recurrent state, no KV cache at all.</p>
+            <div class="paper__frame"><p>Read <strong>Section 3</strong> for the selection mechanism — making the state transitions input-dependent is what lifted SSMs to competitive quality. <strong>Section 3.3</strong> on the hardware-aware parallel scan is a nice companion to FlashAttention: same philosophy of designing the algorithm around the memory hierarchy. Read the results with a critical eye toward recall-heavy tasks, which is where the constant-state limitation shows.</p></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--blinky" id="pitfalls">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--blinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>BLINKY · PITFALLS</p>
+        <h2 class="section__title">What people get wrong</h2>
+        <div class="pitfall">
+          <p class="pitfall__wrong"><span>FlashAttention is an approximation that trades accuracy for speed.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>It is exact. The online softmax rescaling is an algebraic identity, not a numerical shortcut, so the output is identical to naive attention up to floating-point reassociation. Exactness is the entire reason it was adoptable — you can apply it to any trained checkpoint with no re-evaluation, which the approximate-attention methods it displaced could never claim.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>FlashAttention makes attention sub-quadratic.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>The FLOPs are still O(N²d) and the KV cache still grows linearly. What becomes linear is the <em>memory</em> required for intermediates, because the score matrix is never materialized. It removes a memory-traffic constant, not an asymptotic term. Sub-quadratic attention is a different research line (linear attention, SSMs, sparse patterns) with different trade-offs.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Using a prefill-tuned attention kernel for decode.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>At query length 1 there are no query blocks to parallelize over, so a standard FlashAttention kernel leaves most of the GPU idle — at batch 1 with 32 heads, over 75% of an H100's SMs have nothing to do. You need a split-K decode kernel (FlashDecoding) that parallelizes along the KV dimension instead. Serving engines ship separate kernels for the two phases for exactly this reason.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Reaching for kernel fusion before enabling CUDA graphs.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>Fusion is real work — writing or sourcing kernels, validating them. CUDA graphs are a configuration change that cuts per-launch overhead roughly 10×, taking launch cost from ~25% of a decode step to ~2.5%. For a decode loop, where every step has identical shapes, graph capture is close to free. Do the configuration change first and re-measure before writing any kernels.</p></div></div>
+        </div>
+      </section>
+
+      <section class="section" id="checkpoint">
+        <div class="wall checkpoint">
+          <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>POWER PELLET · CHECKPOINT</p>
+          <p class="checkpoint__claim">You can trace the FlashAttention tiling on paper for a small matrix and convince
+yourself the online softmax is exact — and you can explain why decode needs a different kernel
+than prefill.</p>
+          <details class="qa">
+            <summary>Why is FlashAttention faster when it does more arithmetic than naive attention?</summary>
+            <div class="qa__a prose"><p>Because attention was never limited by arithmetic. Naive attention writes and reads the <code>[N, N]</code> score matrix four times: at <code>N = 8192</code> with 32 heads and 32 layers that is about 550 GB of HBM traffic, roughly 164 ms at 3.35 TB/s, against only ~36 ms of actual arithmetic. FlashAttention keeps tiles in shared memory — about 6× the bandwidth of HBM — and never writes the score matrix out at all, so the 164 ms largely disappears. In the backward pass it <em>recomputes</em> attention probabilities rather than storing them, spending extra FLOPs to save bandwidth, and it is still faster. That trade only makes sense once you accept that bytes, not FLOPs, are the currency.</p></div>
+          </details>
+<details class="qa">
+            <summary>Show why the online softmax rescaling is exact rather than approximate.</summary>
+            <div class="qa__a prose"><p>Suppose you have processed a block with max <code>m1</code> and partial sum <code>l1 = Σ exp(x - m1)</code>, and a new block raises the max to <code>m</code>. Multiply the old sum by <code>exp(m1 - m)</code>. For each term, <code>exp(x - m1) × exp(m1 - m) = exp(x - m1 + m1 - m) = exp(x - m)</code> — which is exactly the term you would have computed had you known <code>m</code> from the start. The rescaling re-expresses the same quantity in a different exponential base; nothing is dropped or approximated. The same factor applies to the accumulated output. This is why FlashAttention is a drop-in for any trained model with no re-evaluation needed, and it is the reason it displaced the approximate-attention literature rather than joining it.</p></div>
+          </details>
+<details class="qa">
+            <summary>Why does the decode phase need a different attention kernel than prefill?</summary>
+            <div class="qa__a prose"><p>Because the parallelism disappears. FlashAttention parallelizes over batch, heads, and query blocks — and at decode the query length is 1, so query-block parallelism is gone. At batch 1 with 32 heads you have 32 independent work units for a 132-SM H100: over 75% of the machine idle, with each unit serially scanning the entire KV cache. FlashDecoding fixes this by splitting along the <em>KV</em> dimension: compute partial results for chunks of the cache in parallel, then merge them with the same online-softmax rescaling. Splitting 8,192 keys into 16 chunks gives 16× the work units. Notice the algebra pays off twice — introduced for sequential tiling, reused for parallel combination.</p></div>
+          </details>
+<details class="qa">
+            <summary>What does a GQA-aware decode kernel do differently, and what does it buy?</summary>
+            <div class="qa__a prose"><p>With 8 KV heads serving 32 query heads, four query heads share each KV head. A GQA-aware kernel reads a KV head from HBM once and reuses it from registers or shared memory for all four, raising the arithmetic intensity of the attention step from about 1 to about 4 MAC-per-byte. Since decode attention is memory-bound, that is close to a 4× faster attention step. A kernel that instead materializes replicated KV heads to make the tensor shapes match reads the same data four times and throws the entire benefit away — a real and easily-made bug, and one reason GQA support has to be built into the kernel rather than handled by a reshape.</p></div>
+          </details>
+<details class="qa">
+            <summary>Why are unfused elementwise operations disproportionately expensive at decode time?</summary>
+            <div class="qa__a prose"><p>Because they have essentially zero arithmetic intensity and there is nothing to hide them behind. An RMSNorm on a <code>[1, 4096]</code> vector reads 8 KB, does a few FLOPs per element, and writes 8 KB — a full HBM round trip for almost no work. A 32-layer decode step has roughly seven such operations per layer, so about 224 of them, each with ~5 µs of launch overhead: 1.12 ms against a 4.5 ms theoretical step, or 25% of the budget spent launching rather than computing. During prefill these hide behind compute-bound matmuls; at decode you are already memory-bound so every round trip is fully exposed. CUDA graphs cut per-launch cost roughly 10× and are the cheap fix; fusion is the further, more expensive one.</p></div>
+          </details>
+<details class="qa">
+            <summary>Why did hybrid attention/SSM models win over pure state-space models?</summary>
+            <div class="qa__a prose"><p>Because a constant-size recurrent state cannot losslessly summarize an unbounded history — that is an information-theoretic limit, not an implementation shortfall. Pure SSMs like Mamba get constant decode memory with no KV cache, which is an enormous inference advantage, but they underperform on tasks needing precise recall from long context: copying, retrieval, in-context learning from many examples. Attention can look up any previous token exactly because it keeps every key. Hybrids interleave mostly SSM or linear-attention layers with a few full-attention layers, so most of the memory saving is retained while the attention layers supply exact recall where it is needed. Jamba, Zamba and Samba are examples. The general shape — most layers cheap, a few layers exact — recurs throughout this field.</p></div>
+          </details>
+          <p style="margin-top:var(--s7)">
+            <button class="done-toggle" type="button" data-complete="7" aria-pressed="false">
+              MARK LEVEL 07 CLEARED
+            </button>
+          </p>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="glossary">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>GLOSSARY</p>
+        <h2 class="section__title">Glossary</h2>
+        <div class="gloss">
+          <div class="gloss__row"><div class="gloss__term">shared memory / SRAM</div><div class="gloss__def">On-chip memory, ~228 KB per SM on Hopper, with roughly 6x the bandwidth of HBM. The tier FlashAttention keeps its tiles in.</div></div><div class="gloss__row"><div class="gloss__term">online softmax</div><div class="gloss__def">Computing softmax incrementally with a running max and sum, rescaling earlier partials when a larger value appears. Exact, not approximate.</div></div><div class="gloss__row"><div class="gloss__term">FlashAttention</div><div class="gloss__def">Tiled exact attention that never materializes the N x N score matrix in HBM. Cuts HBM accesses to O(N^2 d^2 / M).</div></div><div class="gloss__row"><div class="gloss__term">FlashDecoding</div><div class="gloss__def">Decode-phase attention that parallelizes along the KV dimension (split-K) because query-length-1 offers no query parallelism.</div></div><div class="gloss__row"><div class="gloss__term">split-K</div><div class="gloss__def">Partitioning a reduction across parallel workers and combining their partial results afterward.</div></div><div class="gloss__row"><div class="gloss__term">kernel fusion</div><div class="gloss__def">Combining adjacent operations into one kernel so intermediates never round-trip to HBM.</div></div><div class="gloss__row"><div class="gloss__term">CUDA Graph</div><div class="gloss__def">A captured, replayable sequence of kernel launches. Removes most per-launch CPU overhead; essential for decode loops.</div></div><div class="gloss__row"><div class="gloss__term">warp specialization</div><div class="gloss__def">Assigning different warps within a block to different roles (producer/consumer) so data movement overlaps computation. Central to FlashAttention-3.</div></div><div class="gloss__row"><div class="gloss__term">linear attention</div><div class="gloss__def">Replacing softmax with a kernel feature map so attention can be reassociated into O(N d^2). Constant state, weaker exact recall.</div></div><div class="gloss__row"><div class="gloss__term">SSM</div><div class="gloss__def">State space model. Maintains a fixed-size recurrent state, so there is no KV cache; Mamba is the leading example.</div></div><div class="gloss__row"><div class="gloss__term">attention hybrid</div><div class="gloss__def">A stack mixing mostly SSM or linear-attention layers with a few full-attention layers, trading some memory saving for exact recall.</div></div>
+        </div>
+      </section>
+
+      <nav class="pagenav">
+        <a href="memory-optimization.html" data-nav="prev"><span>◀ PREVIOUS LEVEL</span>06 MEMORY OPTIMIZATION</a>
+        <a href="speculative-decoding.html" data-nav="next" style="text-align:right"><span>NEXT LEVEL ▶</span>08 SPECULATIVE DECODING</a>
+      </nav>
+
+    </main>
+  </div>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <p class="foot__h">LEVELS</p>
+        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">&nbsp;</p>
+        <ul><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">REFERENCE</p>
+        <ul>
+          <li><a href="../reference/timeline.html">Timeline</a></li>
+          <li><a href="../reference/hardware.html">GPU spec table</a></li>
+          <li><a href="../reference/engines.html">Serving engines</a></li>
+          <li><a href="../reference/frontier.html">Open problems</a></li>
+          <li><a href="../reference/glossary.html">Glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="foot__h">SOURCE</p>
+        <ul>
+          <li><a href="https://github.com/tushar-amrit-6/inference">GitHub repository</a></li>
+          <li><a href="../reference/how-to-use.html">How to work through this</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
+    do the arithmetic yourself.</p>
+  </div>
+</footer>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

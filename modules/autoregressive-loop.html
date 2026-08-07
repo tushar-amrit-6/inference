@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>01 · THE AUTOREGRESSIVE LOOP — LLM INFERENCE</title>
+<meta name="description" content="Prefill and decode are not two phases of one job. They are two different jobs.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="01 · THE AUTOREGRESSIVE LOOP — LLM INFERENCE">
+<meta property="og:description" content="Prefill and decode are not two phases of one job. They are two different jobs.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/arcade.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20fill%3D%22%23000%22%2F%3E%3Cpath%20d%3D%22M16%2C16%20L29%2C9%20A15%2C15%200%201%200%2029%2C23%20Z%22%20fill%3D%22%23FFE800%22%2F%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="scorebar">
+  <a class="scorebar__home" href="../index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="var(--pac)" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
+  <span class="scorebar__item"><span class="scorebar__label">LEVEL</span><span class="scorebar__value scorebar__value--pac">01</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/11</span></span>
+  <span class="scorebar__spacer"></span>
+  <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
+</header>
+<div class="wrap">
+  <div class="shell">
+    <nav class="rail" aria-label="Module contents">
+  <p class="rail__head">ON THIS LEVEL</p>
+  <ul class="rail__list">
+    <li><a class="rail__link" href="#big-idea" data-kind="dot"><span class="rail__dot"></span><span>The big idea</span></a></li><li><a class="rail__link" href="#concept-0" data-kind="dot"><span class="rail__dot"></span><span>Why the loop cannot be parallelized</span></a></li><li><a class="rail__link" href="#concept-1" data-kind="dot"><span class="rail__dot"></span><span>Prefill: compute-bound, and it scales with the prompt</span></a></li><li><a class="rail__link" href="#concept-2" data-kind="dot"><span class="rail__dot"></span><span>Decode: memory-bound, and it barely notices the prompt</span></a></li><li><a class="rail__link" href="#concept-3" data-kind="dot"><span class="rail__dot"></span><span>The naive recomputation problem</span></a></li><li><a class="rail__link" href="#concept-4" data-kind="dot"><span class="rail__dot"></span><span>Anatomy of one decode step</span></a></li><li><a class="rail__link" href="#concept-5" data-kind="dot"><span class="rail__dot"></span><span>What throughput means when the loop is serial</span></a></li><li><a class="rail__link" href="#math-lab" data-kind="dot"><span class="rail__dot"></span><span>Math by hand</span></a></li><li><a class="rail__link" href="#code-lab" data-kind="dot"><span class="rail__dot"></span><span>Code lab</span></a></li><li><a class="rail__link" href="#papers" data-kind="dot"><span class="rail__dot"></span><span>Papers</span></a></li><li><a class="rail__link" href="#pitfalls" data-kind="dot"><span class="rail__dot"></span><span>Pitfalls</span></a></li><li><a class="rail__link" href="#checkpoint" data-kind="power"><span class="rail__dot"></span><span>Checkpoint</span></a></li><li><a class="rail__link" href="#glossary" data-kind="dot"><span class="rail__dot"></span><span>Glossary</span></a></li>
+  </ul>
+  <div class="rail__nav">
+    <a class="rail__step" href="transformer-fundamentals.html">◀ 00 TRANSFORMER FUNDAMENTALS</a>
+    <a class="rail__step" href="../index.html">▲ ALL LEVELS</a>
+    <a class="rail__step" href="kv-cache.html">02 THE KV CACHE ▶</a>
+  </div>
+</nav>
+    <main id="main">
+
+      <div class="mod-head">
+        <p class="mod-head__level">LEVEL 01</p>
+        <h1 class="mod-head__title">THE AUTOREGRESSIVE LOOP</h1>
+        <p class="mod-head__tag">Prefill and decode are not two phases of one job. They are two different jobs.</p>
+        <div class="mod-head__meta">
+          <span>⏱ 4–6 hours</span>
+          <span>● 6 concepts</span>
+          <span>📄 3 papers</span>
+          <span>▸ needs: Module 0, Comfort with big-O reasoning</span>
+        </div>
+      </div>
+
+      <section class="section ghost ghost--pinky" id="big-idea">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--pinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>PINKY · THE BIG IDEA</p>
+        <div class="prose"><p>A language model is a function from a sequence to a distribution over the next token. To get a sequence out of it you have to call it repeatedly, feeding each output back in. That loop is the whole of generation, and it is where all the difficulty lives.</p>
+<p>The critical realisation is that the loop contains <strong>two workloads that look identical in code and behave nothing alike on hardware</strong>. Processing the prompt — <em>prefill</em> — hands the GPU thousands of positions at once and it happily saturates. Generating each subsequent token — <em>decode</em> — hands it a single position and it starves, because you must still stream every weight in the model to produce that one token.</p>
+<p>Once you see them as separate workloads, a lot of confusing behaviour resolves. Why does TTFT scale with prompt length but TPOT barely does? Why does batching help throughput enormously and latency not at all? Why do serving systems increasingly run prefill and decode on <em>different machines</em>? All of it follows from this split.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="concepts">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>PELLETS · CONCEPTS</p>
+        <article class="concept" id="concept-0">
+  <div class="concept__head">
+    <span class="concept__n">01</span>
+    <h3 class="concept__title">Why the loop cannot be parallelized</h3>
+  </div>
+  <div class="prose"><p>Generation is a strict dependency chain. To sample token <code>n+1</code> you need the logits at position <code>n</code>, which need the hidden state at position <code>n</code>, which needs token <code>n</code> to have already been sampled. There is no reordering that breaks this.</p>
+<p>The practical consequence is that <strong>generation latency has a floor set by the number of sequential model invocations</strong>, not by total arithmetic. If one forward pass takes 5 ms, then 500 tokens take at least 2.5 seconds. Buying a GPU with twice the FLOPs does not help if each pass is waiting on memory. Buying two GPUs does not help either, unless you split each pass across them (Module 9) — you cannot run pass <code>n</code> and pass <code>n+1</code> concurrently.</p>
+<p>This is what makes LLM serving strange compared to most inference workloads. An image classifier is one forward pass; you scale it by adding replicas. A language model is <em>N</em> forward passes with a serial dependency, and the only ways out are:</p>
+<ol><li><strong>Make each pass cheaper</strong> — quantization, smaller models, better kernels (Modules 6, 7).</li><li><strong>Do more per pass</strong> — batching, so one weight load serves many sequences (Module 5).</li><li><strong>Take more than one token per pass</strong> — speculative decoding, the only technique that attacks the chain length itself (Module 8).</li></ol>
+<p>Category 3 is worth flagging now because it is the only one that shortens the dependency chain rather than making each link cheaper. That is why it gets a whole module and why people find it so satisfying.</p>
+<p>One caveat on &quot;inherently sequential&quot;: it is true for a fixed model and a fixed output. It is not a law of nature. Diffusion language models and other non-autoregressive approaches sidestep it entirely, at a quality cost that has so far kept them out of production for general text.</p></div>
+  <pre class="ascii" aria-label="diagram">   prompt &quot;the cat sat&quot;
+        |
+        v
+   [ PREFILL ]  3 positions in one pass  --&gt;  &quot; on&quot;
+        |
+        v
+   [ DECODE  ]  1 position  --&gt;  &quot; the&quot;      pass 2
+   [ DECODE  ]  1 position  --&gt;  &quot; mat&quot;      pass 3
+   [ DECODE  ]  1 position  --&gt;  &quot;.&quot;         pass 4
+   [ DECODE  ]  1 position  --&gt;  &lt;eos&gt;       pass 5
+
+   4 sequential passes for 4 tokens. Unavoidable.</pre>
+  <p class="keypoint"><b>REMEMBER</b>Token n+1 is a function of token n, so the dependency chain has length N and no amount of hardware shortens it.</p>
+</article>
+<article class="concept" id="concept-1">
+  <div class="concept__head">
+    <span class="concept__n">02</span>
+    <h3 class="concept__title">Prefill: compute-bound, and it scales with the prompt</h3>
+  </div>
+  <div class="prose"><p>When a request arrives you have the entire prompt already. There is no dependency problem — every prompt token is known — so you run one forward pass over all of them at once, exactly like a training step without the backward pass.</p>
+<p>For a 2,000-token prompt, the <code>W_gate</code> matmul is <code>[2000, 4096] @ [4096, 14336]</code>. You read the 58.7 M-parameter weight matrix once and do 2,000 positions' worth of arithmetic with it. The arithmetic-to-bytes ratio is excellent, the tensor cores are fed, and you are <strong>compute-bound</strong>.</p>
+<p>The cost model for prefill is roughly:</p>
+<pre><code>prefill_FLOPs ~= 2 * N_params * S     +     attention term
+                 (the matmuls)              (grows as S^2)</code></pre>
+<p>The <code>2 * N_params</code> per token is the standard estimate — every parameter participates in one multiply and one add. For Llama-3-8B that is <code>2 x 8.03e9 = 16.1 GFLOP per token</code>. A 2,000-token prompt costs about <code>32.1 TFLOP</code> in matmuls alone.</p>
+<p>The attention term is separate and quadratic. Per layer, <code>Q @ K.T</code> and <code>weights @ V</code> together cost about <code>4 * S^2 * d_model</code> FLOPs. Across 32 layers at <code>S = 2000</code>: <code>4 x 2000^2 x 4096 x 32 = 2.1 TFLOP</code>. Small next to 32 TFLOP — but at <code>S = 32000</code> it becomes <code>4 x 32000^2 x 4096 x 32 = 537 TFLOP</code> against <code>514 TFLOP</code> of matmul, and attention has taken over. This crossover is why long-context prefill is its own engineering problem.</p>
+<p>Because prefill is compute-bound, <strong>TTFT scales roughly linearly with prompt length</strong> (plus a quadratic term that bites at long context). Doubling the prompt roughly doubles time-to-first-token. And because it already saturates the GPU, batching prefill buys you very little — the machine was already busy.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Prefill processes the whole prompt in one pass, so each weight load is amortized over thousands of positions and the GPU actually gets busy.</p>
+</article>
+<article class="concept" id="concept-2">
+  <div class="concept__head">
+    <span class="concept__n">03</span>
+    <h3 class="concept__title">Decode: memory-bound, and it barely notices the prompt</h3>
+  </div>
+  <div class="prose"><p>After prefill you have one token. Now you need the next, and you have exactly one new position to process.</p>
+<p>The same <code>W_gate</code> matmul is now <code>[1, 4096] @ [4096, 14336]</code>. You still read all 58.7 M parameters. You do 1 position of arithmetic with them. The ratio has collapsed by 2,000×.</p>
+<p>Per decode step, for Llama-3-8B at fp16:</p>
+<pre><code>bytes moved:  ~15.0 GB   (every weight, once; embedding is a lookup)
+FLOPs done:    ~16.1 GFLOP
+intensity:      16.1e9 / 15.0e9  ~=  1.07 FLOP per byte</code></pre>
+<p>An H100 can do about 295 FLOPs for every byte it moves. You are asking it to do 1. <strong>You are using roughly 0.4% of the machine's arithmetic capability.</strong> The GPU spends essentially the whole step waiting for HBM.</p>
+<p>Two consequences follow, and both are counterintuitive until you see the numbers:</p>
+<p><strong>Decode time is almost independent of context length.</strong> The weights are the same 15 GB whether your context is 100 tokens or 100,000. Only the attention step touches the KV cache, and that cache is usually small relative to the weights. Going from 1k to 8k context might move TPOT by a few percent — nothing like the linear growth in TTFT.</p>
+<p><strong>Decode gets dramatically cheaper per token when batched.</strong> If 32 sequences decode together, you read the 15 GB <em>once</em> and produce 32 tokens. Per-token cost falls by 32×, and arithmetic intensity rises from 1 to 32. This is the single largest lever in LLM serving, and Module 5 is about the machinery required to actually exploit it.</p>
+<p>Note what does <em>not</em> change: the latency of a single step. Batching improves throughput while leaving per-user speed roughly flat (slightly worse, in practice). Latency and throughput are different currencies, and batch size is the exchange rate.</p></div>
+  <pre class="ascii" aria-label="diagram">  PREFILL                          DECODE
+  W [4096 x 14336]                 W [4096 x 14336]
+  x [2000 x 4096]                  x [1 x 4096]
+  ---------------                  ---------------
+  read 117 MB of W                 read 117 MB of W
+  do 2000 positions                do 1 position
+  ~2000 FLOP/byte                  ~1 FLOP/byte
+  GPU: saturated                   GPU: idle, waiting on HBM</pre>
+  <p class="keypoint"><b>REMEMBER</b>Every decode step re-reads every weight in the model to produce one token, so its cost is set by bandwidth and is nearly independent of sequence length.</p>
+</article>
+<article class="concept" id="concept-3">
+  <div class="concept__head">
+    <span class="concept__n">04</span>
+    <h3 class="concept__title">The naive recomputation problem</h3>
+  </div>
+  <div class="prose"><p>Suppose you implement generation the obvious way: keep a list of tokens, append the sampled one, and re-run the full forward pass on the whole list.</p>
+<p>This is correct. It is also profoundly wasteful, in two independent ways that are worth separating because people usually only notice one.</p>
+<p><strong>Waste 1 — the attention quadratic.</strong> At step <code>t</code> you compute a <code>[t, t]</code> score matrix, but you only use the last row. Total attention work over <code>N</code> steps is proportional to <code>sum_{t=1..N} t^2</code>, which is O(N³) in FLOPs — versus O(N²) if you only ever computed the new row. This is the waste that gets mentioned in textbooks.</p>
+<p><strong>Waste 2 — the weight re-reads.</strong> At step <code>t</code> you re-read all 15 GB of weights and re-derive the K and V vectors for all <code>t</code> positions, when <code>t-1</code> of them are bit-identical to last step. This is the waste that actually dominates in practice at realistic sequence lengths, because it is bandwidth and bandwidth is what you are short of.</p>
+<p>Concretely, generating 512 tokens from a 512-token prompt on Llama-3-8B:</p>
+<table><thead><tr><th></th><th>attention FLOPs</th><th>weight bytes read</th></tr></thead><tbody><tr><td>no cache</td><td>~O(N³), tens of TFLOP wasted</td><td>512 × 15.0 GB = <strong>7.7 TB</strong></td></tr><tr><td>with cache</td><td>only the new row each step</td><td>512 × 15.0 GB = <strong>7.7 TB</strong></td></tr></tbody></table>
+<p>Look carefully: <strong>the weight traffic is the same either way.</strong> The cache does not save weight reads — those are irreducible for a single sequence, and only batching fixes them. What the cache eliminates is the redundant recomputation of K and V and the quadratic attention blowup.</p>
+<p>That is a genuinely important distinction and it is worth sitting with. The KV cache is not the answer to the memory-bandwidth problem. It is the answer to a <em>different</em> problem — redundant recomputation — and it happens to be the prerequisite that makes the real answer (batching) affordable, by keeping per-step work small enough that many sequences fit in flight at once.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Without a cache, generating N tokens costs O(N^2) attention work and re-reads the weights N times — and the second cost is the one that hurts first.</p>
+</article>
+<article class="concept" id="concept-4">
+  <div class="concept__head">
+    <span class="concept__n">05</span>
+    <h3 class="concept__title">Anatomy of one decode step</h3>
+  </div>
+  <div class="prose"><p>Zoom into a single decode step so you know what is actually being timed:</p>
+<pre><code>1.  embedding lookup           one row, 8 KB
+2.  for each of 32 layers:
+      a. RMSNorm               read 4096, write 4096      bandwidth-bound
+      b. q/k/v projections     read 25 MB of weights      bandwidth-bound
+      c. RoPE on q, k          tiny elementwise           bandwidth-bound
+      d. append k,v to cache   write ~4 KB                bandwidth-bound
+      e. attention over cache  read the whole KV cache    bandwidth-bound
+      f. o_projection          read 33 MB                 bandwidth-bound
+      g. residual add          trivial                    bandwidth-bound
+      h. RMSNorm               trivial                    bandwidth-bound
+      i. gate/up/down          read 352 MB of weights     bandwidth-bound
+      j. residual add          trivial                    bandwidth-bound
+3.  final RMSNorm
+4.  lm_head                    read 1.05 GB               bandwidth-bound
+5.  sample from 128256 logits</code></pre>
+<p>Every single line is bandwidth-bound at batch 1. There is not one compute-bound operation in a decode step.</p>
+<p>Two things this makes visible that the FLOP count hides:</p>
+<p><strong>Kernel launch overhead is real.</strong> That is on the order of 200+ separate CUDA kernel launches per token if nothing is fused. At roughly 5 µs of launch overhead each, you are looking at ~1 ms of pure overhead against a ~4.5 ms theoretical step — over 20% of your budget spent launching work rather than doing it. This is why CUDA Graphs (capture the launch sequence once, replay it) and aggressive kernel fusion are standard in serving engines, and why a naive PyTorch loop is often 2–3× slower than the roofline says it should be.</p>
+<p><strong>Step 4 is expensive and easy to forget.</strong> The LM head is a <code>[1, 4096] @ [4096, 128256]</code> matmul reading 1.05 GB. That is 7% of your entire per-token byte budget spent turning a hidden state into logits, for a model whose vocabulary is large. It is one reason vocabulary size is an inference cost, not just a modelling choice.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>A decode step is a long chain of small bandwidth-bound operations between the big matmuls, and the glue is not free.</p>
+</article>
+<article class="concept" id="concept-5">
+  <div class="concept__head">
+    <span class="concept__n">06</span>
+    <h3 class="concept__title">What throughput means when the loop is serial</h3>
+  </div>
+  <div class="prose"><p>&quot;How fast is your model?&quot; is not a well-posed question. There are at least four distinct numbers and they trade against each other:</p>
+<ul><li><strong>TTFT</strong> (time to first token) — how long until the user sees anything. Dominated by prefill, so it scales with prompt length and with how long you queued behind other work.</li><li><strong>TPOT / ITL</strong> (time per output token, inter-token latency) — the gap between successive tokens. Dominated by decode. This is what &quot;feels&quot; fast.</li><li><strong>End-to-end latency</strong> — <code>TTFT + TPOT × output_tokens</code>, roughly. What actually matters to a user waiting for a complete answer.</li><li><strong>Throughput</strong> — total tokens per second across all concurrent requests. What determines your cost per million tokens.</li></ul>
+<p>The tension: throughput is maximized by large batches, because one weight load serves many sequences. Per-user TPOT is (slightly) hurt by large batches, and TTFT is badly hurt by them because your request waits for a slot and then contends with everyone else's prefill.</p>
+<p>A useful frame is <strong>Little's Law</strong>: <code>concurrency = arrival_rate × latency</code>. If you want to serve 100 requests per second and each takes 2 seconds, you need 200 requests in flight. That number must fit in your KV cache budget — which is Module 2's subject, and the reason memory management turns out to be the discipline that governs everything.</p>
+<p>The practical upshot is that any benchmark quoting a single &quot;tokens per second&quot; figure without saying <strong>at what batch size, at what context length, and at which percentile</strong> is not telling you anything. A system doing 15,000 tok/s aggregate at batch 256 may deliver a miserable 12 tok/s to each user. Both numbers are true. Module 10 returns to how to benchmark honestly.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Per-user speed and system throughput are different numbers that move in opposite directions as you turn the batch dial.</p>
+</article>
+      </section>
+
+      <section class="section ghost ghost--inky" id="math-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--inky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>INKY · MATH BY HAND</p>
+        <h2 class="section__title">Math by hand</h2>
+        <div class="prose"><p>Take <strong>Llama-3-8B</strong> (8.03 B parameters, fp16) on an <strong>H100 SXM</strong> (3.35 TB/s HBM bandwidth, 989 TFLOP/s dense BF16). A request has a <strong>2,048-token prompt</strong> and generates <strong>512 tokens</strong>. Batch size 1. Ignore the KV cache for now.</p>
+<p>Work out:</p>
+<ol><li>Prefill matmul FLOPs, and the theoretical prefill time if compute-bound.</li><li>Bytes that must be read during prefill, and the theoretical prefill time if bandwidth-bound.</li><li>Which of (1) and (2) is the binding constraint? That answers &quot;is prefill compute- or memory-bound?&quot; with a number rather than an assertion.</li><li>Per-decode-step bytes, and theoretical TPOT.</li><li>Total generation time, and the split between prefill and decode.</li><li>The arithmetic intensity of prefill and of decode. Compare both to the H100's ratio of <code>989e12 / 3.35e12 = 295 FLOP/byte</code>.</li><li>Now suppose you batch <strong>64</strong> such requests. What happens to decode arithmetic intensity, and what does that tell you?</li></ol></div>
+        <details class="spoiler">
+          <summary>SHOW THE WORKED SOLUTION</summary>
+          <div class="spoiler__body prose"><p><strong>1. Prefill FLOPs</strong></p>
+<pre><code>2 x N_params x S = 2 x 8.03e9 x 2048 = 3.29e13 = 32.9 TFLOP
+compute time = 32.9e12 / 989e12 = 33.3 ms</code></pre>
+<p>(Plus the attention term: <code>4 x S^2 x d_model x n_layers = 4 x 2048^2 x 4096 x 32 = 2.20 TFLOP</code>, about 7% more. Call it ~35.5 ms. Small at this length; dominant past ~30k.)</p>
+<p><strong>2. Prefill bytes</strong></p>
+<p>The weights are read once for the whole pass, regardless of <code>S</code>:</p>
+<pre><code>15.0 GB / 3350 GB/s = 4.48 ms</code></pre>
+<p><strong>3. Binding constraint</strong></p>
+<pre><code>compute-bound time   33.3 ms
+bandwidth-bound time  4.48 ms</code></pre>
+<p>Compute is 7.4× larger, so prefill is <strong>compute-bound</strong>. TTFT ≈ 33–36 ms in the ideal case.</p>
+<p><strong>4. Decode</strong></p>
+<p>Every step re-reads every weight:</p>
+<pre><code>bytes  = 15.0 GB
+TPOT   = 15.0 / 3350 = 4.48 ms</code></pre>
+<p>FLOPs per step are <code>2 x 8.03e9 = 16.1 GFLOP</code>, which at 989 TFLOP/s would take <strong>0.016 ms</strong>. The memory time is <strong>275× larger</strong>. Decode is emphatically <strong>memory-bound</strong>.</p>
+<p><strong>5. Total</strong></p>
+<pre><code>prefill:  35.5 ms
+decode:   512 x 4.48 ms = 2293 ms
+                          ---------
+total:                    2329 ms  (2.33 s)</code></pre>
+<p>Prefill is <strong>1.5%</strong> of wall-clock. Decode is <strong>98.5%</strong>. For any request generating a meaningful number of tokens, you are optimising decode.</p>
+<p><strong>6. Arithmetic intensity</strong></p>
+<pre><code>prefill:  32.9e12 FLOP / 15.0e9 bytes  = 2193 FLOP/byte
+decode:   16.1e9  FLOP / 15.0e9 bytes  =  1.07 FLOP/byte
+H100 ridge point:                        295 FLOP/byte</code></pre>
+<p>Prefill sits at 2193, far to the right of the ridge — compute-bound with room to spare. Decode sits at 1.07, far to the left — memory-bound by a factor of about 275. <strong>The two phases are on opposite sides of the roofline by three orders of magnitude.</strong> That is the central asymmetry of the field, and you have now derived it rather than been told it.</p>
+<p><strong>7. Batch 64</strong></p>
+<p>Arithmetic intensity for a matmul <code>W[n,k] @ x[k,B]</code> is:</p>
+<pre><code>FLOPs = 2nkB ,  bytes = 2nk (fp16 weights)  -&gt;  intensity = B FLOP/byte</code></pre>
+<p>The intensity of decode <strong>equals the batch size</strong>. At <code>B = 64</code> you are at 64 FLOP/byte — still below the 295 ridge, so still memory-bound, but you are now doing 64 tokens per 15 GB read instead of 1:</p>
+<pre><code>per-token bytes:  15.0 GB / 64 = 234 MB
+per-token time:   4.48 ms / 64 = 0.07 ms  -&gt;  ~14,300 tok/s aggregate</code></pre>
+<p>A 64× throughput improvement from a single change, with per-user TPOT unchanged at 4.48 ms.</p>
+<p>And the striking corollary: to reach the H100's ridge point you would need <strong>batch ≈ 295</strong>. Below that you are leaving arithmetic on the table no matter what else you do. That single number explains why serving systems fight so hard for large batches — and why Module 2's KV cache budget, which is what caps batch size, is the real constraint on the whole system.</p></div>
+        </details>
+      </section>
+
+      <section class="section ghost ghost--clyde" id="code-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--clyde)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>CLYDE · CODE LAB</p>
+        <h2 class="section__title">Code lab</h2>
+        <div class="prose"><p>Write a generation loop with <strong>no KV cache</strong> and measure how the per-token cost grows with sequence length. Then plot it. You are looking for the quadratic.</p>
+<p>Use a small real model on CPU (GPT-2 is fine and downloads in seconds) so the numbers are real rather than simulated. The absolute times do not matter; the <em>shape</em> of the curve does.</p></div>
+        <div class="prose" style="max-width:none"><pre><code class="lang-python">&quot;&quot;&quot;
+Naive generation with no KV cache. Measures per-token latency vs context length.
+
+    pip install torch transformers matplotlib
+
+Runs on CPU in a couple of minutes. A GPU makes it faster but the shape is the same.
+&quot;&quot;&quot;
+import time
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+MODEL = &quot;gpt2&quot;          # 124M params -- small enough to be quick, real enough to be honest
+N_TOKENS = 256
+
+tok = AutoTokenizer.from_pretrained(MODEL)
+model = AutoModelForCausalLM.from_pretrained(MODEL)
+model.eval()
+
+prompt = &quot;The history of computing begins&quot;
+ids = tok(prompt, return_tensors=&quot;pt&quot;).input_ids
+
+
+@torch.no_grad()
+def generate_no_cache(ids, n):
+    &quot;&quot;&quot;The obvious implementation: re-run the whole forward pass every step.&quot;&quot;&quot;
+    times = []
+    for _ in range(n):
+        t0 = time.perf_counter()
+        # use_cache=False forces a full recompute over the entire sequence
+        out = model(ids, use_cache=False)
+        next_id = out.logits[:, -1, :].argmax(-1, keepdim=True)
+        ids = torch.cat([ids, next_id], dim=1)
+        times.append(time.perf_counter() - t0)
+    return ids, times
+
+
+@torch.no_grad()
+def generate_with_cache(ids, n):
+    &quot;&quot;&quot;The same thing, but keep K and V around. Module 2 explains why this is legal.&quot;&quot;&quot;
+    times = []
+    out = model(ids, use_cache=True)          # prefill
+    past = out.past_key_values
+    next_id = out.logits[:, -1, :].argmax(-1, keepdim=True)
+    ids = torch.cat([ids, next_id], dim=1)
+
+    for _ in range(n - 1):
+        t0 = time.perf_counter()
+        # feed ONLY the new token; the cache supplies everything else
+        out = model(next_id, past_key_values=past, use_cache=True)
+        past = out.past_key_values
+        next_id = out.logits[:, -1, :].argmax(-1, keepdim=True)
+        ids = torch.cat([ids, next_id], dim=1)
+        times.append(time.perf_counter() - t0)
+    return ids, times
+
+
+print(&quot;running without cache...&quot;)
+_, slow = generate_no_cache(ids, N_TOKENS)
+print(&quot;running with cache...&quot;)
+_, fast = generate_with_cache(ids, N_TOKENS)
+
+start_len = ids.shape[1] - N_TOKENS
+lengths_slow = [start_len + i for i in range(len(slow))]
+lengths_fast = [start_len + 1 + i for i in range(len(fast))]
+
+print(f&quot;\n{'ctx':&gt;6} {'no cache (ms)':&gt;15} {'cached (ms)':&gt;13} {'ratio':&gt;8}&quot;)
+for i in range(0, min(len(slow), len(fast)), 32):
+    r = slow[i] / fast[i]
+    print(f&quot;{lengths_slow[i]:&gt;6} {slow[i]*1000:&gt;15.2f} {fast[i]*1000:&gt;13.2f} {r:&gt;8.1f}x&quot;)
+
+print(f&quot;\ntotal without cache: {sum(slow):.2f} s&quot;)
+print(f&quot;total with cache:    {sum(fast):.2f} s&quot;)
+print(f&quot;speedup:             {sum(slow)/sum(fast):.1f}x&quot;)
+
+# --- the plot is the point ---
+try:
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.plot(lengths_slow, [t * 1000 for t in slow], label=&quot;no KV cache&quot;, lw=2)
+    ax.plot(lengths_fast, [t * 1000 for t in fast], label=&quot;with KV cache&quot;, lw=2)
+    ax.set_xlabel(&quot;context length (tokens)&quot;)
+    ax.set_ylabel(&quot;time for ONE token (ms)&quot;)
+    ax.set_title(&quot;Per-token cost vs context length&quot;)
+    ax.legend()
+    ax.grid(alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(&quot;kv_cache_effect.png&quot;, dpi=130)
+    print(&quot;\nwrote kv_cache_effect.png&quot;)
+except ImportError:
+    print(&quot;\n(install matplotlib to get the plot)&quot;)
+
+# --- TODO for you ---
+#   1. Fit a curve to the no-cache line. Is it linear or quadratic in context length?
+#      Think about which parts of the forward pass grow with S and which do not.
+#   2. The cached line is nearly flat but not perfectly flat. What is the slope?
+#      (Hint: one operation in a decode step DOES read something that grows with S.)
+</code></pre></div>
+        <div class="prose"><h3>What you should see</h3><p>The no-cache line grows visibly and superlinearly. The cached line is close to flat.</p>
+<p>On CPU with GPT-2 you should see roughly: at 32 tokens of context the two are within ~2–4× of each other; by 256 tokens the gap is 10–30×. Overall speedup for the 256-token run is typically <strong>10–25×</strong>. Exact numbers depend heavily on your machine — do not chase a specific figure, chase the shape.</p>
+<p>The no-cache curve is dominated by the <em>linear</em> term at these lengths (you re-read the weights every step and reprocess <code>S</code> positions of matmul), with the quadratic attention term becoming visible only at longer contexts. If you extend to 1024+ tokens the curvature becomes obvious.</p>
+<p>The cached line has a small positive slope, not zero. That slope is the KV cache being read: it grows linearly with context. At GPT-2 scale it is barely detectable; at 128k context on a 70B model it is the dominant term in a decode step. That is the whole of Module 2.</p></div>
+        <div class="prose"><h3>Stretch</h3><p>Instrument <code>generate_with_cache</code> to report the size of <code>past_key_values</code> in bytes at each step, and plot it alongside the timings. Then compute, for GPT-2 (12 layers, 12 heads, head_dim 64, fp32), the KV bytes per token by hand and check your instrument agrees. You will use that formula constantly from Module 2 onward.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pac" id="papers">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>THE KEY · PAPERS</p>
+        <h2 class="section__title">Papers, with a reading frame</h2>
+        <div class="papers">
+          <article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2211.05102" target="_blank" rel="noopener">Efficiently Scaling Transformer Inference</a></h3>
+            <p class="paper__by">Pope et al. (Google), 2022</p>
+            <p class="paper__why">The paper that made prefill/decode asymmetry and inference-time roofline analysis legible to the field. Still one of the best treatments of how partitioning interacts with the two phases.</p>
+            <div class="paper__frame"><p>Read <strong>Section 2</strong> (inference cost model) and <strong>Section 3</strong> (partitioning strategies) carefully — Section 2 is essentially this module written by the people who first laid it out rigorously. The multi-chip partitioning notation in Section 3 is heavy going; skim it now and come back after Module 9.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://kipp.ly/transformer-inference-arithmetic/" target="_blank" rel="noopener">Transformer Inference Arithmetic</a></h3>
+            <p class="paper__by">Carol Chen (kipply), 2022</p>
+            <p class="paper__why">The standard back-of-envelope reference for inference cost. Short, numeric, and the source of most of the mental arithmetic practitioners actually use.</p>
+            <div class="paper__frame"><p>Work every calculation yourself as you read rather than accepting the results. The sections on the KV cache and on the memory-bandwidth-bound nature of decoding are the payload. Some absolute hardware numbers have aged; the method has not.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2005.14165" target="_blank" rel="noopener">Language Models are Few-Shot Learners (GPT-3)</a></h3>
+            <p class="paper__by">Brown et al., 2020</p>
+            <p class="paper__why">Not an inference paper, but the one that made long prompts the norm — which is exactly what turned prefill into a workload worth engineering around.</p>
+            <div class="paper__frame"><p>Read only <strong>Section 2.1</strong> on the in-context learning setup. Everything else is out of scope here. The relevant realization: few-shot prompting means prompts got 10–100× longer, and TTFT became a product problem.</p></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--blinky" id="pitfalls">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--blinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>BLINKY · PITFALLS</p>
+        <h2 class="section__title">What people get wrong</h2>
+        <div class="pitfall">
+          <p class="pitfall__wrong"><span>Generation is slow because language models have a lot of FLOPs to do.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>At decode time the FLOPs are trivial — 16 GFLOP against an H100 that does 989,000 GFLOP/s, so about 0.016 ms of arithmetic. The step takes 4.5 ms. You are 99.6% idle, waiting on memory. Generation is slow because of <em>bytes</em>, not FLOPs, and every optimization that helps is best understood as reducing bytes moved or increasing work done per byte.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>The KV cache is what makes decoding memory-bound.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>Backwards. Decoding is memory-bound because you must stream every model weight to produce one token — that is true with or without a cache, and the weights usually outweigh the cache by an order of magnitude. The KV cache is a <em>response</em> to a different problem (recomputation). At very long context or very large batch the cache does become the dominant memory term, but that is a regime, not the default.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>A faster GPU with more FLOPs will speed up token generation.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>Only if it also has more bandwidth. Compare an H100 (3.35 TB/s, 989 TFLOP/s) to an H200: same compute, 4.8 TB/s. The H200 decodes about 1.43× faster at batch 1 purely from bandwidth, and prefills at the same speed. Meanwhile a hypothetical chip with double the FLOPs and identical bandwidth would decode at <em>exactly</em> the same speed. For decode, read the bandwidth line on the spec sheet first.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Tokens per second is a single number that describes a serving system.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>There are at least four numbers — TTFT, TPOT, end-to-end latency, and aggregate throughput — and they trade against each other through batch size. A system at 15,000 tok/s aggregate might deliver 12 tok/s per user. Any benchmark without batch size, context length, and percentiles attached is unfalsifiable.</p></div></div>
+        </div>
+      </section>
+
+      <section class="section" id="checkpoint">
+        <div class="wall checkpoint">
+          <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>POWER PELLET · CHECKPOINT</p>
+          <p class="checkpoint__claim">You can explain, with numbers rather than adjectives, why prefill and decode sit on
+opposite sides of the roofline, and you can predict what happens to TTFT and TPOT when you change
+prompt length, output length, or batch size.</p>
+          <details class="qa">
+            <summary>Your TTFT doubled but TPOT is unchanged. What changed about the workload?</summary>
+            <div class="qa__a prose"><p>Almost certainly the prompt got longer — roughly twice as long, since prefill is compute-bound and scales close to linearly with prompt length (with a quadratic attention term that shows up at long context). TPOT is set by streaming the weights, which does not depend on prompt length, so it stays flat. Other candidates: you got queued behind more prefill work, or the scheduler started admitting more requests so your prefill contends for the GPU. What it is <em>not</em> is a change in model size or quantization — those would move TPOT too.</p></div>
+          </details>
+<details class="qa">
+            <summary>Why does batching improve throughput enormously for decode but barely at all for prefill?</summary>
+            <div class="qa__a prose"><p>Because prefill is already compute-bound. A single 2,000-token prefill saturates the tensor cores; adding more sequences just queues more work for a machine that is already busy, so aggregate throughput is roughly flat and latency rises. Decode is memory-bound with arithmetic intensity equal to the batch size — at batch 1 you read 15 GB of weights to produce one token, which is a ~0.4% utilization of an H100's arithmetic. Batching 64 sequences reads the same 15 GB and produces 64 tokens. The weight load is amortized, so throughput scales nearly linearly until you approach the ridge point or run out of KV cache memory.</p></div>
+          </details>
+<details class="qa">
+            <summary>Without a KV cache, what exactly is being wasted? Be precise about bandwidth versus compute.</summary>
+            <div class="qa__a prose"><p>Two distinct things. First, redundant <em>compute</em>: you recompute the K and V vectors for every past position on every step, and you compute a full <code>[t, t]</code> attention matrix when only the last row is needed — pushing total attention work to O(N³) over a generation instead of O(N²). Second, redundant <em>activation traffic</em> for those recomputed positions. What is <strong>not</strong> wasted, and this is the part people get wrong, is weight bandwidth: you re-read all 15 GB of weights every step either way. The cache does not fix the bandwidth problem — batching does. The cache fixes recomputation, and by keeping per-step work small it is what makes large batches affordable.</p></div>
+          </details>
+<details class="qa">
+            <summary>A request has a 100-token prompt and generates 1,000 tokens. Another has a 10,000-token prompt and generates 10 tokens. Which costs the serving system more, and which feels slower to the user?</summary>
+            <div class="qa__a prose"><p>They stress different resources. Using Llama-3-8B on an H100: the first costs about 1.6 TFLOP of prefill plus 1,000 decode steps ≈ 4.5 s of bandwidth-bound work — it dominates GPU <em>time</em> and occupies a batch slot for a long while. The second costs about 161 TFLOP of prefill (~163 ms compute-bound) plus 10 decode steps (~45 ms) ≈ 0.2 s total — far more FLOPs but far less wall-clock, and it releases its slot quickly. So the first costs the system more; the second has much worse TTFT. To the user, the first feels responsive but takes 4.5 s to finish; the second stalls for 160 ms then finishes almost instantly. This is exactly why chunked prefill exists (Module 5): a 10,000-token prefill run as one blocking unit stalls every other request's decode.</p></div>
+          </details>
+<details class="qa">
+            <summary>Why is decode latency roughly independent of context length, given that attention is O(S²)?</summary>
+            <div class="qa__a prose"><p>Because the O(S²) applies to prefill, where you compute an <code>[S, S]</code> score matrix. At decode you have one query attending to <code>S</code> keys, so attention is O(S) per step, not O(S²) — and that linear term is reading the KV cache, which is typically much smaller than the weights. For Llama-3-8B at 8k context the KV cache is 1 GiB against 15 GB of weights, so it contributes about 7% of the bytes moved. Doubling context to 16k adds another 7%, not 100%. The weight traffic is constant and dominant, so TPOT is nearly flat. This stops being true at very long context or very large batch, where the KV cache overtakes the weights — which is exactly the regime Module 6 attacks.</p></div>
+          </details>
+          <p style="margin-top:var(--s7)">
+            <button class="done-toggle" type="button" data-complete="1" aria-pressed="false">
+              MARK LEVEL 01 CLEARED
+            </button>
+          </p>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="glossary">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>GLOSSARY</p>
+        <h2 class="section__title">Glossary</h2>
+        <div class="gloss">
+          <div class="gloss__row"><div class="gloss__term">prefill</div><div class="gloss__def">The forward pass over the entire prompt, done in one shot. Compute-bound; sets TTFT.</div></div><div class="gloss__row"><div class="gloss__term">decode</div><div class="gloss__def">The per-token forward passes that follow prefill, one position at a time. Memory-bound; sets TPOT.</div></div><div class="gloss__row"><div class="gloss__term">TTFT</div><div class="gloss__def">Time to first token. How long the user waits before anything appears.</div></div><div class="gloss__row"><div class="gloss__term">TPOT / ITL</div><div class="gloss__def">Time per output token / inter-token latency. The gap between successive tokens once streaming starts.</div></div><div class="gloss__row"><div class="gloss__term">arithmetic intensity</div><div class="gloss__def">FLOPs performed per byte moved from memory. Compare it against the hardware ratio to find your bottleneck.</div></div><div class="gloss__row"><div class="gloss__term">ridge point</div><div class="gloss__def">The arithmetic intensity at which a machine transitions from memory-bound to compute-bound. About 295 FLOP/byte for an H100.</div></div><div class="gloss__row"><div class="gloss__term">Little's Law</div><div class="gloss__def">concurrency = arrival rate x latency. Tells you how many requests must be in flight to hit a throughput target.</div></div><div class="gloss__row"><div class="gloss__term">CUDA Graph</div><div class="gloss__def">A captured, replayable sequence of kernel launches. Removes per-launch CPU overhead, which is significant when a decode step is hundreds of tiny kernels.</div></div>
+        </div>
+      </section>
+
+      <nav class="pagenav">
+        <a href="transformer-fundamentals.html" data-nav="prev"><span>◀ PREVIOUS LEVEL</span>00 TRANSFORMER FUNDAMENTALS</a>
+        <a href="kv-cache.html" data-nav="next" style="text-align:right"><span>NEXT LEVEL ▶</span>02 THE KV CACHE</a>
+      </nav>
+
+    </main>
+  </div>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <p class="foot__h">LEVELS</p>
+        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">&nbsp;</p>
+        <ul><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">REFERENCE</p>
+        <ul>
+          <li><a href="../reference/timeline.html">Timeline</a></li>
+          <li><a href="../reference/hardware.html">GPU spec table</a></li>
+          <li><a href="../reference/engines.html">Serving engines</a></li>
+          <li><a href="../reference/frontier.html">Open problems</a></li>
+          <li><a href="../reference/glossary.html">Glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="foot__h">SOURCE</p>
+        <ul>
+          <li><a href="https://github.com/tushar-amrit-6/inference">GitHub repository</a></li>
+          <li><a href="../reference/how-to-use.html">How to work through this</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
+    do the arithmetic yourself.</p>
+  </div>
+</footer>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

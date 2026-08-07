@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>03 · DECODING AND SAMPLING — LLM INFERENCE</title>
+<meta name="description" content="The model gives you a distribution. Turning it into a token is a separate design problem.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="03 · DECODING AND SAMPLING — LLM INFERENCE">
+<meta property="og:description" content="The model gives you a distribution. Turning it into a token is a separate design problem.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/arcade.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20fill%3D%22%23000%22%2F%3E%3Cpath%20d%3D%22M16%2C16%20L29%2C9%20A15%2C15%200%201%200%2029%2C23%20Z%22%20fill%3D%22%23FFE800%22%2F%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="scorebar">
+  <a class="scorebar__home" href="../index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="var(--pac)" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
+  <span class="scorebar__item"><span class="scorebar__label">LEVEL</span><span class="scorebar__value scorebar__value--pac">03</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/11</span></span>
+  <span class="scorebar__spacer"></span>
+  <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
+</header>
+<div class="wrap">
+  <div class="shell">
+    <nav class="rail" aria-label="Module contents">
+  <p class="rail__head">ON THIS LEVEL</p>
+  <ul class="rail__list">
+    <li><a class="rail__link" href="#big-idea" data-kind="dot"><span class="rail__dot"></span><span>The big idea</span></a></li><li><a class="rail__link" href="#concept-0" data-kind="dot"><span class="rail__dot"></span><span>Greedy decoding, and why the highest-probability token is not the goal</span></a></li><li><a class="rail__link" href="#concept-1" data-kind="dot"><span class="rail__dot"></span><span>Beam search, and why it lost</span></a></li><li><a class="rail__link" href="#concept-2" data-kind="dot"><span class="rail__dot"></span><span>Temperature: sharpening and flattening</span></a></li><li><a class="rail__link" href="#concept-3" data-kind="dot"><span class="rail__dot"></span><span>Truncation: top-k, top-p, and min-p</span></a></li><li><a class="rail__link" href="#concept-4" data-kind="dot"><span class="rail__dot"></span><span>Repetition penalties and how they misfire</span></a></li><li><a class="rail__link" href="#concept-5" data-kind="dot"><span class="rail__dot"></span><span>Constrained decoding: making invalid output impossible</span></a></li><li><a class="rail__link" href="#concept-6" data-kind="dot"><span class="rail__dot"></span><span>Why temperature 0 is not deterministic</span></a></li><li><a class="rail__link" href="#math-lab" data-kind="dot"><span class="rail__dot"></span><span>Math by hand</span></a></li><li><a class="rail__link" href="#code-lab" data-kind="dot"><span class="rail__dot"></span><span>Code lab</span></a></li><li><a class="rail__link" href="#papers" data-kind="dot"><span class="rail__dot"></span><span>Papers</span></a></li><li><a class="rail__link" href="#pitfalls" data-kind="dot"><span class="rail__dot"></span><span>Pitfalls</span></a></li><li><a class="rail__link" href="#checkpoint" data-kind="power"><span class="rail__dot"></span><span>Checkpoint</span></a></li><li><a class="rail__link" href="#glossary" data-kind="dot"><span class="rail__dot"></span><span>Glossary</span></a></li>
+  </ul>
+  <div class="rail__nav">
+    <a class="rail__step" href="kv-cache.html">◀ 02 THE KV CACHE</a>
+    <a class="rail__step" href="../index.html">▲ ALL LEVELS</a>
+    <a class="rail__step" href="roofline.html">04 METRICS AND THE ROOFLINE ▶</a>
+  </div>
+</nav>
+    <main id="main">
+
+      <div class="mod-head">
+        <p class="mod-head__level">LEVEL 03</p>
+        <h1 class="mod-head__title">DECODING AND SAMPLING</h1>
+        <p class="mod-head__tag">The model gives you a distribution. Turning it into a token is a separate design problem.</p>
+        <div class="mod-head__meta">
+          <span>⏱ 5–7 hours</span>
+          <span>● 7 concepts</span>
+          <span>📄 4 papers</span>
+          <span>▸ needs: Module 0, Module 1, Basic probability</span>
+        </div>
+      </div>
+
+      <section class="section ghost ghost--pinky" id="big-idea">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--pinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>PINKY · THE BIG IDEA</p>
+        <div class="prose"><p>A language model does not output text. It outputs a vector of 128,256 logits. Every choice about how to turn that vector into a token is <em>yours</em>, sits outside the model, and can be changed without retraining anything.</p>
+<p>This is the cheapest lever in the entire stack and the most frequently misconfigured. Identical weights with different sampling parameters produce output that ranges from robotically repetitive to incoherent. Most complaints that &quot;the model is bad at X&quot; are, on inspection, complaints about a temperature setting.</p>
+<p>The module also covers two things that surprise people. First, <strong>maximizing likelihood produces bad text</strong> — this is an empirical finding with a solid explanation, and it is why beam search, which dominated machine translation, lost decisively for open-ended generation. Second, <strong>inference is not deterministic even at temperature 0</strong>, for reasons that have nothing to do with sampling and everything to do with floating-point arithmetic on parallel hardware.</p>
+<p>Sampling also has a systems cost. Constrained decoding, logprobs, and penalties all add per-token work in the hot loop, and at batch 256 a naive sampler can become a measurable fraction of your step time.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="concepts">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>PELLETS · CONCEPTS</p>
+        <article class="concept" id="concept-0">
+  <div class="concept__head">
+    <span class="concept__n">01</span>
+    <h3 class="concept__title">Greedy decoding, and why the highest-probability token is not the goal</h3>
+  </div>
+  <div class="prose"><p>The simplest rule: take <code>argmax(logits)</code>. Deterministic, free, and reproducible.</p>
+<p>It has two distinct problems, and they are worth separating.</p>
+<p><strong>It is locally greedy.</strong> The most likely first token may lead into a region of low-probability continuations. The sequence &quot;The&quot; → &quot;cat&quot; might have higher joint probability than &quot;A&quot; → &quot;cat&quot;, but if <code>P(A) &gt; P(The)</code> greedy commits to &quot;A&quot; and never looks back. This is the standard search critique, and it motivates beam search.</p>
+<p><strong>It produces degenerate text.</strong> This one is more surprising and more important. Greedy output on open-ended prompts falls into loops — repeating a phrase, then a sentence, then a paragraph, indefinitely. Not occasionally: reliably. Holtzman et al. documented this carefully in 2019, and the mechanism is a positive feedback loop. A repeated phrase raises the model's estimate that it is in a repetitive context, which raises the probability of repeating again.</p>
+<p>The deep point is that <strong>high probability is not the objective</strong>. Human text is <em>not</em> the most likely text under a language model. Holtzman's Figure 2 is the memorable evidence: the per-token probability of real human writing fluctuates wildly, dipping low constantly, while beam-search output sits at a consistently high probability. Real language is full of surprise — that is what makes it informative. A decoder that maximizes likelihood systematically strips the surprise out.</p>
+<p>Where greedy is still right:</p>
+<ul><li><strong>Reproducibility matters</strong> — evaluation, regression tests, debugging.</li><li><strong>The output space is narrow</strong> — extraction, classification, format conversion. If there is one correct answer, sampling can only hurt.</li><li><strong>Speculative decoding verification</strong> — the target model's greedy choice defines acceptance.</li></ul>
+<p>Where it is wrong: anything open-ended. Creative writing, dialogue, brainstorming, and — perhaps counterintuitively — long chains of reasoning, where a little diversity helps escape a bad line of argument.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Greedy is locally optimal and globally arbitrary: picking the best token at each step does not produce the best sequence.</p>
+</article>
+<article class="concept" id="concept-1">
+  <div class="concept__head">
+    <span class="concept__n">02</span>
+    <h3 class="concept__title">Beam search, and why it lost</h3>
+  </div>
+  <div class="prose"><p>Beam search keeps the <code>k</code> highest-probability <em>partial sequences</em> at each step rather than one. Expand all <code>k</code>, score all <code>k × V</code> continuations by cumulative log-probability, keep the best <code>k</code>. It is a heuristic search for the maximum-probability sequence, and it works — it reliably finds sequences with higher joint probability than greedy.</p>
+<p>It dominated neural machine translation for years, and still does. So why is it absent from essentially every chat model's default configuration?</p>
+<p><strong>Because it succeeds at the wrong objective.</strong> Higher probability means blander, more generic, more repetitive text. Beam search finds the safest possible continuation, which for open-ended generation is exactly the failure mode. The classic symptom: raise the beam width and output quality gets <em>worse</em>, monotonically. That is the signature of a search that is working correctly on a bad objective.</p>
+<p>The task distinction is sharp and worth internalizing:</p>
+<table><thead><tr><th>task</th><th>output space</th><th>beam search</th></tr></thead><tbody><tr><td>translation</td><td>narrow — one meaning, few phrasings</td><td><strong>helps</strong></td></tr><tr><td>summarization</td><td>fairly narrow</td><td>often helps</td></tr><tr><td>code completion</td><td>narrow, constrained</td><td>can help</td></tr><tr><td>dialogue</td><td>wide open</td><td><strong>hurts</strong></td></tr><tr><td>creative writing</td><td>wide open</td><td><strong>hurts badly</strong></td></tr></tbody></table>
+<p>There is also a systems argument, and it is nearly as decisive. Beam search multiplies your memory and compute by <code>k</code>: you maintain <code>k</code> KV caches per request and run <code>k</code> sequences through every forward pass. From Module 2, KV cache is what caps batch size — so beam width 4 cuts your concurrency by roughly 4×. You pay 4× the cost for output most users rate as worse. In a throughput-driven serving business that argument alone ends the discussion.</p>
+<p>(Beam search does have one elegant systems property: the beams share a prefix, so with copy-on-write block sharing under PagedAttention the memory cost is far below 4×. vLLM implements this. It softens the cost argument but not the quality one.)</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Beam search finds higher-probability sequences, and higher-probability sequences are exactly what you do not want in open-ended generation.</p>
+</article>
+<article class="concept" id="concept-2">
+  <div class="concept__head">
+    <span class="concept__n">03</span>
+    <h3 class="concept__title">Temperature: sharpening and flattening</h3>
+  </div>
+  <div class="prose"><p>Temperature is a single division applied to the logits before the softmax:</p>
+<pre><code>p_i = exp(z_i / T) / sum_j exp(z_j / T)</code></pre>
+<ul><li><code>T = 1</code> — the model's own distribution, unmodified.</li><li><code>T &lt; 1</code> — sharpens. Gaps between logits are magnified, high-probability tokens get more probability. As <code>T → 0</code> it converges to greedy.</li><li><code>T &gt; 1</code> — flattens. Gaps shrink, the tail gets more mass. As <code>T → ∞</code> it converges to uniform over the whole vocabulary.</li></ul>
+<p>Work a concrete example. Logits <code>[4.0, 3.0, 1.0, 0.0]</code>:</p>
+<table><thead><tr><th>T</th><th>p1</th><th>p2</th><th>p3</th><th>p4</th></tr></thead><tbody><tr><td>0.5</td><td>0.867</td><td>0.117</td><td>0.002</td><td>0.000</td></tr><tr><td>1.0</td><td>0.643</td><td>0.236</td><td>0.032</td><td>0.012</td></tr><tr><td>1.5</td><td>0.526</td><td>0.270</td><td>0.071</td><td>0.036</td></tr><tr><td>2.0</td><td>0.456</td><td>0.277</td><td>0.102</td><td>0.062</td></tr></tbody></table>
+<p>Two things to notice. At <code>T = 0.5</code> the top token has 87% of the mass and the fourth is effectively unreachable. At <code>T = 2.0</code> the fourth token — which the model gave 1.2% — now has 6.2%, a <strong>5× increase in the junk</strong>.</p>
+<p>That is the failure mode at high temperature, and it is why temperature alone is a poor diversity knob. A 128,256-token vocabulary has a <em>very</em> long tail. Even if each tail token has tiny probability, there are 128,000 of them, and flattening the distribution hands them collectively a large share. Sample from that often enough and you get a token that derails the sequence — and because generation is autoregressive, one bad token poisons everything after it.</p>
+<p>This is why temperature is almost always combined with a <strong>truncation</strong> method. Truncation removes the tail; temperature reshapes what remains.</p>
+<p><strong>Order of operations matters and is a real source of confusion between libraries.</strong> Most implementations (including Hugging Face and vLLM) apply temperature <em>first</em>, then truncate. If you truncate first and then apply temperature, the same nominal settings give different behaviour — because top-p computes its cutoff on the sharpened or flattened distribution rather than the original. When comparing sampling configurations across systems, check the order before concluding the models differ.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Temperature divides the logits before softmax, so it rescales the distribution multiplicatively in log-space — it does not add or remove options.</p>
+</article>
+<article class="concept" id="concept-3">
+  <div class="concept__head">
+    <span class="concept__n">04</span>
+    <h3 class="concept__title">Truncation: top-k, top-p, and min-p</h3>
+  </div>
+  <div class="prose"><p>All three zero out part of the distribution and renormalize what is left. They differ in how they draw the line.</p>
+<p><strong>Top-k.</strong> Keep the <code>k</code> highest-probability tokens. Simple, but <code>k</code> is fixed while the distribution is not. When the model is confident (one token at 95%), <code>k = 50</code> drags in 49 tokens that should never be considered. When the model is genuinely uncertain across 500 plausible tokens, <code>k = 50</code> cuts off legitimate options.</p>
+<p><strong>Top-p (nucleus).</strong> Sort descending, accumulate probability, keep tokens until the cumulative sum reaches <code>p</code>. The <em>number</em> of candidates adapts to the shape of the distribution:</p>
+<pre><code>confident:  [0.95, 0.03, 0.01, ...]  -&gt;  p=0.9 keeps 1 token
+uncertain:  [0.08, 0.07, 0.07, ...]  -&gt;  p=0.9 keeps ~30 tokens</code></pre>
+<p>This is the Holtzman et al. contribution and it was a genuine advance. But it has a known flaw: at high temperature the distribution flattens, so reaching cumulative <code>p</code> requires many more tokens, and top-p lets in the tail exactly when the tail is most dangerous. Temperature and top-p interact badly at the extremes.</p>
+<p><strong>Min-p.</strong> Keep every token whose probability is at least <code>min_p × p_max</code>, where <code>p_max</code> is the top token's probability. The threshold is <em>relative to the model's confidence</em>:</p>
+<pre><code>min_p = 0.1
+confident:  p_max = 0.95  -&gt;  threshold 0.095  -&gt;  very few survive
+uncertain:  p_max = 0.08  -&gt;  threshold 0.008  -&gt;  many survive</code></pre>
+<p>This is the behaviour you actually want, and it degrades gracefully under temperature: since the threshold scales with <code>p_max</code>, flattening the distribution does not automatically widen the candidate set the way it does for top-p. Min-p is the reason people can run temperature 1.5+ without the output falling apart, and it has become a common default in local-inference communities.</p>
+<p>A rough guide to defaults, offered with the caveat that the right values are task- and model-specific and worth measuring rather than copying:</p>
+<table><thead><tr><th>use case</th><th>temperature</th><th>truncation</th></tr></thead><tbody><tr><td>factual QA, extraction</td><td>0 – 0.3</td><td>greedy or top-p 0.9</td></tr><tr><td>general chat</td><td>0.7 – 1.0</td><td>top-p 0.9–0.95, or min-p 0.05–0.1</td></tr><tr><td>creative writing</td><td>1.0 – 1.4</td><td>min-p 0.05–0.1</td></tr><tr><td>code generation</td><td>0 – 0.2</td><td>greedy or top-p 0.95</td></tr></tbody></table>
+<p>The cost of all of these is a sort over the vocabulary. A full sort of 128,256 logits per sequence per token is not free at batch 256 — production samplers use partial sorts (top-k selection) and fused kernels for exactly this reason.</p></div>
+  <pre class="ascii" aria-label="diagram">  logits -&gt; [temperature] -&gt; softmax -&gt; [truncate] -&gt; renormalize -&gt; sample
+
+  TOP-K (k=3)              TOP-P (p=0.9)            MIN-P (0.1)
+  ████ 0.45  keep          ████ 0.45  keep  (0.45)  ████ 0.45  keep
+  ███  0.30  keep          ███  0.30  keep  (0.75)  ███  0.30  keep
+  ██   0.15  keep          ██   0.15  keep  (0.90)  ██   0.15  keep
+  █    0.06  CUT           █    0.06  cut           █    0.06  keep (&gt;0.045)
+  ·    0.04  CUT           ·    0.04  cut           ·    0.04  CUT  (&lt;0.045)
+
+  fixed count              fixed mass               fixed RATIO to the top</pre>
+  <p class="keypoint"><b>REMEMBER</b>Top-k truncates by rank, top-p by cumulative mass, min-p by relative probability — and only the last adapts correctly to how confident the model is.</p>
+</article>
+<article class="concept" id="concept-4">
+  <div class="concept__head">
+    <span class="concept__n">05</span>
+    <h3 class="concept__title">Repetition penalties and how they misfire</h3>
+  </div>
+  <div class="prose"><p>Even with good sampling, models loop. The standard patches all modify logits based on what has already been generated.</p>
+<p><strong>Repetition penalty</strong> (Keskar et al., CTRL) divides the logit of any previously-seen token by <code>r &gt; 1</code>. The implementation detail that catches people:</p>
+<pre><code>z_i = z_i / r   if z_i &gt; 0
+z_i = z_i * r   if z_i &lt; 0</code></pre>
+<p>The sign check exists because dividing a negative logit would <em>increase</em> it. This asymmetry means the penalty's strength depends on the sign of the logit, which is a fairly arbitrary property.</p>
+<p><strong>Frequency penalty</strong> subtracts <code>alpha × count(token)</code> — scales with how often the token appeared. <strong>Presence penalty</strong> subtracts a flat <code>beta</code> if the token appeared at all. Both are additive in logit space, which is better behaved than division.</p>
+<p>Now the failure modes, which are more serious than they are usually presented:</p>
+<p><strong>Function words are punished first.</strong> The most-repeated tokens in any English text are &quot;the&quot;, &quot;a&quot;, &quot;of&quot;, &quot;to&quot;, &quot;,&quot;. A repetition penalty hits them hardest. Set <code>r = 1.2</code> and the model starts dropping articles and prepositions — output becomes subtly telegraphic in a way that reads as &quot;off&quot; without an obvious cause.</p>
+<p><strong>Code and structured output break.</strong> Python repeats <code>self</code>, <code>return</code>, <code>def</code>, <code>import</code>, indentation tokens. JSON repeats <code>{</code>, <code>}</code>, <code>&quot;</code>, <code>:</code>. Penalizing repetition in structured output means penalizing correctness. <strong>Repetition penalties should be off for code and off for constrained JSON.</strong> This is a common and avoidable production bug.</p>
+<p><strong>Long contexts poison the penalty.</strong> If the penalty applies over the whole context, then in a 32k-token conversation nearly every common token has appeared and is penalized. Good implementations apply it over a sliding window (the last <code>n</code> tokens); many do not, or do not expose the window.</p>
+<p><strong>It treats identity, not structure.</strong> The real problem is repeated <em>phrases</em>, and a token-level penalty cannot see phrases. It over-penalizes legitimate reuse and under-penalizes a loop built from varied tokens.</p>
+<p>The honest summary: penalties are a blunt patch for a symptom whose real cause is the model's distribution. Prefer fixing the distribution — better truncation, min-p, a better prompt — and treat penalties as a last resort with narrow windows and small values (1.05–1.15 for repetition penalty, 0.1–0.5 for frequency). DRY and similar n-gram-aware samplers are attempts at the structural version of this idea.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Penalties operate on token identity with no notion of syntax, so they degrade the text they are meant to fix.</p>
+</article>
+<article class="concept" id="concept-5">
+  <div class="concept__head">
+    <span class="concept__n">06</span>
+    <h3 class="concept__title">Constrained decoding: making invalid output impossible</h3>
+  </div>
+  <div class="prose"><p>If you need valid JSON, you can ask nicely, validate, and retry — or you can make invalid output unrepresentable.</p>
+<p>The mechanism is a <strong>logit mask</strong>. At each step, given the tokens generated so far, compute which next tokens could still lead to a valid string. Set every other logit to <code>-inf</code>. Sample from what remains. The output is valid by construction, with no retries.</p>
+<p>The machinery:</p>
+<ol><li>Express the target format as a regular expression or context-free grammar.</li><li>Compile it to a finite state machine (or a pushdown automaton for CFGs).</li><li><strong>Precompute, for each FSM state, the set of allowed vocabulary tokens.</strong> This is the expensive step and the key insight of the Outlines paper — done ahead of time, it turns per-step constraint checking into an O(1) lookup instead of a scan over 128k tokens.</li><li>At generation time, track the state, look up the mask, apply, sample, advance.</li></ol>
+<p>The hard part is that <strong>the FSM is over characters but sampling is over tokens</strong>, and BPE tokens span multiple characters and do not align to grammar boundaries. A single token might be <code>&quot;},{&quot;</code> — valid in some JSON states and not others. Handling this token-boundary mismatch correctly is most of the implementation difficulty and the source of most bugs in naive versions.</p>
+<p>Costs worth knowing before you turn it on:</p>
+<ul><li><strong>Compilation is not free.</strong> A complex grammar can take hundreds of milliseconds to compile. Cache compiled grammars by schema; do not compile per request.</li><li><strong>Masking is per-sequence work in the hot loop.</strong> At batch 256 with 128k vocabulary, applying distinct masks is real overhead. It is why structured output is a first-class engineering concern in SGLang and xgrammar rather than a wrapper.</li><li><strong>Constraints do not confer competence.</strong> Forcing schema-valid JSON guarantees the <em>shape</em>, not the <em>content</em>. A model that does not know the answer will emit a well-formed wrong one. There is also evidence that heavy constraint can degrade reasoning quality, presumably by pushing the model off its natural distribution — so for reasoning-heavy tasks, prefer letting the model think freely and constraining only a final extraction step.</li></ul></div>
+  <pre class="ascii" aria-label="diagram">  state: expecting a JSON key
+
+    vocabulary            mask        result
+    ' &quot;'      logit 3.2   allow  -&gt;    3.2
+    ' {'      logit 2.9   BLOCK  -&gt;   -inf
+    ' hello'  logit 2.1   BLOCK  -&gt;   -inf
+    ' &quot;name'  logit 1.8   allow  -&gt;    1.8
+                                       |
+                                  softmax over survivors only
+                                  -&gt; malformed JSON is unreachable</pre>
+  <p class="keypoint"><b>REMEMBER</b>A grammar compiled to a state machine yields a token mask per step, so malformed output cannot be generated rather than being retried.</p>
+</article>
+<article class="concept" id="concept-6">
+  <div class="concept__head">
+    <span class="concept__n">07</span>
+    <h3 class="concept__title">Why temperature 0 is not deterministic</h3>
+  </div>
+  <div class="prose"><p>Set temperature to 0, send the same prompt twice, get different completions. This surprises people, and the explanation has nothing to do with sampling.</p>
+<p><strong>Floating-point addition is not associative.</strong> In real arithmetic <code>(a + b) + c = a + (b + c)</code>. In floating point it is not, because each addition rounds:</p>
+<pre><code>(1e10 + 1.0) - 1e10  =  0.0     in fp32
+1e10 + (1.0 - 1e10)  =  1.0</code></pre>
+<p>A GPU matmul sums thousands of products in parallel and combines partial results in whatever order the kernel's parallel reduction dictates. That order depends on the thread and block configuration, which depends on the tensor shapes, which depend on <strong>the batch size and sequence lengths of everyone else in your batch</strong>.</p>
+<p>So the chain is:</p>
+<pre><code>different batch composition
+  -&gt; different kernel/tile configuration selected
+  -&gt; different floating-point reduction order
+  -&gt; logits differ in the last few bits
+  -&gt; if the top two logits are close, argmax flips
+  -&gt; a different token
+  -&gt; a completely different continuation from there on</code></pre>
+<p>The divergence is usually rare per token but the consequences compound: one flipped token early changes everything after it.</p>
+<p>Contributing factors, roughly in order of how often they bite:</p>
+<ol><li><strong>Batch-dependent kernel selection.</strong> The big one. Your request is batched with different neighbours each time, so the matmul kernel and its reduction order change.</li><li><strong>Atomics and non-deterministic reductions.</strong> Some kernels use <code>atomicAdd</code>, which completes in nondeterministic order by design.</li><li><strong>Autotuning.</strong> Libraries pick algorithms by benchmarking at runtime; the winner can vary.</li><li><strong>Mixed precision.</strong> bf16 has 8 mantissa bits. Ties and near-ties are common, so small perturbations flip argmax more often than you would guess.</li><li><strong>MoE routing.</strong> In a sparse model, batch composition can change expert assignment and capacity-factor dropping, which is a much larger perturbation than a rounding difference.</li></ol>
+<p>Getting real determinism requires <strong>batch-invariant kernels</strong> — kernels whose reduction order does not depend on batch composition. This is achievable (Thinking Machines published a detailed treatment of batch-invariant kernels in 2025) but costs performance, because you give up the freedom to pick the fastest tiling for each shape.</p>
+<p>The practical implications: do not build tests that assert exact token equality across runs; assert on semantic properties instead. Do not promise users bit-reproducible output unless you have specifically engineered for it. And when debugging a &quot;flaky&quot; model, check whether you are chasing a bug or chasing floating-point.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Floating-point addition is not associative, so changing the batch changes the reduction order, which changes the logits, which can flip an argmax.</p>
+</article>
+      </section>
+
+      <section class="section ghost ghost--inky" id="math-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--inky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>INKY · MATH BY HAND</p>
+        <h2 class="section__title">Math by hand</h2>
+        <div class="prose"><p>Work these by hand. A calculator is fine; a script is cheating, because the point is to feel how the transformations behave.</p>
+<p>The model gives you logits over a 6-token vocabulary:</p>
+<pre><code>token:   A      B      C      D      E      F
+logit:   3.0    2.0    1.0    0.5    0.0   -1.0</code></pre>
+<ol><li>Compute the softmax at <code>T = 1.0</code>. Verify it sums to 1.</li><li>Recompute at <code>T = 0.5</code> and at <code>T = 2.0</code>. Tabulate all three.</li><li>At <code>T = 2.0</code>, by what factor did the probability of F (the worst token) increase relative to <code>T = 1.0</code>? This is the &quot;temperature amplifies junk&quot; effect, quantified.</li><li>At <code>T = 1.0</code>, apply <strong>top-p = 0.9</strong>. Which tokens survive? What are the renormalized probabilities?</li><li>At <code>T = 1.0</code>, apply <strong>min-p = 0.1</strong>. Which tokens survive?</li><li>Now suppose the model is <em>uncertain</em>: logits are <code>[1.0, 0.9, 0.8, 0.7, 0.6, 0.5]</code>. Apply top-p = 0.9 and min-p = 0.1 to this. Compare the number of survivors in each case against question 4/5.</li><li>From (4)–(6), state in one sentence the behavioural difference between top-p and min-p.</li><li>Bonus: at <code>T = 2.0</code>, apply top-p = 0.9. How many tokens survive now, versus at <code>T = 1.0</code>? What does that tell you about combining high temperature with top-p?</li></ol></div>
+        <details class="spoiler">
+          <summary>SHOW THE WORKED SOLUTION</summary>
+          <div class="spoiler__body prose"><p><strong>1. Softmax at T = 1.0</strong></p>
+<pre><code>exp(3.0)  = 20.086
+exp(2.0)  =  7.389
+exp(1.0)  =  2.718
+exp(0.5)  =  1.649
+exp(0.0)  =  1.000
+exp(-1.0) =  0.368
+             ------
+sum       = 33.210
+
+A = 20.086/33.210 = 0.6048
+B =  7.389/33.210 = 0.2225
+C =  2.718/33.210 = 0.0818
+D =  1.649/33.210 = 0.0496
+E =  1.000/33.210 = 0.0301
+F =  0.368/33.210 = 0.0111
+                    ------
+                    1.0000  ✓</code></pre>
+<p><strong>2. All three temperatures</strong></p>
+<p>At <code>T = 0.5</code> the logits double to <code>[6, 4, 2, 1, 0, -2]</code>:</p>
+<pre><code>exp: 403.43, 54.598, 7.389, 2.718, 1.000, 0.135   sum = 469.27
+p:   0.8597, 0.1163, 0.0157, 0.0058, 0.0021, 0.0003</code></pre>
+<p>At <code>T = 2.0</code> the logits halve to <code>[1.5, 1.0, 0.5, 0.25, 0, -0.5]</code>:</p>
+<pre><code>exp: 4.4817, 2.7183, 1.6487, 1.2840, 1.0000, 0.6065   sum = 11.739
+p:   0.3818, 0.2316, 0.1404, 0.1094, 0.0852, 0.0517</code></pre>
+<table><thead><tr><th>token</th><th>T=0.5</th><th>T=1.0</th><th>T=2.0</th></tr></thead><tbody><tr><td>A</td><td>0.8597</td><td>0.6048</td><td>0.3818</td></tr><tr><td>B</td><td>0.1163</td><td>0.2225</td><td>0.2316</td></tr><tr><td>C</td><td>0.0157</td><td>0.0818</td><td>0.1404</td></tr><tr><td>D</td><td>0.0058</td><td>0.0496</td><td>0.1094</td></tr><tr><td>E</td><td>0.0021</td><td>0.0301</td><td>0.0852</td></tr><tr><td>F</td><td>0.0003</td><td>0.0111</td><td>0.0517</td></tr></tbody></table>
+<p><strong>3. Junk amplification</strong></p>
+<pre><code>F: 0.0517 / 0.0111 = 4.66x</code></pre>
+<p>The worst token became <strong>4.7× more likely</strong> while the best became 1.6× less likely. Now scale this intuition to a real 128,256-token vocabulary: there are ~128,000 tokens in the tail, each getting a similar multiplicative boost. Their <em>collective</em> mass grows enormously. That is why high temperature without truncation produces incoherence rather than creativity.</p>
+<p><strong>4. Top-p = 0.9 at T = 1.0</strong></p>
+<p>Accumulate in descending order:</p>
+<pre><code>A: 0.6048   cumulative 0.6048   &lt; 0.9, keep
+B: 0.2225   cumulative 0.8273   &lt; 0.9, keep
+C: 0.0818   cumulative 0.9091   &gt;= 0.9, keep (this one crosses) and STOP</code></pre>
+<p>Survivors: <strong>A, B, C</strong>. Renormalized by 0.9091:</p>
+<pre><code>A = 0.6048/0.9091 = 0.6653
+B = 0.2225/0.9091 = 0.2447
+C = 0.0818/0.9091 = 0.0900</code></pre>
+<p><em>(Note: implementations differ on whether the crossing token is included. Hugging Face and vLLM include it, so the kept mass is ≥ p rather than ≤ p. Worth checking in any library you rely on.)</em></p>
+<p><strong>5. Min-p = 0.1 at T = 1.0</strong></p>
+<pre><code>p_max = 0.6048
+threshold = 0.1 x 0.6048 = 0.06048
+
+A 0.6048 &gt;= 0.06048  keep
+B 0.2225 &gt;= 0.06048  keep
+C 0.0818 &gt;= 0.06048  keep
+D 0.0496 &lt;  0.06048  CUT
+E 0.0301 &lt;  0.06048  CUT
+F 0.0111 &lt;  0.06048  CUT</code></pre>
+<p>Survivors: <strong>A, B, C</strong>. Same answer as top-p here — which is exactly why you need question 6 to see the difference.</p>
+<p><strong>6. The uncertain distribution</strong></p>
+<p>Logits <code>[1.0, 0.9, 0.8, 0.7, 0.6, 0.5]</code> at <code>T = 1.0</code>:</p>
+<pre><code>exp: 2.7183, 2.4596, 2.2255, 2.0138, 1.8221, 1.6487   sum = 12.888
+p:   0.2109, 0.1908, 0.1727, 0.1563, 0.1414, 0.1279</code></pre>
+<p><em>Top-p = 0.9:</em></p>
+<pre><code>0.2109  cum 0.2109  keep
+0.1908  cum 0.4017  keep
+0.1727  cum 0.5744  keep
+0.1563  cum 0.7307  keep
+0.1414  cum 0.8721  keep
+0.1279  cum 1.0000  keep (crosses 0.9)</code></pre>
+<p><strong>All 6 survive.</strong></p>
+<p><em>Min-p = 0.1:</em></p>
+<pre><code>p_max = 0.2109,  threshold = 0.02109
+every token is &gt;= 0.02109</code></pre>
+<p><strong>All 6 survive.</strong></p>
+<p>Both adapt here. The distinguishing case is the <em>confident</em> distribution combined with temperature, which is question 8.</p>
+<p><strong>7. The difference in one sentence</strong></p>
+<p>Top-p fixes the <strong>total probability mass</strong> it keeps and lets the candidate count float; min-p fixes the <strong>ratio to the best token</strong> and lets both count and mass float — so min-p tracks the model's confidence directly rather than through the proxy of cumulative mass.</p>
+<p><strong>8. Top-p = 0.9 at T = 2.0</strong> (the original confident logits)</p>
+<pre><code>A: 0.3818   cum 0.3818   keep
+B: 0.2316   cum 0.6134   keep
+C: 0.1404   cum 0.7538   keep
+D: 0.1094   cum 0.8632   keep
+E: 0.0852   cum 0.9484   keep (crosses)</code></pre>
+<p><strong>5 tokens survive, versus 3 at T = 1.0.</strong></p>
+<p>This is the flaw. Raising temperature flattens the distribution, so more tokens are needed to accumulate 0.9 of the mass — top-p <em>widens</em> the candidate set exactly when each candidate has become less trustworthy. The two knobs compound in the wrong direction.</p>
+<p>Min-p at <code>T = 2.0</code>: threshold is <code>0.1 × 0.3818 = 0.03818</code>, and all six tokens exceed it — so min-p widens too, but for the honest reason that the model really has become less certain, and the threshold remains anchored to the top token rather than to an absolute mass target. That anchoring is why min-p stays usable at temperatures where top-p starts admitting the tail.</p></div>
+        </details>
+      </section>
+
+      <section class="section ghost ghost--clyde" id="code-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--clyde)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>CLYDE · CODE LAB</p>
+        <h2 class="section__title">Code lab</h2>
+        <div class="prose"><p>Implement greedy, temperature, top-k, top-p, and min-p from scratch in NumPy — no <code>torch.multinomial</code>, no library sampling. Then run a temperature sweep on a real model and characterize how the output degrades at each end.</p>
+<p>The implementation is short. The value is in the sweep: seeing the same prompt go from robotic to incoherent as one number changes is worth more than any amount of reading about it.</p></div>
+        <div class="prose" style="max-width:none"><pre><code class="lang-python">&quot;&quot;&quot;
+Samplers from scratch, then a temperature sweep on a real model.
+    pip install numpy torch transformers
+&quot;&quot;&quot;
+import numpy as np
+
+
+def softmax(logits, temperature=1.0):
+    if temperature &lt;= 0:                       # T -&gt; 0 is greedy
+        out = np.zeros_like(logits, dtype=np.float64)
+        out[np.argmax(logits)] = 1.0
+        return out
+    z = np.asarray(logits, dtype=np.float64) / temperature
+    z = z - z.max()                            # stability: exp(large) overflows
+    e = np.exp(z)
+    return e / e.sum()
+
+
+def top_k_filter(probs, k):
+    &quot;&quot;&quot;Keep the k highest-probability tokens.&quot;&quot;&quot;
+    if k is None or k &lt;= 0 or k &gt;= len(probs):
+        return probs
+    out = np.zeros_like(probs)
+    idx = np.argpartition(probs, -k)[-k:]      # O(V), not a full sort
+    out[idx] = probs[idx]
+    return out / out.sum()
+
+
+def top_p_filter(probs, p):
+    &quot;&quot;&quot;Nucleus: keep the smallest set whose cumulative mass reaches p.
+
+    Includes the token that crosses the threshold, matching HF/vLLM behaviour,
+    so the kept mass is &gt;= p rather than &lt;= p.
+    &quot;&quot;&quot;
+    if p is None or p &gt;= 1.0:
+        return probs
+    order = np.argsort(probs)[::-1]
+    sorted_p = probs[order]
+    cum = np.cumsum(sorted_p)
+    # keep everything strictly before the crossing, plus the crossing token
+    n_keep = int(np.searchsorted(cum, p) + 1)
+    n_keep = min(n_keep, len(probs))
+    out = np.zeros_like(probs)
+    out[order[:n_keep]] = sorted_p[:n_keep]
+    return out / out.sum()
+
+
+def min_p_filter(probs, min_p):
+    &quot;&quot;&quot;Keep tokens with probability &gt;= min_p * p_max. Threshold scales with confidence.&quot;&quot;&quot;
+    if min_p is None or min_p &lt;= 0:
+        return probs
+    threshold = min_p * probs.max()
+    out = np.where(probs &gt;= threshold, probs, 0.0)
+    return out / out.sum()
+
+
+def sample(logits, temperature=1.0, top_k=None, top_p=None, min_p=None, rng=None):
+    &quot;&quot;&quot;Temperature first, then truncation -- the HF/vLLM order.&quot;&quot;&quot;
+    rng = rng or np.random.default_rng()
+    probs = softmax(logits, temperature)
+    if top_k:  probs = top_k_filter(probs, top_k)
+    if top_p:  probs = top_p_filter(probs, top_p)
+    if min_p:  probs = min_p_filter(probs, min_p)
+    return int(rng.choice(len(probs), p=probs))
+
+
+# ============================================================
+# Reproduce the math lab
+# ============================================================
+logits = np.array([3.0, 2.0, 1.0, 0.5, 0.0, -1.0])
+names = list(&quot;ABCDEF&quot;)
+
+print(&quot;=== temperature sweep ===&quot;)
+print(f&quot;{'tok':&gt;4} {'T=0.5':&gt;8} {'T=1.0':&gt;8} {'T=2.0':&gt;8}&quot;)
+cols = [softmax(logits, t) for t in (0.5, 1.0, 2.0)]
+for i, n in enumerate(names):
+    print(f&quot;{n:&gt;4} {cols[0][i]:&gt;8.4f} {cols[1][i]:&gt;8.4f} {cols[2][i]:&gt;8.4f}&quot;)
+print(f&quot;\n  junk amplification, F: {cols[2][5]/cols[1][5]:.2f}x&quot;)
+
+print(&quot;\n=== truncation on a CONFIDENT distribution (T=1.0) ===&quot;)
+p1 = softmax(logits, 1.0)
+for label, f in [(&quot;top-p 0.9&quot;, top_p_filter(p1, 0.9)),
+                 (&quot;min-p 0.1&quot;, min_p_filter(p1, 0.1)),
+                 (&quot;top-k 3&quot;, top_k_filter(p1, 3))]:
+    kept = [names[i] for i in range(6) if f[i] &gt; 0]
+    print(f&quot;  {label:&lt;12} keeps {len(kept)}: {' '.join(kept)}&quot;)
+
+print(&quot;\n=== truncation on an UNCERTAIN distribution (T=1.0) ===&quot;)
+p2 = softmax(np.array([1.0, 0.9, 0.8, 0.7, 0.6, 0.5]), 1.0)
+for label, f in [(&quot;top-p 0.9&quot;, top_p_filter(p2, 0.9)),
+                 (&quot;min-p 0.1&quot;, min_p_filter(p2, 0.1)),
+                 (&quot;top-k 3&quot;, top_k_filter(p2, 3))]:
+    kept = [names[i] for i in range(6) if f[i] &gt; 0]
+    print(f&quot;  {label:&lt;12} keeps {len(kept)}: {' '.join(kept)}&quot;)
+
+print(&quot;\n=== the top-p flaw: confident distribution at T=2.0 ===&quot;)
+p3 = softmax(logits, 2.0)
+print(f&quot;  top-p 0.9 keeps {(top_p_filter(p3, 0.9) &gt; 0).sum()} tokens (was 3 at T=1.0)&quot;)
+print(f&quot;  min-p 0.1 keeps {(min_p_filter(p3, 0.1) &gt; 0).sum()} tokens&quot;)
+
+
+# ============================================================
+# The sweep on a real model -- this is the part that teaches
+# ============================================================
+def sweep():
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    name = &quot;gpt2&quot;
+    tok = AutoTokenizer.from_pretrained(name)
+    model = AutoModelForCausalLM.from_pretrained(name).eval()
+
+    prompt = &quot;The three most important ideas in computer science are&quot;
+    ids = tok(prompt, return_tensors=&quot;pt&quot;).input_ids
+
+    @torch.no_grad()
+    def gen(n=60, seed=0, **kw):
+        rng = np.random.default_rng(seed)
+        cur, past = ids, None
+        out_ids = []
+        for _ in range(n):
+            o = model(cur if past is None else cur[:, -1:],
+                      past_key_values=past, use_cache=True)
+            past = o.past_key_values
+            nxt = sample(o.logits[0, -1].float().numpy(), rng=rng, **kw)
+            out_ids.append(nxt)
+            cur = torch.cat([cur, torch.tensor([[nxt]])], dim=1)
+        return tok.decode(out_ids)
+
+    print(&quot;\n&quot; + &quot;=&quot; * 70)
+    print(&quot;TEMPERATURE SWEEP -- same prompt, same seed, one knob&quot;)
+    print(&quot;=&quot; * 70)
+    for T in [0.0, 0.5, 0.8, 1.0, 1.3, 1.8, 2.5]:
+        label = &quot;greedy&quot; if T == 0 else f&quot;T={T}&quot;
+        print(f&quot;\n--- {label} ---&quot;)
+        print(gen(temperature=T).strip()[:300])
+
+    print(&quot;\n&quot; + &quot;=&quot; * 70)
+    print(&quot;T=1.8 WITH TRUNCATION -- the tail is the problem, not the temperature&quot;)
+    print(&quot;=&quot; * 70)
+    for label, kw in [(&quot;no truncation&quot;, {}),
+                      (&quot;top-p 0.9&quot;, {&quot;top_p&quot;: 0.9}),
+                      (&quot;min-p 0.1&quot;, {&quot;min_p&quot;: 0.1})]:
+        print(f&quot;\n--- T=1.8, {label} ---&quot;)
+        print(gen(temperature=1.8, **kw).strip()[:300])
+
+
+if __name__ == &quot;__main__&quot;:
+    try:
+        sweep()
+    except ImportError:
+        print(&quot;\n(pip install torch transformers for the model sweep)&quot;)
+
+# --- TODO for you ---
+#   1. Implement a repetition penalty and confirm it damages code generation.
+#      Prompt with &quot;def fibonacci(n):&quot; and try penalty 1.0, 1.15, 1.3.
+#      Watch 'return' and indentation tokens get suppressed.
+#   2. Implement typical sampling (Meister et al., 2022): keep tokens whose
+#      surprisal is closest to the distribution's entropy. Compare to min-p.
+</code></pre></div>
+        <div class="prose"><h3>What you should see</h3><p>The math-lab reproduction matches the hand calculation exactly: junk amplification of 4.66×, top-p and min-p both keeping 3 tokens on the confident distribution and all 6 on the uncertain one, and at T=2.0 top-p widening to 5 while min-p stays anchored.</p>
+<p>The temperature sweep is where the learning happens. Expect roughly:</p>
+<ul><li><strong>Greedy / T=0.0</strong> — coherent, then a loop. GPT-2 usually starts repeating within 40 tokens.</li><li><strong>T=0.5</strong> — coherent, safe, slightly dull.</li><li><strong>T=0.8–1.0</strong> — the usable range. Varied and mostly sensible.</li><li><strong>T=1.3</strong> — noticeably looser; occasional non-sequiturs.</li><li><strong>T=1.8</strong> — frequent nonsense words and broken syntax.</li><li><strong>T=2.5</strong> — near-total incoherence, often with rare unicode and code fragments.</li></ul>
+<p>Then the second block makes the actual point: T=1.8 with min-p 0.1 is <em>dramatically</em> more coherent than T=1.8 raw, while keeping the variety. The temperature was never the problem — the tail was. That comparison is the single most useful thing in this lab.</p>
+<p>(GPT-2 is a weak model, so even T=0.8 wanders. The <em>relative</em> progression is what to look at, not absolute quality.)</p></div>
+        <div class="prose"><h3>Stretch</h3><p>Quantify the degradation instead of eyeballing it. For each temperature, generate 20 completions and measure: (a) fraction of generated tokens that are repeats of a token in the previous 20 positions, (b) distinct-2 — the ratio of unique bigrams to total bigrams, and (c) mean per-token log-probability under the model itself. Plot all three against temperature. You should find repetition falling and distinct-2 rising with temperature, while mean log-probability falls monotonically — which is precisely Holtzman's point that likelihood and quality diverge.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pac" id="papers">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>THE KEY · PAPERS</p>
+        <h2 class="section__title">Papers, with a reading frame</h2>
+        <div class="papers">
+          <article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/1904.09751" target="_blank" rel="noopener">The Curious Case of Neural Text Degeneration</a></h3>
+            <p class="paper__by">Holtzman et al., 2019</p>
+            <p class="paper__why">The nucleus sampling paper, and the paper that explained why maximizing likelihood produces bad text. One of the most practically consequential NLP papers of its era.</p>
+            <div class="paper__frame"><p><strong>Figure 2</strong> is the whole argument in one image: per-token probability of human text fluctuates constantly while beam-search text sits at a high plateau. Read <strong>Section 3</strong> for why maximization fails and <strong>Section 4</strong> for nucleus sampling itself. The evaluation in Section 5 (perplexity of generated text against human text, distinct-n) is worth reading for how to measure generation quality at all.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2307.09702" target="_blank" rel="noopener">Efficient Guided Generation for Large Language Models</a></h3>
+            <p class="paper__by">Willard &amp; Louf, 2023</p>
+            <p class="paper__why">The Outlines paper. Shows how to precompute FSM-state-to-token-mask maps so constrained decoding costs O(1) per step instead of a scan over the vocabulary.</p>
+            <div class="paper__frame"><p><strong>Section 3</strong> is the contribution: indexing the vocabulary by FSM state ahead of time. <strong>Section 4</strong> extends it to context-free grammars with a pushdown automaton. Pay attention to the discussion of token-boundary alignment — that mismatch between character-level grammars and BPE tokens is where the real difficulty lives.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/1909.05858" target="_blank" rel="noopener">CTRL: A Conditional Transformer Language Model for Controllable Generation</a></h3>
+            <p class="paper__by">Keskar et al., 2019</p>
+            <p class="paper__why">Source of the repetition penalty that nearly every inference library implements, usually without citation.</p>
+            <div class="paper__frame"><p>Read <strong>Section 4.1</strong> only — the penalized-sampling paragraph. It is a few lines and defines the formula you will find in every serving codebase, including the sign asymmetry.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2202.00666" target="_blank" rel="noopener">Locally Typical Sampling</a></h3>
+            <p class="paper__by">Meister et al., 2022</p>
+            <p class="paper__why">An information-theoretic alternative to top-p: keep tokens whose surprisal is near the distribution entropy, rather than the most likely ones.</p>
+            <div class="paper__frame"><p>Read the introduction and Section 3. The framing — that natural language keeps information rate roughly constant, so you want <em>typical</em> tokens rather than <em>likely</em> ones — is a genuinely different way to think about the decoding objective.</p></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--blinky" id="pitfalls">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--blinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>BLINKY · PITFALLS</p>
+        <h2 class="section__title">What people get wrong</h2>
+        <div class="pitfall">
+          <p class="pitfall__wrong"><span>Temperature 0 means deterministic output.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>Temperature 0 removes randomness from <em>sampling</em>, not from the logits. Those still vary run to run because GPU reductions are order-dependent and the order depends on batch composition. When the top two logits are close, argmax flips and the continuation diverges completely. Bit-level reproducibility requires batch-invariant kernels and a throughput sacrifice.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Higher temperature means more creative.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>Higher temperature means a flatter distribution, which means more probability on the long tail — and in a 128k-token vocabulary the tail is mostly junk, not creativity. Without truncation, high temperature yields broken syntax and invented words. With min-p, the same temperature yields genuine variety. Creativity comes from sampling widely <em>within</em> the plausible set, not from sampling outside it.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>A repetition penalty is a safe default to leave on.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>It punishes the most frequent tokens first, which in English are function words — &quot;the&quot;, &quot;a&quot;, &quot;of&quot;, &quot;to&quot; — so output goes subtly telegraphic. In code and JSON it punishes the tokens that constitute correctness. And if applied over a full 32k context rather than a sliding window, nearly every common token ends up penalized. Keep it off by default; if you need it, use a narrow window and a small value.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Constrained decoding makes the model more accurate.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>It makes the output <em>well-formed</em>, which is a different property. A schema guarantees the shape; it says nothing about whether the values are right. A model that does not know the answer will emit a syntactically perfect wrong one. There is also evidence that heavy constraint can hurt reasoning quality by pushing the model off its natural distribution — so for reasoning tasks, let it think freely and constrain only the final extraction.</p></div></div>
+        </div>
+      </section>
+
+      <section class="section" id="checkpoint">
+        <div class="wall checkpoint">
+          <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>POWER PELLET · CHECKPOINT</p>
+          <p class="checkpoint__claim">You can predict what changing any sampling parameter will do to output quality, and
+you can explain both why beam search lost for open-ended generation and why temperature 0 does
+not guarantee reproducible output.</p>
+          <details class="qa">
+            <summary>Why does beam search improve translation but hurt dialogue?</summary>
+            <div class="qa__a prose"><p>Beam search searches for the highest-probability sequence, so its value depends on whether high probability is a good proxy for quality. In translation the output space is narrow — one source meaning, a few acceptable phrasings — so the most likely sequence is usually the right one. In dialogue the output space is enormous and the most likely response is the blandest: &quot;I don't know&quot;, &quot;That's interesting&quot;. Holtzman et al. showed that human text does not sit at high probability under a language model; it fluctuates, and that variability is what makes it informative. The diagnostic symptom is that increasing beam width makes open-ended output monotonically worse — a search working correctly on the wrong objective. There is also a systems cost: <code>k</code> beams means <code>k</code> KV caches, which cuts concurrency.</p></div>
+          </details>
+<details class="qa">
+            <summary>You raise temperature from 0.8 to 1.5 and output becomes incoherent. Is the temperature wrong?</summary>
+            <div class="qa__a prose"><p>Not necessarily — the missing truncation is more likely the problem. Temperature flattens the distribution multiplicatively, and with a 128,256-token vocabulary that hands a large collective share of mass to ~128,000 tail tokens. Sample one and the sequence derails, permanently, because generation is autoregressive. The fix is to pair the temperature with min-p (say 0.05–0.1), which cuts every token below a fixed ratio of the top token's probability. Note that top-p is a poor partner here: flattening the distribution makes top-p keep <em>more</em> tokens, so it widens the candidate set exactly when candidates are least trustworthy. Min-p's threshold stays anchored to the top token, so it does not have that failure.</p></div>
+          </details>
+<details class="qa">
+            <summary>Explain min-p to someone who already understands top-p, in two sentences.</summary>
+            <div class="qa__a prose"><p>Top-p keeps the smallest set of tokens whose cumulative probability reaches <code>p</code>, so it fixes the total <em>mass</em> retained and lets the candidate count vary. Min-p instead keeps every token whose probability is at least <code>min_p × p_max</code>, fixing the <em>ratio to the best token</em> — which means the cutoff tightens automatically when the model is confident and relaxes when it is genuinely uncertain, and it does not blow open as temperature rises.</p></div>
+          </details>
+<details class="qa">
+            <summary>Your JSON-generating endpoint occasionally emits malformed output. Someone suggests raising the repetition penalty to stop it looping. What is wrong with that?</summary>
+            <div class="qa__a prose"><p>Almost everything. A repetition penalty punishes tokens that have already appeared, and JSON is <em>built</em> from repeated tokens: <code>{</code>, <code>}</code>, <code>&quot;</code>, <code>:</code>, <code>,</code>. Penalizing them makes malformed output more likely, not less. Repetition penalties should be off for JSON and for code generally. The correct fix is constrained decoding: compile the schema to a state machine and mask the logits each step so only tokens that can still lead to valid JSON are sampleable. Then malformed output is not merely unlikely, it is unrepresentable. Worth remembering that this guarantees shape, not correctness — a model that does not know the answer will emit a well-formed wrong one.</p></div>
+          </details>
+<details class="qa">
+            <summary>A user reports the same prompt at temperature 0 gives different answers on different days. Walk through the likely cause.</summary>
+            <div class="qa__a prose"><p>Floating-point non-associativity interacting with batching. GPU matmuls sum thousands of products via parallel reduction, and the reduction order depends on the tile and thread configuration the kernel picks, which depends on the tensor shapes, which depend on the batch composition. The user's request is batched with different neighbours each time, so the logits differ in their last few bits. Usually harmless — but when the top two logits are close, argmax flips, and one different token changes the entire continuation. Contributing factors include atomics, kernel autotuning, bf16's 8-bit mantissa making near-ties common, and for MoE models, batch-dependent expert routing. Real determinism needs batch-invariant kernels, which cost throughput. The practical advice is not to promise bit-reproducibility and not to write tests that assert exact token equality.</p></div>
+          </details>
+          <p style="margin-top:var(--s7)">
+            <button class="done-toggle" type="button" data-complete="3" aria-pressed="false">
+              MARK LEVEL 03 CLEARED
+            </button>
+          </p>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="glossary">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>GLOSSARY</p>
+        <h2 class="section__title">Glossary</h2>
+        <div class="gloss">
+          <div class="gloss__row"><div class="gloss__term">logits</div><div class="gloss__def">Raw unnormalized scores over the vocabulary, before softmax. Everything in this module operates on them.</div></div><div class="gloss__row"><div class="gloss__term">temperature</div><div class="gloss__def">Divisor applied to logits before softmax. Below 1 sharpens, above 1 flattens.</div></div><div class="gloss__row"><div class="gloss__term">top-k</div><div class="gloss__def">Keep the k highest-probability tokens. Fixed count, does not adapt to the distribution.</div></div><div class="gloss__row"><div class="gloss__term">top-p / nucleus</div><div class="gloss__def">Keep the smallest set whose cumulative probability reaches p. Fixed mass, adaptive count.</div></div><div class="gloss__row"><div class="gloss__term">min-p</div><div class="gloss__def">Keep tokens with probability at least min_p times the top token's probability. Fixed ratio, adaptive to confidence.</div></div><div class="gloss__row"><div class="gloss__term">repetition penalty</div><div class="gloss__def">Divides logits of already-seen tokens by r &gt; 1. Blunt, and harmful for code and structured output.</div></div><div class="gloss__row"><div class="gloss__term">frequency penalty</div><div class="gloss__def">Subtracts a term proportional to how many times a token has appeared. Additive in logit space, better behaved than division.</div></div><div class="gloss__row"><div class="gloss__term">constrained decoding</div><div class="gloss__def">Masking logits each step so only tokens consistent with a grammar or schema can be sampled.</div></div><div class="gloss__row"><div class="gloss__term">degeneration</div><div class="gloss__def">The repetitive-loop failure mode of likelihood-maximizing decoders. Named and diagnosed by Holtzman et al.</div></div><div class="gloss__row"><div class="gloss__term">batch invariance</div><div class="gloss__def">The property that a kernel produces bit-identical results regardless of batch composition. Required for true determinism; costs performance.</div></div>
+        </div>
+      </section>
+
+      <nav class="pagenav">
+        <a href="kv-cache.html" data-nav="prev"><span>◀ PREVIOUS LEVEL</span>02 THE KV CACHE</a>
+        <a href="roofline.html" data-nav="next" style="text-align:right"><span>NEXT LEVEL ▶</span>04 METRICS AND THE ROOFLINE</a>
+      </nav>
+
+    </main>
+  </div>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <p class="foot__h">LEVELS</p>
+        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">&nbsp;</p>
+        <ul><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">REFERENCE</p>
+        <ul>
+          <li><a href="../reference/timeline.html">Timeline</a></li>
+          <li><a href="../reference/hardware.html">GPU spec table</a></li>
+          <li><a href="../reference/engines.html">Serving engines</a></li>
+          <li><a href="../reference/frontier.html">Open problems</a></li>
+          <li><a href="../reference/glossary.html">Glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="foot__h">SOURCE</p>
+        <ul>
+          <li><a href="https://github.com/tushar-amrit-6/inference">GitHub repository</a></li>
+          <li><a href="../reference/how-to-use.html">How to work through this</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
+    do the arithmetic yourself.</p>
+  </div>
+</footer>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

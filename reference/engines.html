@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SERVING ENGINES — LLM INFERENCE</title>
+<meta name="description" content="Not a feature table. An argument about what each engine optimizes for, and what it gives up to get there.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="SERVING ENGINES — LLM INFERENCE">
+<meta property="og:description" content="Not a feature table. An argument about what each engine optimizes for, and what it gives up to get there.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/arcade.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20fill%3D%22%23000%22%2F%3E%3Cpath%20d%3D%22M16%2C16%20L29%2C9%20A15%2C15%200%201%200%2029%2C23%20Z%22%20fill%3D%22%23FFE800%22%2F%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="scorebar">
+  <a class="scorebar__home" href="../index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="var(--pac)" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
+  
+  <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/11</span></span>
+  <span class="scorebar__spacer"></span>
+  <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
+</header>
+<div class="wrap wrap--narrow">
+  <main id="main">
+    <div class="mod-head">
+      <p class="mod-head__level">REFERENCE</p>
+      <h1 class="mod-head__title">SERVING ENGINES</h1>
+      <p class="mod-head__tag">Not a feature table. An argument about what each engine optimizes for, and what it gives up to get there.</p>
+    </div>
+    <section class="section"><div class="prose" style="max-width:none"><p>Feature tables go stale in weeks and tell you nothing about why a system is shaped the way it is. What follows is the design philosophy of each engine — the thing that stays true between releases.</p>
+<h3>vLLM — memory management as the organizing principle</h3>
+<p><strong>The bet:</strong> if you fix KV cache fragmentation, everything else follows. Recovered memory becomes batch size, batch size becomes arithmetic intensity, arithmetic intensity becomes throughput.</p>
+<p>PagedAttention is the mechanism, and it drove the whole design. Blocks of 16 tokens, per-sequence block tables, non-contiguous physical storage, copy-on-write for shared prefixes. Continuous batching sits on top and depends on it — you cannot cheaply admit and evict sequences mid-flight if each one owns a contiguous reservation.</p>
+<p><strong>What it gives up:</strong> peak single-request latency. vLLM is built around keeping many sequences in flight, and the scheduler, block manager and Python-side machinery cost you something at batch 1. It has also historically trailed TensorRT-LLM on raw kernel performance for specific model/hardware pairs, because it optimizes for generality across a very large model zoo.</p>
+<p><strong>Pick it when:</strong> you are serving many concurrent users, you want broad model support, and you want to deploy today without a compilation step.</p>
+<h3>SGLang — the workload is not one request at a time</h3>
+<p><strong>The bet:</strong> real traffic is structured and repetitive. Requests share system prompts, few-shot examples, documents, and conversation history. An engine that treats each request as independent is leaving most of the work on the table.</p>
+<p>RadixAttention is the mechanism: a radix tree over cached KV prefixes with automatic longest-prefix matching and LRU eviction. Where vLLM's prefix caching handles the common case, SGLang treats sharing as the <em>default</em> structure of the workload. Its frontend language makes that explicit, letting you express branching, parallel calls and constrained generation as a program rather than a sequence of opaque API calls. Structured output is a first-class concern rather than a wrapper.</p>
+<p><strong>What it gives up:</strong> simplicity, and some generality. The programming model is more opinionated, and the benefits are largest for workloads that genuinely share prefixes.</p>
+<p><strong>Pick it when:</strong> agentic loops, multi-turn chat with long histories, RAG over a shared corpus, or heavy structured/JSON output — anywhere the prefix reuse rate is high.</p>
+<h3>TensorRT-LLM — compile ahead of time, run with no surprises</h3>
+<p><strong>The bet:</strong> the last 20–30% of performance lives in kernel selection, fusion and layout decisions that are only correct for a specific model on specific hardware at a specific batch size. So make those decisions ahead of time, at build time, with full knowledge of the deployment.</p>
+<p>You compile a model into an engine artifact for a target GPU, precision, batch size range and sequence length range. The result is typically the fastest option on NVIDIA hardware, with the tightest and most predictable latency.</p>
+<p><strong>What it gives up:</strong> flexibility, and a great deal of operational convenience. The engine is tied to the GPU it was built for. Changing max batch size or context length means recompiling. Build times are long, and new model architectures take longer to land than in the Python-first engines.</p>
+<p><strong>Pick it when:</strong> a fixed model on fixed NVIDIA hardware at scale, where a 25% efficiency gain is worth a compilation pipeline in your deploy process.</p>
+<h3>llama.cpp — the weight-dominated regime, taken seriously</h3>
+<p><strong>The bet:</strong> most people running a model locally have one user, a short context, and not enough memory. That is the weight-dominated regime from Level 02, where weight bytes are essentially the entire cost of a decode step — so weight quantization is not one optimization among many, it is <em>the</em> optimization.</p>
+<p>Hence the k-quant family and an obsessive focus on getting good quality out of 2–5 bits per weight. Hence also CPU inference, GPU offloading of a subset of layers, Metal and Vulkan backends, and a zero-dependency C++ build. Different regime, different correct answers.</p>
+<p><strong>What it gives up:</strong> throughput at scale. Continuous batching and paged KV arrived late and are not the design centre. Serving hundreds of concurrent users is not what it is for.</p>
+<p><strong>Pick it when:</strong> local or edge inference, consumer hardware, one or few users, or you need the model to fit in memory it does not obviously fit in.</p>
+<h3>How to choose, in one table</h3>
+<table><thead><tr><th>your situation</th><th>engine</th></tr></thead><tbody><tr><td>many users, many models, deploy today</td><td>vLLM</td></tr><tr><td>high prefix reuse: agents, chat, RAG</td><td>SGLang</td></tr><tr><td>heavy structured / JSON output</td><td>SGLang</td></tr><tr><td>one model, NVIDIA, squeeze the last 25%</td><td>TensorRT-LLM</td></tr><tr><td>strict and predictable p99 latency</td><td>TensorRT-LLM</td></tr><tr><td>laptop, desktop, edge, single user</td><td>llama.cpp</td></tr><tr><td>CPU-only or partial GPU offload</td><td>llama.cpp</td></tr></tbody></table>
+<h3>What they all agree on</h3>
+<p>The convergence is as informative as the differences. Every serious engine now implements continuous batching, paged KV cache, some form of prefix caching, chunked prefill, CUDA graphs, fused kernels, FlashAttention-family kernels, quantization (weights, and increasingly KV), and speculative decoding.</p>
+<p>Those are no longer differentiators. They are table stakes, and the fact that four independently designed systems converged on the same list is decent evidence that the list is correct.</p>
+<blockquote><p>Version numbers and specific feature availability move fast. Treat the philosophies above as durable and check current documentation for anything you are about to depend on.</p></blockquote></div></section>
+  </main>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <p class="foot__h">LEVELS</p>
+        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">&nbsp;</p>
+        <ul><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">REFERENCE</p>
+        <ul>
+          <li><a href="../reference/timeline.html">Timeline</a></li>
+          <li><a href="../reference/hardware.html">GPU spec table</a></li>
+          <li><a href="../reference/engines.html">Serving engines</a></li>
+          <li><a href="../reference/frontier.html">Open problems</a></li>
+          <li><a href="../reference/glossary.html">Glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="foot__h">SOURCE</p>
+        <ul>
+          <li><a href="https://github.com/tushar-amrit-6/inference">GitHub repository</a></li>
+          <li><a href="../reference/how-to-use.html">How to work through this</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
+    do the arithmetic yourself.</p>
+  </div>
+</footer>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TIMELINE — LLM INFERENCE</title>
+<meta name="description" content="The papers and systems that actually changed how inference is done — each one an answer to the same question about bytes moved from memory.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="TIMELINE — LLM INFERENCE">
+<meta property="og:description" content="The papers and systems that actually changed how inference is done — each one an answer to the same question about bytes moved from memory.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/arcade.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20fill%3D%22%23000%22%2F%3E%3Cpath%20d%3D%22M16%2C16%20L29%2C9%20A15%2C15%200%201%200%2029%2C23%20Z%22%20fill%3D%22%23FFE800%22%2F%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="scorebar">
+  <a class="scorebar__home" href="../index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="var(--pac)" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
+  
+  <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/11</span></span>
+  <span class="scorebar__spacer"></span>
+  <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
+</header>
+<div class="wrap wrap--narrow">
+  <main id="main">
+    <div class="mod-head">
+      <p class="mod-head__level">REFERENCE</p>
+      <h1 class="mod-head__title">TIMELINE</h1>
+      <p class="mod-head__tag">The papers and systems that actually changed how inference is done — each one an answer to the same question about bytes moved from memory.</p>
+    </div>
+    <section class="section">
+    <div class="prose" style="margin-bottom:var(--s8)"><p>Read this as a single argument rather than a list. In 2017 nobody was thinking about inference cost, because models were small enough that it did not matter. By 2020 prompts had got long. By 2022 the models had got big enough that the memory wall became the only thing that mattered, and every year since has produced another attack on it — architectural, algorithmic, systems-level, or hardware.</p>
+<p>Dates are the arXiv preprint month where one exists, since that is usually when the idea entered circulation rather than when a venue accepted it.</p></div>
+    <ol class="tl">
+      <li class="tl__item">
+        <p class="tl__date">2017-06</p>
+        <h2 class="tl__name"><a href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noopener">Attention Is All You Need</a></h2>
+        <p class="tl__what">The transformer. Encoder-decoder, post-norm, learned positional encodings, and no thought given to generation cost.</p>
+        <p class="tl__why">Establishes the architecture whose weights you will spend the next decade trying to move less often. Also establishes causal masking, which is what makes a KV cache legal at all.</p>
+      </li><li class="tl__item">
+        <p class="tl__date">2019-04</p>
+        <h2 class="tl__name"><a href="https://arxiv.org/abs/1904.09751" target="_blank" rel="noopener">The Curious Case of Neural Text Degeneration</a></h2>
+        <p class="tl__what">Nucleus (top-p) sampling, and the demonstration that maximizing likelihood produces degenerate text.</p>
+        <p class="tl__why">Kills beam search for open-ended generation — which incidentally removes a k-fold multiplier on KV cache and compute that nobody could have afforded at scale.</p>
+      </li><li class="tl__item">
+        <p class="tl__date">2019-09</p>
+        <h2 class="tl__name"><a href="https://arxiv.org/abs/1909.08053" target="_blank" rel="noopener">Megatron-LM</a></h2>
+        <p class="tl__what">Tensor parallelism: split each layer across GPUs with column-parallel then row-parallel matmuls, costing two all-reduces per layer.</p>
+        <p class="tl__why">The mechanism by which a model too large for one GPU becomes servable. It also multiplies aggregate bandwidth, which is why TP helps decode latency and not just capacity.</p>
+      </li><li class="tl__item">
+        <p class="tl__date">2019-11</p>
+        <h2 class="tl__name"><a href="https://arxiv.org/abs/1911.02150" target="_blank" rel="noopener">Fast Transformer Decoding: One Write-Head is All You Need</a></h2>
+        <p class="tl__what">Multi-query attention. One KV head shared by all query heads, shrinking the cache by the head count.</p>
+        <p class="tl__why">The first paper to name the KV cache as *the* inference bottleneck and attack it architecturally. Four years ahead of the field, and largely ignored until the field caught up.</p>
+      </li><li class="tl__item">
+        <p class="tl__date">2020-05</p>
+        <h2 class="tl__name"><a href="https://arxiv.org/abs/2005.14165" target="_blank" rel="noopener">GPT-3 / in-context learning</a></h2>
+        <p class="tl__what">Few-shot prompting as the standard interface, which made prompts 10–100x longer overnight.</p>
+        <p class="tl__why">Turns prefill from a rounding error into a distinct, compute-bound workload with its own latency budget. Everything about TTFT starts here.</p>
+      </li><li class="tl__item">
+        <p class="tl__date">2022-05</p>
+        <h2 class="tl__name"><a href="https://arxiv.org/abs/2205.14135" target="_blank" rel="noopener">FlashAttention</a></h2>
+        <p class="tl__what">Tiling plus online softmax, computing exact attention without ever materializing the N×N score matrix in HBM.</p>
+        <p class="tl__why">The clearest single demonstration of the thesis: same arithmetic, far fewer bytes moved, 2–4x faster. Memory traffic drops from O(N²) to O(N²d²/M) where M is SRAM size.</p>
+      </li><li class="tl__item">
+        <p class="tl__date">2022-07</p>
+        <h2 class="tl__name"><a href="https://www.usenix.org/conference/osdi22/presentation/yu" target="_blank" rel="noopener">Orca (OSDI ’22)</a></h2>
+        <p class="tl__what">Continuous / iteration-level batching: evict finished sequences and admit new ones at every decode step rather than every request.</p>
+        <p class="tl__why">Turns the batch dial from a static setting into a live one. Since decode arithmetic intensity equals batch size, keeping the batch full is the single largest throughput lever in serving.</p>
+      </li><li class="tl__item">
+        <p class="tl__date">2022-10</p>
+        <h2 class="tl__name"><a href="https://arxiv.org/abs/2210.17323" target="_blank" rel="noopener">GPTQ</a></h2>
+        <p class="tl__what">Accurate post-training weight quantization to 3–4 bits using approximate second-order information.</p>
+        <p class="tl__why">Weights are most of the bytes you move at small batch, so 4-bit weights are close to a 4x decode speedup in the weight-dominated regime. No retraining required.</p>
+      </li><li class="tl__item">
+        <p class="tl__date">2022-11</p>
+        <h2 class="tl__name"><a href="https://arxiv.org/abs/2211.05102" target="_blank" rel="noopener">Efficiently Scaling Transformer Inference</a></h2>
+        <p class="tl__what">A rigorous cost model for inference, partitioning strategies derived from it, and the latency/throughput Pareto frontier made explicit.</p>
+        <p class="tl__why">The paper that made roofline reasoning standard practice for inference. If you internalize one analytical framework, take it from here.</p>
+      </li><li class="tl__item">
+        <p class="tl__date">2022-11</p>
+        <h2 class="tl__name"><a href="https://arxiv.org/abs/2211.17192" target="_blank" rel="noopener">Speculative decoding</a></h2>
+        <p class="tl__what">Draft several tokens with a cheap model, verify them in one parallel pass of the target model, and accept via modified rejection sampling.</p>
+        <p class="tl__why">The only technique that shortens the sequential dependency chain rather than making each link cheaper — and it provably preserves the output distribution exactly.</p>
+      </li><li class="tl__item">
+        <p class="tl__date">2023-05</p>
+        <h2 class="tl__name"><a href="https://arxiv.org/abs/2305.13245" target="_blank" rel="noopener">GQA</a></h2>
+        <p class="tl__what">Grouped-query attention: an interpolation between MHA and MQA, plus a recipe for converting existing MHA checkpoints cheaply.</p>
+        <p class="tl__why">The compromise the whole field adopted. Cuts the KV cache 8x on a 70B model with minimal quality loss, and is what makes long-context serving economically possible.</p>
+      </li><li class="tl__item">
+        <p class="tl__date">2023-07</p>
+        <h2 class="tl__name"><a href="https://arxiv.org/abs/2307.08691" target="_blank" rel="noopener">FlashAttention-2</a></h2>
+        <p class="tl__what">Better work partitioning across warps and thread blocks, and fewer non-matmul FLOPs. Roughly 2x over FlashAttention-1.</p>
+        <p class="tl__why">A reminder that on modern GPUs, non-tensor-core arithmetic is comparatively expensive and scheduling is as important as the algorithm.</p>
+      </li><li class="tl__item">
+        <p class="tl__date">2023-09</p>
+        <h2 class="tl__name"><a href="https://arxiv.org/abs/2309.06180" target="_blank" rel="noopener">vLLM / PagedAttention (SOSP ’23)</a></h2>
+        <p class="tl__what">Virtual-memory paging applied to the KV cache: fixed-size blocks, per-sequence block tables, non-contiguous physical storage, copy-on-write sharing.</p>
+        <p class="tl__why">Measured KV memory utilization in prior systems at 20.4–38.2%. Paging pushes waste below 4%, and the recovered memory converts directly into batch size and therefore throughput.</p>
+      </li><li class="tl__item">
+        <p class="tl__date">2023-11</p>
+        <h2 class="tl__name"><a href="https://arxiv.org/abs/2311.18677" target="_blank" rel="noopener">Splitwise</a></h2>
+        <p class="tl__what">Run prefill and decode on separate machine pools, transferring the KV cache between them.</p>
+        <p class="tl__why">Takes the prefill/decode asymmetry to its logical conclusion: two workloads with opposite bottlenecks should not share a scheduler, let alone a GPU.</p>
+      </li><li class="tl__item">
+        <p class="tl__date">2023-12</p>
+        <h2 class="tl__name"><a href="https://arxiv.org/abs/2312.07104" target="_blank" rel="noopener">SGLang / RadixAttention</a></h2>
+        <p class="tl__what">A radix tree over cached KV prefixes, enabling automatic longest-prefix reuse across arbitrary request patterns, plus a frontend language for structured generation.</p>
+        <p class="tl__why">Turns prefix sharing from a special case (one fixed system prompt) into a general mechanism. Decisive for agentic and multi-turn workloads, where history is re-sent every step.</p>
+      </li><li class="tl__item">
+        <p class="tl__date">2023-12</p>
+        <h2 class="tl__name"><a href="https://arxiv.org/abs/2312.00752" target="_blank" rel="noopener">Mamba</a></h2>
+        <p class="tl__what">A selective state-space model with constant-size recurrent state, so there is no KV cache that grows with sequence length.</p>
+        <p class="tl__why">The alternative bet: rather than compress the cache, remove it. Pure SSMs lost ground on exact recall, but hybrid attention/SSM stacks took the idea mainstream.</p>
+      </li><li class="tl__item">
+        <p class="tl__date">2024-01</p>
+        <h2 class="tl__name"><a href="https://arxiv.org/abs/2401.15077" target="_blank" rel="noopener">Medusa and EAGLE</a></h2>
+        <p class="tl__what">Self-speculation: extra decoding heads (Medusa) or feature-level autoregression (EAGLE) generate drafts without a separate draft model.</p>
+        <p class="tl__why">Removes the main practical objection to speculative decoding — that you need a second well-aligned model with its own memory footprint and its own weights to stream.</p>
+      </li><li class="tl__item">
+        <p class="tl__date">2024-01</p>
+        <h2 class="tl__name"><a href="https://arxiv.org/abs/2401.09670" target="_blank" rel="noopener">DistServe (OSDI ’24)</a></h2>
+        <p class="tl__what">Prefill/decode disaggregation with per-phase parallelism, optimizing goodput under explicit TTFT and TPOT SLOs.</p>
+        <p class="tl__why">Makes goodput — throughput that actually meets its latency target — the metric, and shows that co-locating the two phases costs you more than the KV transfer does.</p>
+      </li><li class="tl__item">
+        <p class="tl__date">2024-05</p>
+        <h2 class="tl__name"><a href="https://arxiv.org/abs/2405.04434" target="_blank" rel="noopener">DeepSeek-V2 / Multi-head Latent Attention</a></h2>
+        <p class="tl__what">Compress K and V into a shared low-rank latent vector per token, cached in place of the full per-head keys and values.</p>
+        <p class="tl__why">The most aggressive architectural attack on the cache to date — a reported ~93% KV reduction versus MHA — while claiming *better* quality than MHA rather than a trade.</p>
+      </li><li class="tl__item">
+        <p class="tl__date">2024-07</p>
+        <h2 class="tl__name"><a href="https://arxiv.org/abs/2407.08608" target="_blank" rel="noopener">FlashAttention-3</a></h2>
+        <p class="tl__what">Hopper-specific: warp specialization, asynchronous TMA copies, and interleaved matmul/softmax to hide the non-tensor-core work. Adds FP8 support.</p>
+        <p class="tl__why">Shows that extracting the last factor of two now requires exploiting specific hardware asynchrony, not just better asymptotics.</p>
+      </li><li class="tl__item">
+        <p class="tl__date">2025-01</p>
+        <h2 class="tl__name"><a href="https://arxiv.org/abs/2501.12948" target="_blank" rel="noopener">Reasoning models change the workload shape</a></h2>
+        <p class="tl__what">Long chain-of-thought models that spend thousands of tokens thinking before answering.</p>
+        <p class="tl__why">Shifts the decode-to-prefill ratio dramatically toward decode — the memory-bound half. A workload that was 60% prefill by FLOPs can become almost entirely decode by wall-clock.</p>
+      </li>
+    </ol>
+  </section>
+  </main>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <p class="foot__h">LEVELS</p>
+        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">&nbsp;</p>
+        <ul><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">REFERENCE</p>
+        <ul>
+          <li><a href="../reference/timeline.html">Timeline</a></li>
+          <li><a href="../reference/hardware.html">GPU spec table</a></li>
+          <li><a href="../reference/engines.html">Serving engines</a></li>
+          <li><a href="../reference/frontier.html">Open problems</a></li>
+          <li><a href="../reference/glossary.html">Glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="foot__h">SOURCE</p>
+        <ul>
+          <li><a href="https://github.com/tushar-amrit-6/inference">GitHub repository</a></li>
+          <li><a href="../reference/how-to-use.html">How to work through this</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
+    do the arithmetic yourself.</p>
+  </div>
+</footer>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

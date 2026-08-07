@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>02 · THE KV CACHE — LLM INFERENCE</title>
+<meta name="description" content="The single most important object in inference. Everything downstream is memory management.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="02 · THE KV CACHE — LLM INFERENCE">
+<meta property="og:description" content="The single most important object in inference. Everything downstream is memory management.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/arcade.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20fill%3D%22%23000%22%2F%3E%3Cpath%20d%3D%22M16%2C16%20L29%2C9%20A15%2C15%200%201%200%2029%2C23%20Z%22%20fill%3D%22%23FFE800%22%2F%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="scorebar">
+  <a class="scorebar__home" href="../index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="var(--pac)" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
+  <span class="scorebar__item"><span class="scorebar__label">LEVEL</span><span class="scorebar__value scorebar__value--pac">02</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/11</span></span>
+  <span class="scorebar__spacer"></span>
+  <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
+</header>
+<div class="wrap">
+  <div class="shell">
+    <nav class="rail" aria-label="Module contents">
+  <p class="rail__head">ON THIS LEVEL</p>
+  <ul class="rail__list">
+    <li><a class="rail__link" href="#big-idea" data-kind="dot"><span class="rail__dot"></span><span>The big idea</span></a></li><li><a class="rail__link" href="#concept-0" data-kind="dot"><span class="rail__dot"></span><span>What is stored, and deriving the size formula</span></a></li><li><a class="rail__link" href="#concept-1" data-kind="dot"><span class="rail__dot"></span><span>Why the KV cache, not the weights, caps your batch size</span></a></li><li><a class="rail__link" href="#concept-2" data-kind="dot"><span class="rail__dot"></span><span>The GQA multiplier, and what it bought</span></a></li><li><a class="rail__link" href="#concept-3" data-kind="dot"><span class="rail__dot"></span><span>Fragmentation: the waste nobody budgets for</span></a></li><li><a class="rail__link" href="#concept-4" data-kind="dot"><span class="rail__dot"></span><span>The two-regime memory budget</span></a></li><li><a class="rail__link" href="#concept-5" data-kind="dot"><span class="rail__dot"></span><span>Cache reuse: the free win hiding in chat</span></a></li><li><a class="rail__link" href="#math-lab" data-kind="dot"><span class="rail__dot"></span><span>Math by hand</span></a></li><li><a class="rail__link" href="#code-lab" data-kind="dot"><span class="rail__dot"></span><span>Code lab</span></a></li><li><a class="rail__link" href="#papers" data-kind="dot"><span class="rail__dot"></span><span>Papers</span></a></li><li><a class="rail__link" href="#pitfalls" data-kind="dot"><span class="rail__dot"></span><span>Pitfalls</span></a></li><li><a class="rail__link" href="#checkpoint" data-kind="power"><span class="rail__dot"></span><span>Checkpoint</span></a></li><li><a class="rail__link" href="#glossary" data-kind="dot"><span class="rail__dot"></span><span>Glossary</span></a></li>
+  </ul>
+  <div class="rail__nav">
+    <a class="rail__step" href="autoregressive-loop.html">◀ 01 THE AUTOREGRESSIVE LOOP</a>
+    <a class="rail__step" href="../index.html">▲ ALL LEVELS</a>
+    <a class="rail__step" href="decoding-and-sampling.html">03 DECODING AND SAMPLING ▶</a>
+  </div>
+</nav>
+    <main id="main">
+
+      <div class="mod-head">
+        <p class="mod-head__level">LEVEL 02</p>
+        <h1 class="mod-head__title">THE KV CACHE</h1>
+        <p class="mod-head__tag">The single most important object in inference. Everything downstream is memory management.</p>
+        <div class="mod-head__meta">
+          <span>⏱ 6–8 hours</span>
+          <span>● 6 concepts</span>
+          <span>📄 4 papers</span>
+          <span>▸ needs: Module 0, Module 1</span>
+        </div>
+      </div>
+
+      <section class="section ghost ghost--pinky" id="big-idea">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--pinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>PINKY · THE BIG IDEA</p>
+        <div class="prose"><p>Module 1 established that decode is memory-bound and that batching is the way out. This module explains why you cannot simply crank the batch size to 295 and go home.</p>
+<p>Every sequence in flight owns a private, growing block of GPU memory: its KV cache. The weights are shared by all sequences — load them once, use them for everyone. The KV cache is not shared. Each sequence pays for its own, and the bill grows with every token generated.</p>
+<p>So your batch size is not a tuning parameter you choose. It is a <strong>quotient</strong>:</p>
+<pre><code>max_batch = (GPU_memory - weights - workspace) / kv_bytes_per_sequence</code></pre>
+<p>That is the master equation of LLM serving. Weights are fixed the moment you pick a model. Workspace is roughly fixed. Everything else — every technique in Modules 5 through 9 — is an attempt to make the numerator bigger or the denominator smaller, so that more sequences fit and each weight load does more useful work.</p>
+<p>Learn to compute <code>kv_bytes_per_sequence</code> in your head. It is the most useful piece of mental arithmetic in the field.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="concepts">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>PELLETS · CONCEPTS</p>
+        <article class="concept" id="concept-0">
+  <div class="concept__head">
+    <span class="concept__n">01</span>
+    <h3 class="concept__title">What is stored, and deriving the size formula</h3>
+  </div>
+  <div class="prose"><p>Build the formula up rather than memorising it. For <strong>one token, at one layer, in one attention head</strong>, you store:</p>
+<ul><li>a key vector of <code>head_dim</code> numbers,</li><li>a value vector of <code>head_dim</code> numbers.</li></ul>
+<p>That is <code>2 × head_dim</code> numbers. The leading <strong>2</strong> is K and V — nothing more mysterious than that.</p>
+<p>Now multiply out the dimensions you have:</p>
+<pre><code>x kv_heads      each KV head has its own K and V (this is n_kv_heads, NOT n_heads)
+x layers        every layer attends independently and keeps its own cache
+x seq_len       one entry per position, and it only ever grows
+x batch         no sharing between sequences
+x dtype_bytes   2 for fp16/bf16, 1 for fp8/int8</code></pre>
+<p>Giving:</p>
+<pre><code>kv_bytes = 2 * n_layers * n_kv_heads * head_dim * seq_len * batch * dtype_bytes</code></pre>
+<p>The term people get wrong is <code>n_kv_heads</code>. On a GQA model this is much smaller than <code>n_heads</code>, and using the wrong one inflates your estimate by the GQA ratio — 4× on Llama-3-8B, 8× on Llama-3-70B. Check the config, not the head count.</p>
+<p>The most useful form is <strong>bytes per token per sequence</strong>, because it strips out the two things that vary at runtime:</p>
+<pre><code>bytes_per_token = 2 * n_layers * n_kv_heads * head_dim * dtype_bytes</code></pre>
+<p>For Llama-3-8B at fp16: <code>2 × 32 × 8 × 128 × 2 = 131,072 bytes = 128 KiB per token</code>. For Llama-3-70B at fp16: <code>2 × 80 × 8 × 128 × 2 = 327,680 bytes = 320 KiB per token</code>.</p>
+<p>Commit those two numbers. From them everything else is one multiplication: an 8k-context 70B sequence is <code>320 KiB × 8192 = 2.5 GiB</code>, and thirty-two of them is 80 GiB — an entire H100, holding nothing but cache.</p>
+<p>Note what is <strong>not</strong> in the formula: <code>n_heads</code>, <code>d_model</code>, and <code>vocab_size</code> are all absent. The KV cache is governed by the <em>KV</em> side of attention alone, which is precisely why architectural attacks on it (MQA, GQA, MLA in Module 6) are so effective — they change one term in a product.</p></div>
+  <pre class="ascii" aria-label="diagram">  per token, per layer:
+
+    K  [n_kv_heads=8, head_dim=128]  ─┐
+                                      ├─ 2 x 8 x 128 x 2 bytes = 4 KiB
+    V  [n_kv_heads=8, head_dim=128]  ─┘
+
+  x 80 layers                     = 320 KiB   per token   (Llama-3-70B)
+  x 8192 tokens                   = 2.5 GiB   per sequence
+  x 32 sequences                  = 80 GiB    &lt;- one entire H100</pre>
+  <p class="keypoint"><b>REMEMBER</b>kv_bytes = 2 × layers × kv_heads × head_dim × seq_len × batch × dtype_bytes, and every term is there for a reason you can name.</p>
+</article>
+<article class="concept" id="concept-1">
+  <div class="concept__head">
+    <span class="concept__n">02</span>
+    <h3 class="concept__title">Why the KV cache, not the weights, caps your batch size</h3>
+  </div>
+  <div class="prose"><p>Weights and KV cache behave completely differently as you scale, and confusing them is the most common planning error in LLM serving.</p>
+<p><strong>Weights are fixed and shared.</strong> A 70B model at fp16 is 140 GB whether you serve one request or a thousand. Load once, use for everyone.</p>
+<p><strong>KV cache is per-sequence and grows.</strong> Every admitted request adds its own, and every token generated grows it.</p>
+<p>Put real numbers on it. Serving <strong>Llama-3-70B on 4× H100 80GB</strong> (320 GB total):</p>
+<pre><code>total memory                        320 GB
+- weights (fp16)                    140 GB
+- activations, workspace, frag       ~20 GB
+                                    -------
+available for KV cache              ~160 GB</code></pre>
+<p>At 320 KiB per token, that budget buys you <code>160e9 / 327680 ≈ 488,000 tokens</code> of cache — total, across all sequences. How that divides up depends entirely on context length:</p>
+<table><thead><tr><th>context per request</th><th>KV per sequence</th><th>concurrent sequences</th></tr></thead><tbody><tr><td>1,024</td><td>320 MiB</td><td>~477</td></tr><tr><td>4,096</td><td>1.25 GiB</td><td>~119</td></tr><tr><td>8,192</td><td>2.5 GiB</td><td>~59</td></tr><tr><td>32,768</td><td>10 GiB</td><td>~14</td></tr><tr><td>131,072</td><td>40 GiB</td><td>~3</td></tr></tbody></table>
+<p>Read the last row. On a <strong>$120,000 machine</strong>, a 70B model at 128k context can hold <strong>three</strong> concurrent requests. Not three hundred. Three.</p>
+<p>Now connect it to Module 1. Decode arithmetic intensity equals batch size, and an H100's ridge point is 295 FLOP/byte. At 8k context you can reach batch 59 — roughly 20% of the way to the ridge, so you are still 5× off saturating the machine's arithmetic. At 128k context you reach batch 3, which is 1% of the ridge. <strong>The KV cache is what stands between you and the throughput the hardware is capable of.</strong></p>
+<p>This is why memory optimization (Module 6) is not a side quest. Halving the KV cache does not just save memory; it doubles the batch size, which doubles arithmetic intensity, which approximately doubles throughput. Memory work <em>is</em> throughput work.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Weights are a one-time fixed cost shared by every sequence; KV cache is a per-sequence cost that grows without bound.</p>
+</article>
+<article class="concept" id="concept-2">
+  <div class="concept__head">
+    <span class="concept__n">03</span>
+    <h3 class="concept__title">The GQA multiplier, and what it bought</h3>
+  </div>
+  <div class="prose"><p>Run the formula with the KV-head count as the only variable, on Llama-3-70B (<code>n_layers=80</code>, <code>head_dim=128</code>, fp16, 8k context, batch 32):</p>
+<table><thead><tr><th>scheme</th><th>kv_heads</th><th>bytes/token</th><th>per 8k seq</th><th>batch 32</th></tr></thead><tbody><tr><td>MHA (64 q heads, 64 kv)</td><td>64</td><td>2.5 MiB</td><td>20 GiB</td><td><strong>640 GiB</strong></td></tr><tr><td>GQA-8 (what Llama 3 ships)</td><td>8</td><td>320 KiB</td><td>2.5 GiB</td><td><strong>80 GiB</strong></td></tr><tr><td>MQA (single kv head)</td><td>1</td><td>40 KiB</td><td>320 MiB</td><td><strong>10 GiB</strong></td></tr></tbody></table>
+<p>The MHA row is the one to sit with. A hypothetical multi-head Llama-3-70B would need <strong>640 GiB of KV cache</strong> to serve 32 sequences at 8k — eight H100s of pure cache, on top of the two you need for weights. Ten GPUs to serve 32 users. That configuration is not expensive, it is unshippable.</p>
+<p>GQA-8 turns it into 80 GiB, which fits alongside the weights on a 4-GPU node with room to spare. <strong>Grouped-query attention is not a minor efficiency tweak. It is the architectural decision that made long-context serving economically possible</strong>, and it is why essentially every model released since 2023 uses it.</p>
+<p>The trade is quality, and the honest framing is that it is small but real. Ainslie et al. found GQA lands close to MHA quality while training much faster than converting to MQA, and MQA — sharing a single KV head across all queries — degrades noticeably more. The sweet spot the field converged on is 4 to 8 KV heads, and it was found empirically rather than derived.</p>
+<p>There is a second, subtler benefit that matters in Module 9. Tensor parallelism splits attention heads across GPUs, and <strong>you cannot split a KV head across two devices without replicating it</strong>. With 8 KV heads you can run TP-8 cleanly, one KV head per GPU. Beyond TP-8 you must duplicate KV heads across devices, and the cache stops shrinking as you add GPUs. The KV head count silently sets a ceiling on how far you can usefully parallelize.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Grouped-query attention divides the KV cache by n_heads/n_kv_heads, and it is the reason long context is affordable at all.</p>
+</article>
+<article class="concept" id="concept-3">
+  <div class="concept__head">
+    <span class="concept__n">04</span>
+    <h3 class="concept__title">Fragmentation: the waste nobody budgets for</h3>
+  </div>
+  <div class="prose"><p>The arithmetic above assumes you use every byte you allocate. Pre-vLLM systems did not come close.</p>
+<p>The problem is that you do not know how long a sequence will be until it finishes. A request arrives, you must give it cache memory, and its final length is unknown. The obvious safe answer is to allocate for the worst case: reserve <code>max_seq_len</code> up front, contiguously.</p>
+<p>If <code>max_seq_len</code> is 8,192 and the request generates 200 tokens, you reserved 2.5 GiB and used 61 MiB. <strong>97.6% waste.</strong> And because you took a contiguous block, the unused portion cannot be lent to anyone else.</p>
+<p>The vLLM paper breaks the waste into three kinds, and the distinction is worth keeping:</p>
+<ul><li><strong>Internal fragmentation</strong> — space reserved inside a sequence's own allocation that it never fills. The dominant term, and the one above.</li><li><strong>External fragmentation</strong> — free memory that exists but is split into chunks too small to satisfy a contiguous request. The classic malloc problem.</li><li><strong>Reservation waste</strong> — memory held for future tokens of a sequence that is currently running. Legitimately needed eventually, but idle right now.</li></ul>
+<p>Their measurement is the memorable one: in existing systems, <strong>only 20.4% to 38.2% of allocated KV cache memory held actual token state.</strong> Between 60% and 80% was waste. Meaning that a system reporting &quot;GPU memory full, cannot admit requests&quot; was, most of the time, two-thirds empty.</p>
+<p>There is a subtler cost too. Because you must reserve for the worst case, <code>max_seq_len</code> becomes a <em>global</em> tax. Raising your advertised context window from 8k to 32k shrinks your maximum batch size by 4× <strong>even if no request ever uses more than 2k</strong>, because every request still reserves 32k. Operators discovered this the hard way.</p>
+<p>PagedAttention (Module 6) fixes this by borrowing the idea operating systems settled on in the 1960s: allocate in small fixed-size blocks, keep a per-sequence block table, and let physical memory be non-contiguous. Waste drops below 4%. It is a genuinely lovely result — a hard systems problem solved by noticing it was a solved problem in a different field.</p></div>
+  <pre class="ascii" aria-label="diagram">  NAIVE: reserve max_seq_len contiguously
+
+  seq A  [####································]  200/8192 used
+  seq B  [#########···························]  900/8192 used
+  seq C  [##··································]  150/8192 used
+         ^^^^^^^^^^ used     ^^^^^^^^^^^^^^^^^^ reserved, wasted, unlendable
+
+  PAGED: 16-token blocks, allocated on demand, non-contiguous
+
+  seq A  [#][#][#][#]                     -&gt;  free pool: [ ][ ][ ][ ][ ][ ]...
+  seq B  [#][#][#][#][#][#][#][#]             any sequence can take any block
+  seq C  [#][#][#]</pre>
+  <p class="keypoint"><b>REMEMBER</b>Naive allocators reserve max_seq_len per request, so a system that looks full is typically 60–80% empty.</p>
+</article>
+<article class="concept" id="concept-4">
+  <div class="concept__head">
+    <span class="concept__n">05</span>
+    <h3 class="concept__title">The two-regime memory budget</h3>
+  </div>
+  <div class="prose"><p>A decode step reads two things: all the weights, and all the KV cache of every sequence in the batch. Which dominates determines what you should be optimizing.</p>
+<pre><code>bytes_per_step = weight_bytes  +  batch * seq_len * kv_bytes_per_token
+                 (constant)       (grows with load and context)</code></pre>
+<p>Llama-3-8B at fp16: weights ≈ 15.0 GB, KV ≈ 128 KiB/token. Setting the terms equal:</p>
+<pre><code>batch * seq_len = 15.0e9 / 131072 = 114,441 tokens</code></pre>
+<p>So the crossover is at about <strong>114,000 cached tokens in flight</strong>. Below that you are weight-dominated; above it, cache-dominated.</p>
+<table><thead><tr><th>situation</th><th>tokens in flight</th><th>regime</th></tr></thead><tbody><tr><td>batch 1, 2k context</td><td>2,048</td><td>weights, overwhelmingly (0.02×)</td></tr><tr><td>batch 32, 2k context</td><td>65,536</td><td>weights still (0.57×)</td></tr><tr><td>batch 32, 8k context</td><td>262,144</td><td><strong>cache dominates</strong> (2.3×)</td></tr><tr><td>batch 8, 128k context</td><td>1,048,576</td><td>cache, crushingly (9.2×)</td></tr></tbody></table>
+<p>This table should change how you read optimization advice, because the two regimes want opposite things:</p>
+<p><strong>Weight-dominated</strong> (small batch, short context — interactive single-user, local inference). Quantize the weights. int4 weight-only quantization nearly quadruples decode speed here because weight bytes <em>are</em> your step time. KV optimizations do almost nothing. This is why llama.cpp is obsessed with weight quantization: it is the correct obsession for its regime.</p>
+<p><strong>Cache-dominated</strong> (large batch, long context — production serving). Weight quantization helps much less. You want KV quantization, GQA/MLA, PagedAttention, prefix caching, eviction. This is why vLLM and SGLang are built the way they are.</p>
+<p>Most arguments about &quot;the best inference optimization&quot; are really two people in different regimes talking past each other. Ask which side of the crossover they are on and the disagreement usually dissolves.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Below a threshold the weights dominate your bytes-per-step; above it the KV cache does, and your optimization targets change completely.</p>
+</article>
+<article class="concept" id="concept-5">
+  <div class="concept__head">
+    <span class="concept__n">06</span>
+    <h3 class="concept__title">Cache reuse: the free win hiding in chat</h3>
+  </div>
+  <div class="prose"><p>Consider a chat application. Turn 3 of a conversation sends:</p>
+<pre><code>[system prompt: 500 tokens]
+[user turn 1] [assistant turn 1]
+[user turn 2] [assistant turn 2]
+[user turn 3]                        &lt;- only this is new</code></pre>
+<p>A stateless server prefills all of it — say 3,000 tokens — to produce one new token. But the KV entries for the first 2,900 tokens are <em>identical</em> to what it computed last turn. Causality guarantees it: appending tokens cannot change the K or V of anything earlier.</p>
+<p>If you keep that cache, turn 3's prefill is 100 tokens instead of 3,000. A <strong>30× reduction in TTFT</strong>, for free, with no approximation.</p>
+<p>The same idea applies across <em>different</em> requests that share a prefix. A thousand users hitting the same 800-token system prompt share those 800 tokens' worth of KV state exactly. Compute it once, point every sequence at it. This is <strong>prefix caching</strong>, and with a radix tree to find the longest matching prefix (SGLang's RadixAttention) it generalises to arbitrary sharing patterns — few-shot examples, document QA over a shared document, agent loops that replay a growing trajectory.</p>
+<p>Agentic workloads make this decisive rather than merely nice. An agent that takes 20 steps re-sends its entire growing history every step. Without prefix caching, total prefill work is quadratic in the number of steps. With it, each step prefills only the newest action and observation.</p>
+<p>Three things make this harder than it sounds, and all three are real bugs people ship:</p>
+<ol><li><strong>RoPE position indices.</strong> Cached keys were rotated by their absolute position. Reuse a prefix at a different offset without handling this and you get silently wrong attention.</li><li><strong>Eviction policy.</strong> Cache memory is the same memory sequences need. Keeping prefixes for possible future hits costs you batch size <em>now</em>. LRU is the usual answer; the right answer depends on your traffic.</li><li><strong>Isolation.</strong> Sharing cache across users is sharing derived state across users. The state is keyed by exact token prefix, so a hit requires an exact match — but it is worth knowing this is a cross-tenant surface, and that hit/miss timing can in principle leak whether someone else has sent a given prefix.</li></ol></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Multi-turn conversation re-sends a prefix that has not changed, so the KV cache for it can be kept rather than recomputed.</p>
+</article>
+      </section>
+
+      <section class="section ghost ghost--inky" id="math-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--inky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>INKY · MATH BY HAND</p>
+        <h2 class="section__title">Math by hand</h2>
+        <div class="prose"><p>The canonical calculation. Do it on paper before touching a calculator.</p>
+<p><strong>Model: Llama-3-70B.</strong> Config: <code>n_layers = 80</code>, <code>n_heads = 64</code>, <code>n_kv_heads = 8</code>, <code>head_dim = 128</code>, <code>d_model = 8192</code>, 70.6 B parameters.</p>
+<ol><li>KV cache bytes <strong>per token per sequence</strong> at fp16.</li><li>KV cache for <strong>one sequence at 8,192 context</strong>. In GiB.</li><li>KV cache for <strong>batch 32 at 8,192 context</strong>. In GiB.</li><li>Model weights at fp16, in GB. Compare to (3). Which is bigger?</li><li>You have <strong>4× H100 80GB</strong> = 320 GB, and you reserve 20 GB for activations and workspace. How many 8,192-token sequences fit concurrently?</li><li>Redo (5) at <strong>128k context</strong>. How many sequences now?</li><li>Now the payoff. Recompute (3) under: <strong>(a)</strong> MQA (1 KV head), <strong>(b)</strong> fp8 KV cache, <strong>(c)</strong> both together. For each, state the batch-size multiplier it buys.</li><li>Given decode arithmetic intensity ≈ batch size and an H100 ridge point of 295 FLOP/byte, which of these configurations gets you closest to saturating the GPU's arithmetic?</li></ol></div>
+        <details class="spoiler">
+          <summary>SHOW THE WORKED SOLUTION</summary>
+          <div class="spoiler__body prose"><p><strong>1. Bytes per token</strong></p>
+<pre><code>2 (K and V) x 80 layers x 8 kv_heads x 128 head_dim x 2 bytes
+  = 2 x 80 x 8 x 128 x 2
+  = 327,680 bytes
+  = 320 KiB per token</code></pre>
+<p><strong>2. One sequence at 8,192 tokens</strong></p>
+<pre><code>327,680 x 8,192 = 2,684,354,560 bytes
+                = 2,621,440 KiB = 2,560 MiB = 2.5 GiB</code></pre>
+<p><strong>3. Batch 32</strong></p>
+<pre><code>2.5 GiB x 32 = 80 GiB   (85.9 GB)</code></pre>
+<p><strong>4. Weights</strong></p>
+<pre><code>70.6e9 x 2 bytes = 141.2 GB = 131.5 GiB</code></pre>
+<p>Weights (131.5 GiB) still exceed the cache (80 GiB) at this batch and context — but only by 1.6×. Push to batch 64 and the cache wins. The two are the same order of magnitude, which is the regime change that makes KV memory a first-class concern.</p>
+<p><strong>5. Concurrent sequences at 8k</strong></p>
+<pre><code>320 GB total - 141.2 GB weights - 20 GB workspace = 158.8 GB for KV
+158.8e9 / 2.684e9 per sequence = 59.2  -&gt;  59 sequences</code></pre>
+<p><strong>6. At 128k context</strong></p>
+<pre><code>per sequence: 327,680 x 131,072 = 42.95e9 bytes = 40 GiB
+158.8e9 / 42.95e9 = 3.7  -&gt;  3 sequences</code></pre>
+<p>Three. On four H100s. This is the long-context serving problem in one number.</p>
+<p><strong>7. The optimizations</strong>, all at 8k context, batch 32:</p>
+<p><strong>(a) MQA, 1 KV head:</strong></p>
+<pre><code>2 x 80 x 1 x 128 x 2 = 40,960 bytes/token  (40 KiB, an 8x reduction)
+batch 32 at 8k: 40,960 x 8192 x 32 = 10.7e9 = 10 GiB
+new capacity: 158.8e9 / (40,960 x 8192) = 473 sequences
+multiplier vs GQA-8: 8x</code></pre>
+<p><strong>(b) fp8 KV cache, keeping GQA-8:</strong></p>
+<pre><code>2 x 80 x 8 x 128 x 1 = 163,840 bytes/token  (160 KiB, a 2x reduction)
+batch 32 at 8k: 40 GiB
+new capacity: 118 sequences
+multiplier: 2x</code></pre>
+<p><strong>(c) Both:</strong></p>
+<pre><code>2 x 80 x 1 x 128 x 1 = 20,480 bytes/token  (20 KiB, a 16x reduction)
+batch 32 at 8k: 5 GiB
+new capacity: 946 sequences
+multiplier: 16x</code></pre>
+<p><strong>8. Which saturates the GPU?</strong></p>
+<p>Decode arithmetic intensity ≈ batch size; the H100 ridge is 295 FLOP/byte.</p>
+<pre><code>GQA-8, fp16:      59 sequences   -&gt;  intensity ~59    20% of ridge
+fp8 KV:          118 sequences   -&gt;  intensity ~118   40% of ridge
+MQA, fp16:       473 sequences   -&gt;  past the ridge -- now COMPUTE-bound
+MQA + fp8:       946 sequences   -&gt;  well past the ridge</code></pre>
+<p>The baseline configuration reaches only about 20% of the ridge point: even with memory perfectly packed, four H100s spend most of every decode step waiting on HBM. Combining KV optimizations pushes past the ridge and <strong>changes the bottleneck from memory to compute</strong> — at which point memory work stops paying and you switch to Modules 7 and 8.</p>
+<p>That is the real lesson. The goal of KV optimization is not &quot;use less memory.&quot; It is to buy enough batch size to cross the ridge point, after which the same effort buys you nothing and you should be doing something else.</p>
+<p><em>(Caveat for honesty: real systems do not hit these numbers. MQA costs quality, fp8 KV costs a little more, and at batch 473 you are contending with scheduling overhead, attention kernels that scale with total cached tokens, and the fact that 946 concurrent users have wildly heterogeneous lengths. Treat these as upper bounds that tell you where the ceiling is, not throughput predictions.)</em></p></div>
+        </details>
+      </section>
+
+      <section class="section ghost ghost--clyde" id="code-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--clyde)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>CLYDE · CODE LAB</p>
+        <h2 class="section__title">Code lab</h2>
+        <div class="prose"><p>Two parts.</p>
+<p><strong>Part A</strong> — write a KV cache calculator you will actually keep. Feed it a model config and get back bytes per token, per-sequence cost at a given context, and how many sequences fit in a given memory budget. Then use it to reproduce the math lab.</p>
+<p><strong>Part B</strong> — go back to Module 1's generation loop and instrument the real cache, so you can see your formula predict PyTorch's actual allocation to the byte.</p></div>
+        <div class="prose" style="max-width:none"><pre><code class="lang-python">&quot;&quot;&quot;
+Part A: the KV cache calculator. Keep this file.
+Part B: verify the formula against a real model's actual cache.
+&quot;&quot;&quot;
+from dataclasses import dataclass
+
+GiB = 1024 ** 3
+GB = 10 ** 9
+
+
+@dataclass
+class ModelConfig:
+    name: str
+    n_layers: int
+    n_heads: int
+    n_kv_heads: int
+    head_dim: int
+    n_params: float           # total parameters
+
+    def kv_bytes_per_token(self, dtype_bytes=2):
+        # 2 = one K vector and one V vector.
+        # NOTE: n_kv_heads, not n_heads. This is the term people get wrong.
+        return 2 * self.n_layers * self.n_kv_heads * self.head_dim * dtype_bytes
+
+    def kv_bytes(self, seq_len, batch=1, dtype_bytes=2):
+        return self.kv_bytes_per_token(dtype_bytes) * seq_len * batch
+
+    def weight_bytes(self, dtype_bytes=2):
+        return int(self.n_params * dtype_bytes)
+
+    def max_batch(self, total_mem_bytes, seq_len,
+                  weight_dtype=2, kv_dtype=2, workspace_bytes=20 * GB):
+        budget = total_mem_bytes - self.weight_bytes(weight_dtype) - workspace_bytes
+        if budget &lt;= 0:
+            return 0
+        return int(budget // self.kv_bytes(seq_len, 1, kv_dtype))
+
+
+LLAMA3_8B = ModelConfig(&quot;Llama-3-8B&quot;, 32, 32, 8, 128, 8.03e9)
+LLAMA3_70B = ModelConfig(&quot;Llama-3-70B&quot;, 80, 64, 8, 128, 70.6e9)
+MISTRAL_7B = ModelConfig(&quot;Mistral-7B&quot;, 32, 32, 8, 128, 7.24e9)
+
+
+def report(cfg, seq_len, batch, total_mem, kv_dtype=2):
+    per_tok = cfg.kv_bytes_per_token(kv_dtype)
+    print(f&quot;\n=== {cfg.name} @ {seq_len} ctx, batch {batch}, kv={kv_dtype}B ===&quot;)
+    print(f&quot;  kv per token       {per_tok:&gt;14,} B  ({per_tok/1024:.0f} KiB)&quot;)
+    print(f&quot;  kv per sequence    {cfg.kv_bytes(seq_len)/GiB:&gt;14.2f} GiB&quot;)
+    print(f&quot;  kv for batch       {cfg.kv_bytes(seq_len, batch, kv_dtype)/GiB:&gt;14.2f} GiB&quot;)
+    print(f&quot;  weights (fp16)     {cfg.weight_bytes()/GB:&gt;14.1f} GB&quot;)
+    print(f&quot;  max concurrent     {cfg.max_batch(total_mem, seq_len, kv_dtype=kv_dtype):&gt;14,}&quot;)
+
+
+# --- reproduce the math lab ---
+FOUR_H100 = 4 * 80 * GB
+report(LLAMA3_70B, 8192, 32, FOUR_H100)
+report(LLAMA3_70B, 131072, 32, FOUR_H100)
+report(LLAMA3_70B, 8192, 32, FOUR_H100, kv_dtype=1)      # fp8 KV
+
+# --- what GQA actually bought us ---
+print(&quot;\n=== Llama-3-70B @ 8k, batch 32: KV scheme comparison ===&quot;)
+print(f&quot;  {'scheme':&lt;12} {'kv/token':&gt;12} {'batch-32 KV':&gt;14} {'max seqs':&gt;10}&quot;)
+for label, kvh in [(&quot;MHA (64)&quot;, 64), (&quot;GQA-8&quot;, 8), (&quot;MQA (1)&quot;, 1)]:
+    c = ModelConfig(&quot;x&quot;, 80, 64, kvh, 128, 70.6e9)
+    print(f&quot;  {label:&lt;12} {c.kv_bytes_per_token()/1024:&gt;9.0f} KiB&quot;
+          f&quot; {c.kv_bytes(8192, 32)/GiB:&gt;11.1f} GiB&quot;
+          f&quot; {c.max_batch(FOUR_H100, 8192):&gt;10,}&quot;)
+
+# --- the two-regime crossover ---
+print(&quot;\n=== where does KV overtake weights? (Llama-3-8B) ===&quot;)
+crossover = LLAMA3_8B.weight_bytes() / LLAMA3_8B.kv_bytes_per_token()
+print(f&quot;  crossover at {crossover:,.0f} cached tokens in flight&quot;)
+for b, s in [(1, 2048), (32, 2048), (32, 8192), (8, 131072)]:
+    tot = b * s
+    ratio = LLAMA3_8B.kv_bytes(s, b) / LLAMA3_8B.weight_bytes()
+    regime = &quot;CACHE-dominated&quot; if ratio &gt; 1 else &quot;weight-dominated&quot;
+    print(f&quot;  batch {b:&gt;3}, ctx {s:&gt;6}: {tot:&gt;9,} tokens  kv/weights={ratio:&gt;5.2f}  {regime}&quot;)
+
+
+# ============================================================
+# Part B: check the formula against a real model
+# ============================================================
+def verify():
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    name = &quot;gpt2&quot;
+    model = AutoModelForCausalLM.from_pretrained(name)
+    tok = AutoTokenizer.from_pretrained(name)
+    c = model.config
+
+    # GPT-2 is plain MHA: n_kv_heads == n_head
+    cfg = ModelConfig(name, c.n_layer, c.n_head, c.n_head,
+                      c.n_embd // c.n_head, 124e6)
+
+    ids = tok(&quot;Attention is all you need, but memory bandwidth is what you get.&quot;,
+              return_tensors=&quot;pt&quot;).input_ids
+    seq = ids.shape[1]
+
+    with torch.no_grad():
+        out = model(ids, use_cache=True)
+
+    # count real bytes in past_key_values
+    actual = 0
+    for layer in out.past_key_values:
+        for t in layer:                      # (key, value)
+            actual += t.numel() * t.element_size()
+
+    dtype_bytes = out.past_key_values[0][0].element_size()
+    predicted = cfg.kv_bytes(seq, 1, dtype_bytes)
+
+    print(f&quot;\n=== Part B: formula vs reality ({name}, seq={seq}) ===&quot;)
+    print(f&quot;  layers={cfg.n_layers} kv_heads={cfg.n_kv_heads} &quot;
+          f&quot;head_dim={cfg.head_dim} dtype={dtype_bytes}B&quot;)
+    print(f&quot;  predicted  {predicted:&gt;12,} bytes&quot;)
+    print(f&quot;  actual     {actual:&gt;12,} bytes&quot;)
+    print(f&quot;  match: {predicted == actual}&quot;)
+
+
+if __name__ == &quot;__main__&quot;:
+    try:
+        verify()
+    except ImportError:
+        print(&quot;\n(pip install torch transformers to run Part B)&quot;)
+
+# --- TODO for you ---
+#   1. Add an mla_bytes_per_token() for DeepSeek-style latent attention:
+#      per layer it stores ONE latent vector of kv_lora_rank (512) plus a
+#      rope part (64), so 576 values -- not 2 x heads x head_dim. Compare.
+#   2. Add a method that answers: &quot;given N GPUs of M GB, what is the longest
+#      context I can serve at batch B?&quot; Invert the equation.
+</code></pre></div>
+        <div class="prose"><h3>What you should see</h3><p>Part A reproduces the math lab exactly: 320 KiB per token for the 70B, 2.5 GiB per 8k sequence, 80 GiB at batch 32, ~59 concurrent sequences on 4×H100, and 3 at 128k context. The GQA table shows MHA needing 640 GiB and MQA needing 10 GiB for the same workload.</p>
+<p>The crossover section prints ~114,441 tokens, and correctly labels batch 32 at 2k context as weight-dominated but batch 32 at 8k as cache-dominated.</p>
+<p>Part B prints <code>match: True</code>. GPT-2 small has 12 layers, 12 heads, head_dim 64, fp32, so at a 16-token sequence: <code>2 × 12 × 12 × 64 × 4 × 16 = 1,179,648 bytes</code>. Seeing your formula predict PyTorch's allocation to the byte is the point of the exercise — after this you will trust the arithmetic.</p>
+<p>If it does not match, the usual causes are: the model has GQA and you passed <code>n_head</code> for <code>n_kv_heads</code>; or the cache dtype is not what you assumed.</p></div>
+        <div class="prose"><h3>Stretch</h3><p>Return to Module 1's timing loop and plot the <em>cached</em> line against your predicted KV cache size at each step. The residual slope of that line is the cache being read. Then extend the calculator to model <strong>PagedAttention</strong>: given a block size of 16 tokens, compute the internal fragmentation for a realistic distribution of sequence lengths (try a lognormal with median 300 and a long tail) and compare against the naive reserve-<code>max_seq_len</code> allocator. You should reproduce something close to the vLLM paper's finding that naive allocation wastes 60–80%.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pac" id="papers">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>THE KEY · PAPERS</p>
+        <h2 class="section__title">Papers, with a reading frame</h2>
+        <div class="papers">
+          <article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/1911.02150" target="_blank" rel="noopener">Fast Transformer Decoding: One Write-Head is All You Need</a></h3>
+            <p class="paper__by">Noam Shazeer, 2019</p>
+            <p class="paper__why">The MQA paper — the first to name the KV cache as *the* inference bottleneck and attack it architecturally. Four years ahead of the field.</p>
+            <div class="paper__frame"><p>Six pages. Read <strong>Section 2</strong> for the incremental-decoding cost model, which is essentially this module's argument written in 2019. <strong>Section 3</strong> defines MQA in a paragraph. The memory-bandwidth analysis at the start is the historically important part: Shazeer identified the problem before hardware trends made it universally painful.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2305.13245" target="_blank" rel="noopener">GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints</a></h3>
+            <p class="paper__by">Ainslie et al., 2023</p>
+            <p class="paper__why">GQA, which every current open-weight model uses. Also shows how to convert an existing MHA checkpoint rather than retraining.</p>
+            <div class="paper__frame"><p><strong>Section 2.2</strong> defines GQA and <strong>Section 2.1</strong> describes the uptraining procedure — mean-pool the KV heads within each group, then fine-tune on ~5% of the original compute. Figure 1 is the picture worth remembering. <strong>Figure 5</strong> has the quality-versus-speed curve that justifies 8 groups. Skim the experiments.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2309.06180" target="_blank" rel="noopener">Efficient Memory Management for Large Language Model Serving with PagedAttention</a></h3>
+            <p class="paper__by">Kwon et al., SOSP 2023</p>
+            <p class="paper__why">The vLLM paper. Read the first half now for the fragmentation analysis; the full treatment is Module 6.</p>
+            <div class="paper__frame"><p>For this module read <strong>Section 3</strong> only — the memory-waste breakdown and Figure 2, which is where the &quot;20.4–38.2% utilization&quot; figure comes from. Stop before Section 4. You will come back for PagedAttention itself.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2211.05102" target="_blank" rel="noopener">Efficiently Scaling Transformer Inference</a></h3>
+            <p class="paper__by">Pope et al., 2022</p>
+            <p class="paper__why">Has the cleanest treatment of how KV cache size interacts with parallelism and batch size.</p>
+            <div class="paper__frame"><p>Revisit <strong>Section 2</strong> with the KV formula in hand. Their cost model separates weight traffic from KV traffic explicitly, and the two-regime split of this module falls straight out of their equations.</p></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--blinky" id="pitfalls">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--blinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>BLINKY · PITFALLS</p>
+        <h2 class="section__title">What people get wrong</h2>
+        <div class="pitfall">
+          <p class="pitfall__wrong"><span>Using n_heads instead of n_kv_heads in the KV cache formula.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>The most common error in this arithmetic, and it inflates your estimate by the GQA ratio — 4× on Llama-3-8B, 8× on Llama-3-70B. Only the K and V projections contribute to the cache, and on a GQA model there are fewer of those than query heads. Always read <code>n_kv_heads</code> (or <code>num_key_value_heads</code>) out of the config; never infer it from the head count.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>The KV cache is small compared to the model weights.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>True at small batch and short context, false exactly where production lives. For Llama-3-8B the two are equal at about 114,000 cached tokens in flight — batch 32 at 8k context is already past it, at 2.3× the weight bytes. At batch 8 with 128k context the cache is 9× the weights. Whether it is &quot;small&quot; is a question about your operating point, not a property of the model.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Raising max_seq_len is free if nobody uses long contexts.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>Not with a naive allocator. If you reserve <code>max_seq_len</code> per request up front, raising the advertised limit from 8k to 32k cuts your maximum batch size by 4× even when every real request is 500 tokens — the reservation is charged whether or not it is used. This is the single most expensive configuration mistake in LLM serving. With PagedAttention the problem mostly goes away, because blocks are allocated on demand.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Prefix caching is an approximation that might change the output.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>It is exact. Causal masking guarantees the K and V of a prefix are bit-identical regardless of what follows, so reusing them gives the same result as recomputing. The failure modes are implementation bugs, not approximation — most commonly mishandling RoPE position indices when a prefix is reused at a different offset, which corrupts attention silently. Done correctly, prefix caching is free performance with no quality cost.</p></div></div>
+        </div>
+      </section>
+
+      <section class="section" id="checkpoint">
+        <div class="wall checkpoint">
+          <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>POWER PELLET · CHECKPOINT</p>
+          <p class="checkpoint__claim">You can compute a KV cache footprint in your head from a config file, and you can
+explain why long context is expensive at inference time in a way that has nothing to do with
+attention's O(N²) compute cost.</p>
+          <details class="qa">
+            <summary>Explain why 128k context is expensive at inference, without mentioning the O(N²) cost of attention.</summary>
+            <div class="qa__a prose"><p>Because the KV cache is linear in context length and must be held in GPU memory for the entire lifetime of the request. Llama-3-70B stores 320 KiB per token, so a 128k-token sequence needs 40 GiB of cache — half an H100 for one user. On a 4×H100 node with 141 GB of weights and 20 GB of workspace, you have about 159 GB left, which fits <strong>three</strong> such sequences. Batch size collapses to 3, arithmetic intensity collapses with it, and you are running a $120,000 machine at roughly 1% of its arithmetic capability. The compute cost of attention is a separate problem that mostly bites during prefill. The memory cost is what stops you serving anyone.</p></div>
+          </details>
+<details class="qa">
+            <summary>A model has 48 layers, 40 attention heads, 8 KV heads, head_dim 128. What is its KV cache per token at fp16, and at fp8?</summary>
+            <div class="qa__a prose"><p><code>2 × 48 × 8 × 128 × 2 = 196,608 bytes = 192 KiB</code> per token at fp16, and half that at fp8: <code>98,304 bytes = 96 KiB</code>. The 40 query heads do not appear anywhere in the calculation — only <code>n_kv_heads</code> matters. Using 40 instead of 8 would give 960 KiB and overstate the cache by 5×, which is the single most common error in these estimates.</p></div>
+          </details>
+<details class="qa">
+            <summary>Your serving system reports &quot;out of memory&quot; at batch 12 when your arithmetic says batch 40 should fit. What is the most likely cause?</summary>
+            <div class="qa__a prose"><p>Fragmentation from a naive allocator that reserves <code>max_seq_len</code> contiguously for every request. If <code>max_seq_len</code> is 8,192 and typical requests use 2,000 tokens, you are wasting about 75% of allocated cache — turning a theoretical batch of 40 into a real batch of 10–12, which matches. The vLLM paper measured exactly this: only 20.4–38.2% of allocated KV memory held real tokens. The fix is paged allocation in small blocks. Worth ruling out first, though: check whether you also under-budgeted activation workspace, and whether CUDA graph capture is holding extra memory.</p></div>
+          </details>
+<details class="qa">
+            <summary>Why does halving your KV cache do more than just save memory?</summary>
+            <div class="qa__a prose"><p>Because it converts directly into throughput. Halving the per-sequence cache doubles how many sequences fit, which doubles the batch size. Decode arithmetic intensity equals batch size, so intensity doubles too — you now do twice as much useful arithmetic per byte of weights streamed. Since decode is memory-bound, throughput roughly doubles. Memory work is throughput work. The caveat is that this holds only until you reach the ridge point (≈295 FLOP/byte on H100); past it you are compute-bound and further KV savings buy nothing.</p></div>
+          </details>
+<details class="qa">
+            <summary>When would you prefer weight quantization over KV cache quantization, and vice versa?</summary>
+            <div class="qa__a prose"><p>It depends on which side of the crossover you are on. Bytes per step are <code>weight_bytes + batch × seq_len × kv_bytes_per_token</code>. For Llama-3-8B those terms are equal at about 114,000 cached tokens in flight. Below that — small batch, short context, single-user local inference — weights dominate and int4 weight quantization gives you close to a linear speedup; KV quantization does nearly nothing. Above it — large batch, long context, production serving — the cache dominates, weight quantization gives diminishing returns, and fp8/int8 KV is what buys you batch size. Most disagreements about &quot;the best optimization&quot; are two people in different regimes.</p></div>
+          </details>
+<details class="qa">
+            <summary>Why does the number of KV heads limit how far you can scale tensor parallelism?</summary>
+            <div class="qa__a prose"><p>Tensor parallelism splits attention heads across GPUs, and a KV head cannot be split across two devices without replicating its cache on both. With 8 KV heads you can run TP-8 with exactly one KV head per GPU and the per-GPU cache shrinks 8×. At TP-16 you must duplicate each KV head across two GPUs, so per-GPU cache stops shrinking even though you added hardware — you are paying for GPUs that add bandwidth and compute but no cache capacity. This is a real constraint on large-model deployment and one reason KV head count is chosen with parallelism in mind, not just quality.</p></div>
+          </details>
+          <p style="margin-top:var(--s7)">
+            <button class="done-toggle" type="button" data-complete="2" aria-pressed="false">
+              MARK LEVEL 02 CLEARED
+            </button>
+          </p>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="glossary">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>GLOSSARY</p>
+        <h2 class="section__title">Glossary</h2>
+        <div class="gloss">
+          <div class="gloss__row"><div class="gloss__term">KV cache</div><div class="gloss__def">The stored key and value tensors for all previous positions, kept so they are not recomputed each step. Per-sequence, and it grows with every token.</div></div><div class="gloss__row"><div class="gloss__term">bytes per token</div><div class="gloss__def">2 x n_layers x n_kv_heads x head_dim x dtype_bytes. The most useful derived number in inference planning.</div></div><div class="gloss__row"><div class="gloss__term">internal fragmentation</div><div class="gloss__def">Memory reserved inside a sequence allocation that the sequence never uses. The dominant waste in naive allocators.</div></div><div class="gloss__row"><div class="gloss__term">external fragmentation</div><div class="gloss__def">Free memory that exists but is broken into pieces too small to satisfy a contiguous allocation.</div></div><div class="gloss__row"><div class="gloss__term">prefix caching</div><div class="gloss__def">Reusing cached KV state across requests that share a leading token sequence. Exact, not approximate.</div></div><div class="gloss__row"><div class="gloss__term">RadixAttention</div><div class="gloss__def">SGLang's radix-tree index over cached prefixes, enabling automatic longest-prefix reuse across arbitrary sharing patterns.</div></div><div class="gloss__row"><div class="gloss__term">crossover point</div><div class="gloss__def">The number of cached tokens in flight at which KV traffic overtakes weight traffic. About 114k tokens for Llama-3-8B at fp16.</div></div><div class="gloss__row"><div class="gloss__term">MQA</div><div class="gloss__def">Multi-query attention: a single KV head shared by all query heads. Maximum cache savings, largest quality cost.</div></div><div class="gloss__row"><div class="gloss__term">workspace</div><div class="gloss__def">GPU memory reserved for activations, temporary buffers, and communication. Typically 10-20 GB, and easy to forget when budgeting.</div></div>
+        </div>
+      </section>
+
+      <nav class="pagenav">
+        <a href="autoregressive-loop.html" data-nav="prev"><span>◀ PREVIOUS LEVEL</span>01 THE AUTOREGRESSIVE LOOP</a>
+        <a href="decoding-and-sampling.html" data-nav="next" style="text-align:right"><span>NEXT LEVEL ▶</span>03 DECODING AND SAMPLING</a>
+      </nav>
+
+    </main>
+  </div>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <p class="foot__h">LEVELS</p>
+        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">&nbsp;</p>
+        <ul><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">REFERENCE</p>
+        <ul>
+          <li><a href="../reference/timeline.html">Timeline</a></li>
+          <li><a href="../reference/hardware.html">GPU spec table</a></li>
+          <li><a href="../reference/engines.html">Serving engines</a></li>
+          <li><a href="../reference/frontier.html">Open problems</a></li>
+          <li><a href="../reference/glossary.html">Glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="foot__h">SOURCE</p>
+        <ul>
+          <li><a href="https://github.com/tushar-amrit-6/inference">GitHub repository</a></li>
+          <li><a href="../reference/how-to-use.html">How to work through this</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
+    do the arithmetic yourself.</p>
+  </div>
+</footer>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>
