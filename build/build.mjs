@@ -326,7 +326,10 @@ function indexPage(modules) {
           <strong>how do we do more useful work per byte moved from memory?</strong> Hold that in
           view and the field stops looking like a pile of tricks.</p>
           <div class="hero__cta">
-            <a class="btn" href="modules/${modules[0].slug}.html">${icon.pac(14)} START AT LEVEL 00</a>
+            <!-- Plays the maze when JS is available; falls back to level 00
+                 without it. A link rather than a JS-revealed button, so the
+                 primary CTA never pops in after load. -->
+            <a class="btn" href="modules/${modules[0].slug}.html" data-game-play>${icon.pac(14)} START</a>
             <a class="btn btn--ghost" href="reference/how-to-use.html">HOW TO WORK THROUGH IT</a>
             <span class="coin" data-resume hidden></span>
           </div>
@@ -365,11 +368,11 @@ function indexPage(modules) {
         </div>
       </div>
       <p class="dim" style="margin-top:var(--s4);font-size:14.5px;max-width:70ch">
-        Or play it. Press start and Pac-Man finds a level on his own; take over with the arrow
-        keys, WASD or a swipe to pick one yourself. Whichever numbered node he eats is the level
-        that opens. The ghosts doze until you take control — after that they will send you back to
-        the start, and the power pellets in the bottom corners make them edible. Clicking a node
-        still just opens it.
+        Or play it. Press start — or just tap left or right while the maze is on screen — and
+        Pac-Man finds a level on his own; take over with the arrow keys, WASD or a swipe to pick
+        one yourself. Whichever numbered node he eats is the level that opens. The ghosts doze
+        until you take control — after that they will send you back to the start, and the power
+        pellets in the bottom corners make them edible. Clicking a node still just opens it.
       </p>
 
       <ul class="maze-legend">

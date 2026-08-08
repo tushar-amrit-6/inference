@@ -342,12 +342,30 @@
     A: 'left', D: 'right', W: 'up', S: 'down',
   };
 
+  function mazeOnScreen() {
+    var r = svg.getBoundingClientRect();
+    var vh = window.innerHeight || document.documentElement.clientHeight;
+    return r.bottom > vh * 0.15 && r.top < vh * 0.85;
+  }
+
   document.addEventListener('keydown', function (e) {
-    if (!running) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     var t = e.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
     var dir = KEYS[e.key];
+
+    if (!running) {
+      // Left or right starts a game, but only while the maze is actually on
+      // screen. Deliberately not up/down: those are how people scroll, and
+      // hijacking them anywhere on the page would be hostile.
+      if (!navigating && (dir === 'left' || dir === 'right') && mazeOnScreen()) {
+        e.preventDefault();
+        start();
+        turn(dir);
+      }
+      return;
+    }
+
     if (dir) { e.preventDefault(); turn(dir); }
     if (e.key === 'Escape') stop('STOPPED');
   });
@@ -419,6 +437,21 @@
   startBtn.addEventListener('click', function () {
     if (running || navigating) stop();
     else start();
+  });
+
+  // The hero CTA plays the maze. It is a real link to level 00, so with JS
+  // disabled it still takes you somewhere useful; here we take it over.
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  Array.prototype.forEach.call(document.querySelectorAll('[data-game-play]'), function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      try {
+        svg.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+      } catch (err) {
+        svg.scrollIntoView();
+      }
+      if (!running && !navigating) start();
+    });
   });
 
   // stop cleanly if the tab goes away mid-run

@@ -61,11 +61,15 @@ const isWall = (r, c) => r >= 0 && r < ROWS && c >= 0 && c < COLS && MAP[r][c] =
 
 /* --- sprites -------------------------------------------------------------- */
 
-/** Pac-Man: a disc with a wedge removed. Mouth opens toward +x. */
+/**
+ * Pac-Man as a static inline icon. Fills with currentColor so it reads on both
+ * the yellow primary button (black text) and the dark scorebar (yellow text) —
+ * a hard-coded --pac fill is invisible on the button.
+ */
 export function pac(x, y, r = 12, cls = 'pac-sprite') {
   const dx = (0.866 * r).toFixed(2), dy = (0.5 * r).toFixed(2);
   // sweep-flag 0, not 1: with 1 you get the 60-degree wedge instead of the disc.
-  return `<path class="${cls}" fill="var(--pac)" d="M${x},${y} L${x + +dx},${y - +dy} A${r},${r} 0 1 0 ${x + +dx},${y + +dy} Z"/>`;
+  return `<path class="${cls}" fill="currentColor" d="M${x},${y} L${x + +dx},${y - +dy} A${r},${r} 0 1 0 ${x + +dx},${y + +dy} Z"/>`;
 }
 
 /**
