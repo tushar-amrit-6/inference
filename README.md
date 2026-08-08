@@ -37,11 +37,11 @@ roles match how each ghost actually behaves in the arcade game:
 
 | Marker | Part | Why that ghost |
 |---|---|---|
-| **Pinky** (pink) | The big idea | She targets four tiles *ahead* of you |
+| **Pinky** (pink) | The big idea | They target four tiles *ahead* of you |
 | **Pellets** (peach) | Concepts | Eaten one at a time |
-| **Inky** (cyan) | Math by hand | His target is *computed*, not chased |
-| **Clyde** (orange) | Code lab | Chases, then retreats to his corner |
-| **Blinky** (red) | Pitfalls | He comes straight at you |
+| **Inky** (cyan) | Math by hand | Their target is *computed*, not chased |
+| **Clyde** (orange) | Code lab | Chases, then retreats to their corner |
+| **Blinky** (red) | Pitfalls | They come straight at you |
 | **Power pellet** | Checkpoint | Eat it and the ghosts turn blue |
 
 ## Running it

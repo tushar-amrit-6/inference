@@ -127,6 +127,19 @@
     }
   }
 
+  /* --- SVG link activation ------------------------------------------------ */
+  // SVG <a> elements are focusable and Tab reaches them, but Chromium does not
+  // fire activation on Enter the way it does for HTML anchors. Wire it up so
+  // the maze is keyboard-navigable, not just mouse-navigable.
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    var node = e.target && e.target.closest ? e.target.closest('a.node[href]') : null;
+    if (!node) return;
+    e.preventDefault();
+    window.location.href = node.getAttribute('href');
+  });
+
   /* --- rail scroll spy --------------------------------------------------- */
 
   var links = Array.prototype.slice.call(document.querySelectorAll('.rail__link'));

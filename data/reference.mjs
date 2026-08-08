@@ -517,9 +517,9 @@ reading:
 | **Power pellet** | Checkpoint | Answer out loud before revealing. Honest self-assessment. |
 
 The ghost roles are not arbitrary — each one matches how that ghost actually behaves in the
-arcade game. Pinky targets four tiles ahead of you, so she is the idea out in front. Inky's
-target is *computed* from Blinky's position, so he is the derived arithmetic. Blinky chases you
-directly, so he is the misconception coming for you.
+arcade game. Pinky targets four tiles ahead of you, so they are the idea out in front. Inky's
+target is *computed* from Blinky's position, so they are the derived arithmetic. Blinky chases you
+directly, so they are the misconception coming for you.
 
 ## The method
 

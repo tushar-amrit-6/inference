@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import { md, esc, plain } from './md.mjs';
-import { renderMaze, icon } from './maze.mjs';
+import { renderMaze, mazeData, assertReachable, icon } from './maze.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
@@ -30,10 +30,10 @@ const SITE = {
 const GHOSTS = {
   bigIdea:    { key: 'pinky',  tag: 'PINKY · THE BIG IDEA',  note: 'targets four tiles ahead of you' },
   concepts:   { key: 'pellet', tag: 'PELLETS · CONCEPTS',    note: 'eat them one at a time' },
-  math:       { key: 'inky',   tag: 'INKY · MATH BY HAND',   note: 'his target is computed' },
+  math:       { key: 'inky',   tag: 'INKY · MATH BY HAND',   note: 'their target is computed' },
   code:       { key: 'clyde',  tag: 'CLYDE · CODE LAB',      note: 'go hands-on, then retreat' },
   papers:     { key: 'pac',    tag: 'THE KEY · PAPERS',      note: 'unlocks the literature' },
-  pitfalls:   { key: 'blinky', tag: 'BLINKY · PITFALLS',     note: 'he chases you directly' },
+  pitfalls:   { key: 'blinky', tag: 'BLINKY · PITFALLS',     note: 'they chase you directly' },
   checkpoint: { key: 'pac',    tag: 'POWER PELLET · CHECKPOINT', note: 'eat it and the ghosts turn blue' },
   glossary:   { key: 'pellet', tag: 'GLOSSARY',              note: '' },
 };
@@ -298,11 +298,11 @@ function indexPage(modules) {
   }));
 
   const legend = [
-    ['pinky', 'PINKY', 'The big idea', 'He targets four tiles ahead of you.'],
+    ['pinky', 'PINKY', 'The big idea', 'They target four tiles ahead of you.'],
     ['pellet', 'PELLETS', 'Concepts', 'Eaten one at a time.'],
-    ['inky', 'INKY', 'Math by hand', 'His target is computed, not chased.'],
-    ['clyde', 'CLYDE', 'Code lab', 'Chases, then retreats to his corner.'],
-    ['blinky', 'BLINKY', 'Pitfalls', 'He comes straight at you.'],
+    ['inky', 'INKY', 'Math by hand', 'Their target is computed, not chased.'],
+    ['clyde', 'CLYDE', 'Code lab', 'Chases, then retreats to their corner.'],
+    ['blinky', 'BLINKY', 'Pitfalls', 'They come straight at you.'],
     ['pac', 'POWER PELLET', 'Checkpoint', 'Eat it and the ghosts turn blue.'],
   ];
 
@@ -356,8 +356,20 @@ function indexPage(modules) {
       <div class="wall maze-frame">
         ${renderMaze(nodes)}
       </div>
-      <p class="center" style="margin-top:var(--s4);min-height:2.4em">
-        <span class="px px-10" data-maze-readout style="color:var(--pac)">HOVER A NODE TO SEE THE LEVEL</span>
+
+      <div class="game-bar">
+        <button class="btn game-start" type="button" data-game-start hidden>▶ START</button>
+        <div class="game-bar__text">
+          <span class="px px-10" data-maze-readout style="color:var(--pac)">HOVER A NODE TO SEE THE LEVEL</span>
+          <span class="px px-10 game-hint" data-game-status></span>
+        </div>
+      </div>
+      <p class="dim" style="margin-top:var(--s4);font-size:14.5px;max-width:70ch">
+        Or play it. Press start and Pac-Man finds a level on his own; take over with the arrow
+        keys, WASD or a swipe to pick one yourself. Whichever numbered node he eats is the level
+        that opens. The ghosts doze until you take control — after that they will send you back to
+        the start, and the power pellets in the bottom corners make them edible. Clicking a node
+        still just opens it.
       </p>
 
       <ul class="maze-legend">
@@ -417,7 +429,9 @@ function indexPage(modules) {
 
   </main>
 </div>
-${footer('', modules)}`;
+${footer('', modules)}
+<script type="application/json" id="maze-data">${JSON.stringify(mazeData(nodes)).replace(/</g, '\\u003c')}</script>
+<script src="assets/js/maze-game.js" defer></script>`;
 
   return layout({
     title: `${SITE.title} — ${SITE.subtitle}`,
@@ -503,6 +517,10 @@ async function main() {
   if (!modules.length) throw new Error('no modules found in data/modules');
 
   const { default: ref } = await import(join(ROOT, 'data', 'reference.mjs'));
+
+  // fail the build rather than ship a level the game cannot drive to
+  const walkable = assertReachable();
+  console.log(`\n  maze: ${walkable} walkable tiles, all 11 nodes reachable`);
 
   await mkdir(join(ROOT, 'modules'), { recursive: true });
   await mkdir(join(ROOT, 'reference'), { recursive: true });

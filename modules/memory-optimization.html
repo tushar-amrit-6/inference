@@ -53,7 +53,7 @@
       </div>
 
       <section class="section ghost ghost--pinky" id="big-idea">
-        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--pinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>PINKY · THE BIG IDEA</p>
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--pinky)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>PINKY · THE BIG IDEA</p>
         <div class="prose"><p>Module 2 gave you the master equation:</p>
 <pre><code>max_batch = (GPU_memory - weights - workspace) / kv_bytes_per_sequence</code></pre>
 <p>Module 4 established that batch size <em>is</em> your arithmetic intensity, and Module 5 gave you the scheduler that keeps the batch full. This module is about the equation's two variable terms — making the numerator bigger and the denominator smaller — and it is where most of the practical engineering in LLM serving lives.</p>
@@ -212,7 +212,7 @@ V: quantize PER TOKEN     -- each token's value vector gets its own scale</code>
       </section>
 
       <section class="section ghost ghost--inky" id="math-lab">
-        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--inky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>INKY · MATH BY HAND</p>
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--inky)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>INKY · MATH BY HAND</p>
         <h2 class="section__title">Math by hand</h2>
         <div class="prose"><p><strong>Llama-3-70B</strong>: 80 layers, 64 query heads, 8 KV heads, head_dim 128, 70.6 B parameters. Serving on <strong>4× H100 80GB</strong> = 320 GB, with 20 GB reserved for workspace. Context 8,192 tokens throughout.</p>
 <p><strong>Part 1 — the baseline.</strong> Recompute from Module 2: KV bytes per token at fp16, per-sequence cost at 8k, weight bytes, and how many sequences fit.</p>
@@ -285,7 +285,7 @@ GQA -&gt; MLA:           170 -&gt; 303   +133 sequences   (requires a different 
       </section>
 
       <section class="section ghost ghost--clyde" id="code-lab">
-        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--clyde)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>CLYDE · CODE LAB</p>
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--clyde)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>CLYDE · CODE LAB</p>
         <h2 class="section__title">Code lab</h2>
         <div class="prose"><p>Two parts.</p>
 <p><strong>Part A</strong> — implement a block allocator and compare it against a naive reserving allocator over a realistic distribution of sequence lengths. Reproduce the vLLM paper's utilization finding yourself.</p>
@@ -564,7 +564,7 @@ print(f&quot;  served from cache    {saved:&gt;8,}  ({saved/total*100:.1f}%)&quo
       </section>
 
       <section class="section ghost ghost--blinky" id="pitfalls">
-        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--blinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>BLINKY · PITFALLS</p>
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--blinky)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>BLINKY · PITFALLS</p>
         <h2 class="section__title">What people get wrong</h2>
         <div class="pitfall">
           <p class="pitfall__wrong"><span>Reaching for quantization before fixing fragmentation.</span></p>

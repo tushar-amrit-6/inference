@@ -53,7 +53,7 @@
       </div>
 
       <section class="section ghost ghost--pinky" id="big-idea">
-        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--pinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>PINKY · THE BIG IDEA</p>
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--pinky)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>PINKY · THE BIG IDEA</p>
         <div class="prose"><p>Up to now you have been told that decode is memory-bound. This module gives you the tool to <em>derive</em> that, and to derive the answer for any model, any GPU, any batch size, any context length — on paper, in about ninety seconds.</p>
 <p>The tool is the <strong>roofline model</strong>, and it rests on one observation: a computation has two costs, arithmetic and data movement, and they happen concurrently. Whichever takes longer is your time. That gives you a single number to compute — <strong>arithmetic intensity</strong>, FLOPs performed per byte moved — and a single number to compare it against — the machine's <strong>ridge point</strong>, its peak FLOP/s divided by its peak bytes/s.</p>
 <pre><code>intensity &lt; ridge point   -&gt;  memory-bound. Optimize bytes.
@@ -222,7 +222,7 @@ max batch = 60 / 0.54 = 111</code></pre>
       </section>
 
       <section class="section ghost ghost--inky" id="math-lab">
-        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--inky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>INKY · MATH BY HAND</p>
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--inky)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>INKY · MATH BY HAND</p>
         <h2 class="section__title">Math by hand</h2>
         <div class="prose"><p>The signature calculation of this course. Do it on paper.</p>
 <p><strong>Part 1 — derive the floor.</strong> A 7B model, fp16, batch 1, short context (ignore the KV cache). Compute the theoretical minimum TPOT and maximum tokens/second on:</p>
@@ -288,7 +288,7 @@ throughput = 115 / 0.034 = 3,380 tok/s</code></pre>
       </section>
 
       <section class="section ghost ghost--clyde" id="code-lab">
-        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--clyde)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>CLYDE · CODE LAB</p>
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--clyde)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>CLYDE · CODE LAB</p>
         <h2 class="section__title">Code lab</h2>
         <div class="prose"><p>Build a roofline calculator that takes a model config, a GPU, a batch size and a context length, and reports where you sit, what your bottleneck is, and what your ceiling is. Then measure a real model and account for the gap.</p>
 <p>This is the tool you will reach for in every remaining module. Write it properly.</p></div>
@@ -519,7 +519,7 @@ if __name__ == &quot;__main__&quot;:
       </section>
 
       <section class="section ghost ghost--blinky" id="pitfalls">
-        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--blinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>BLINKY · PITFALLS</p>
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--blinky)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>BLINKY · PITFALLS</p>
         <h2 class="section__title">What people get wrong</h2>
         <div class="pitfall">
           <p class="pitfall__wrong"><span>Using the headline TFLOPs from the spec sheet.</span></p>

@@ -35,6 +35,26 @@ const PAD = 18;    // breathing room inside the frame
 const COLS = MAP[0].length;
 const ROWS = MAP.length;
 
+/** Where Pac-Man sits before the game starts, and respawns to. [row, col] */
+export const PAC_START = [1, 15];
+
+/**
+ * The four ghosts. `seat` is their idle x-offset inside the house; `spawn` is
+ * the corridor tile they take up station on when a game begins. The house has
+ * no gate in the tilemap, so rather than fake one we simply station them on
+ * row 10 — the long corridor that runs directly above it.
+ */
+export const GHOSTS = [
+  { name: 'blinky', seat: -42, spawn: [10, 8], style: 'chase' },
+  { name: 'pinky', seat: -14, spawn: [10, 9], style: 'ambush' },
+  { name: 'inky', seat: 14, spawn: [10, 11], style: 'flank' },
+  { name: 'clyde', seat: 42, spawn: [10, 12], style: 'shy' },
+];
+
+/** A tile you can walk on: corridor, pellet, power pellet, or a module node. */
+const isOpen = (r, c) =>
+  r >= 0 && r < ROWS && c >= 0 && c < COLS && /[.o0-9A]/.test(MAP[r][c]);
+
 const cx = (c) => PAD + c * T + T / 2;
 const cy = (r) => PAD + r * T + T / 2;
 const isWall = (r, c) => r >= 0 && r < ROWS && c >= 0 && c < COLS && MAP[r][c] === '#';
@@ -48,18 +68,45 @@ export function pac(x, y, r = 12, cls = 'pac-sprite') {
   return `<path class="${cls}" fill="var(--pac)" d="M${x},${y} L${x + +dx},${y - +dy} A${r},${r} 0 1 0 ${x + +dx},${y + +dy} Z"/>`;
 }
 
-/** Ghost: semicircular hood, straight flanks, four feet. */
-export function ghost(x, y, color, w = 24) {
-  const s = w / 24, X = x - w / 2, Y = y - w / 2;
+/**
+ * Pac-Man drawn at the origin inside a translatable group, as two frames:
+ * an open wedge and a closed disc. The chomp is the classic two-frame toggle —
+ * you cannot animate an arc's sweep in CSS, so you alternate the frames.
+ * The group is rotated to face its direction of travel.
+ */
+function pacSprite(id, x, y, r = 12) {
+  const dx = (0.866 * r).toFixed(2), dy = (0.5 * r).toFixed(2);
+  return (
+    `<g id="${id}" class="pac" transform="translate(${x},${y})">` +
+      `<g class="pac__spin">` +
+        `<path class="pac__open" fill="var(--pac)" d="M0,0 L${dx},-${dy} A${r},${r} 0 1 0 ${dx},${dy} Z"/>` +
+        `<circle class="pac__closed" r="${r}" fill="var(--pac)"/>` +
+      `</g>` +
+    `</g>`
+  );
+}
+
+/**
+ * Ghost: semicircular hood, straight flanks, four feet. Drawn at the origin
+ * so it can be translated. Body uses currentColor so frightened mode is a
+ * single `color` change on the group rather than a path rewrite.
+ */
+export function ghost(x, y, color, w = 24, id = '') {
+  const s = w / 24, X = -w / 2, Y = -w / 2;
   const p = (px, py) => `${(X + px * s).toFixed(2)},${(Y + py * s).toFixed(2)}`;
   const body =
     `M${p(1, 22)} V${(Y + 12 * s).toFixed(2)} ` +
     `A${(11 * s).toFixed(2)},${(11 * s).toFixed(2)} 0 0 1 ${p(23, 12)} ` +
     `L${p(23, 22)} L${p(17.5, 18)} L${p(12, 22)} L${p(6.5, 18)} Z`;
   const eye = (ex) =>
-    `<ellipse cx="${(X + ex * s).toFixed(2)}" cy="${(Y + 11 * s).toFixed(2)}" rx="${(3.1 * s).toFixed(2)}" ry="${(3.9 * s).toFixed(2)}" fill="#fff"/>` +
-    `<circle cx="${(X + (ex + 1) * s).toFixed(2)}" cy="${(Y + 12 * s).toFixed(2)}" r="${(1.7 * s).toFixed(2)}" fill="#1414A0"/>`;
-  return `<g><path d="${body}" fill="${color}"/>${eye(8.5)}${eye(15.5)}</g>`;
+    `<ellipse class="ghost__eye" cx="${(X + ex * s).toFixed(2)}" cy="${(Y + 11 * s).toFixed(2)}" rx="${(3.1 * s).toFixed(2)}" ry="${(3.9 * s).toFixed(2)}" fill="#fff"/>` +
+    `<circle class="ghost__pupil" cx="${(X + (ex + 1) * s).toFixed(2)}" cy="${(Y + 12 * s).toFixed(2)}" r="${(1.7 * s).toFixed(2)}" fill="#1414A0"/>`;
+  return (
+    `<g${id ? ` id="${id}"` : ''} class="ghost-sprite" style="color:${color}" ` +
+    `transform="translate(${x},${y})">` +
+      `<path class="ghost__body" d="${body}" fill="currentColor"/>${eye(8.5)}${eye(15.5)}` +
+    `</g>`
+  );
 }
 
 /* --- wall geometry --------------------------------------------------------- */
@@ -131,22 +178,23 @@ export function renderMaze(modules) {
       if (ch === '.') {
         out.push(`<circle class="maze__pellet" data-pellet="${r}-${c}" cx="${cx(c)}" cy="${cy(r)}" r="2.7"/>`);
       } else if (ch === 'o') {
-        out.push(`<circle class="maze__power" cx="${cx(c)}" cy="${cy(r)}" r="6.5"/>`);
+        out.push(`<circle class="maze__power" data-pellet="${r}-${c}" data-power="1" cx="${cx(c)}" cy="${cy(r)}" r="6.5"/>`);
       } else if (/[0-9A]/.test(ch)) {
         nodeAt.set(ch === 'A' ? 10 : Number(ch), [r, c]);
       }
     }
   }
 
-  // ghost house residents — the four pedagogical modes live here
+  // ghost house residents — the four pedagogical modes live here.
+  // These are their idle seats; the game moves them out onto the corridors.
   const houseX = cx(10), houseY = cy(12) + 10;
-  const crew = [
-    ['var(--blinky)', -42], ['var(--pinky)', -14], ['var(--inky)', 14], ['var(--clyde)', 42],
-  ];
-  for (const [color, dx] of crew) out.push(ghost(houseX + dx, houseY, color, 22));
+  for (let i = 0; i < GHOSTS.length; i++) {
+    const g = GHOSTS[i];
+    out.push(ghost(houseX + g.seat, houseY, `var(--${g.name})`, 22, `ghost-${i}`));
+  }
 
   // Pac-Man, mid-corridor on the top row, heading for module 0
-  out.push(pac(cx(15), cy(1), 11));
+  out.push(pacSprite('pac', cx(PAC_START[1]), cy(PAC_START[0]), 11));
 
   // module nodes
   for (const m of modules) {
@@ -172,6 +220,66 @@ export function renderMaze(modules) {
 
 function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/* --- data handed to the client game ---------------------------------------- */
+
+/** Row/col of every module node, keyed by module number. */
+function nodePositions() {
+  const at = new Map();
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const ch = MAP[r][c];
+      if (/[0-9A]/.test(ch)) at.set(ch === 'A' ? 10 : Number(ch), [r, c]);
+    }
+  }
+  return at;
+}
+
+/**
+ * Build-time sanity check: every module node must be walkable-reachable from
+ * Pac-Man's start tile. If a map edit ever strands a node, the build fails
+ * here rather than shipping a level nobody can drive to.
+ */
+export function assertReachable() {
+  const seen = new Set([PAC_START.join(',')]);
+  const q = [PAC_START];
+  while (q.length) {
+    const [r, c] = q.shift();
+    for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nr = r + dr, nc = c + dc, k = nr + ',' + nc;
+      if (isOpen(nr, nc) && !seen.has(k)) { seen.add(k); q.push([nr, nc]); }
+    }
+  }
+  const unreachable = [];
+  for (const [n, [r, c]] of nodePositions()) {
+    if (!seen.has(r + ',' + c)) unreachable.push(n);
+  }
+  if (unreachable.length) {
+    throw new Error(`maze: module nodes unreachable from Pac-Man's start: ${unreachable.join(', ')}`);
+  }
+  return seen.size;
+}
+
+/**
+ * Everything the browser needs to run the game, serialized into the page.
+ * Keeping geometry in one place means the JS never re-derives tile maths that
+ * the renderer already did.
+ */
+export function mazeData(modules) {
+  const at = nodePositions();
+  return {
+    map: MAP,
+    tile: T,
+    pad: PAD,
+    cols: COLS,
+    rows: ROWS,
+    pacStart: PAC_START,
+    ghosts: GHOSTS.map((g) => ({ name: g.name, spawn: g.spawn, style: g.style })),
+    nodes: modules
+      .filter((m) => at.has(m.n))
+      .map((m) => ({ n: m.n, rc: at.get(m.n), href: m.href, title: m.title })),
+  };
 }
 
 /* --- small inline sprites for the legend and chrome ----------------------- */

@@ -53,7 +53,7 @@
       </div>
 
       <section class="section ghost ghost--pinky" id="big-idea">
-        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--pinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>PINKY · THE BIG IDEA</p>
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--pinky)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>PINKY · THE BIG IDEA</p>
         <div class="prose"><p>Module 1 established that decode is memory-bound and that batching is the way out. This module explains why you cannot simply crank the batch size to 295 and go home.</p>
 <p>Every sequence in flight owns a private, growing block of GPU memory: its KV cache. The weights are shared by all sequences — load them once, use them for everyone. The KV cache is not shared. Each sequence pays for its own, and the bill grows with every token generated.</p>
 <p>So your batch size is not a tuning parameter you choose. It is a <strong>quotient</strong>:</p>
@@ -201,7 +201,7 @@ available for KV cache              ~160 GB</code></pre>
       </section>
 
       <section class="section ghost ghost--inky" id="math-lab">
-        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--inky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>INKY · MATH BY HAND</p>
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--inky)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>INKY · MATH BY HAND</p>
         <h2 class="section__title">Math by hand</h2>
         <div class="prose"><p>The canonical calculation. Do it on paper before touching a calculator.</p>
 <p><strong>Model: Llama-3-70B.</strong> Config: <code>n_layers = 80</code>, <code>n_heads = 64</code>, <code>n_kv_heads = 8</code>, <code>head_dim = 128</code>, <code>d_model = 8192</code>, 70.6 B parameters.</p>
@@ -257,7 +257,7 @@ MQA + fp8:       946 sequences   -&gt;  well past the ridge</code></pre>
       </section>
 
       <section class="section ghost ghost--clyde" id="code-lab">
-        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--clyde)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>CLYDE · CODE LAB</p>
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--clyde)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>CLYDE · CODE LAB</p>
         <h2 class="section__title">Code lab</h2>
         <div class="prose"><p>Two parts.</p>
 <p><strong>Part A</strong> — write a KV cache calculator you will actually keep. Feed it a model config and get back bytes per token, per-sequence cost at a given context, and how many sequences fit in a given memory budget. Then use it to reproduce the math lab.</p>
@@ -433,7 +433,7 @@ if __name__ == &quot;__main__&quot;:
       </section>
 
       <section class="section ghost ghost--blinky" id="pitfalls">
-        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M1.00,22.00 V12.00 A11.00,11.00 0 0 1 23.00,12.00 L23.00,22.00 L17.50,18.00 L12.00,22.00 L6.50,18.00 Z" fill="var(--blinky)"/><ellipse cx="8.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="9.50" cy="12.00" r="1.70" fill="#1414A0"/><ellipse cx="15.50" cy="11.00" rx="3.10" ry="3.90" fill="#fff"/><circle cx="16.50" cy="12.00" r="1.70" fill="#1414A0"/></g></svg>BLINKY · PITFALLS</p>
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--blinky)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>BLINKY · PITFALLS</p>
         <h2 class="section__title">What people get wrong</h2>
         <div class="pitfall">
           <p class="pitfall__wrong"><span>Using n_heads instead of n_kv_heads in the KV cache formula.</span></p>
