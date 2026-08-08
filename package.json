@@ -1,0 +1,14 @@
+{
+  "name": "llm-inference-course",
+  "private": true,
+  "type": "module",
+  "description": "A self-paced course on LLM inference, built as a static site.",
+  "scripts": {
+    "build": "node build/build.mjs",
+    "check:figures": "node build/check-figures.mjs",
+    "serve": "python3 -m http.server 8000"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1"
+  }
+}

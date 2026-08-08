@@ -60,6 +60,8 @@
   --glow:        0 0 24px color-mix(in srgb, var(--pac) 35%, transparent);
   --sprite-edge: transparent; /* no outline needed on black; must stay a COLOR */
   --asleep: .45;            /* dozing ghosts; paper needs more than the cabinet */
+  --grid-bg:   #05050C;     /* graph paper behind the summary figures         */
+  --grid-line: #16163A;
 
   /* type */
   --display: "Press Start 2P", "Courier New", monospace;
@@ -117,6 +119,8 @@
     --glow:        none;
     --sprite-edge: #2A1E00;   /* printed art gets a keyline so it reads       */
     --asleep: .7;
+    --grid-bg:   #FBFCFE;
+    --grid-line: #D3D9EE;
   }
 }
 
@@ -155,6 +159,8 @@
   --glow:        none;
   --sprite-edge: #2A1E00;
   --asleep: .7;
+  --grid-bg:   #FBFCFE;
+  --grid-line: #D3D9EE;
 }
 
 /* --- reset ---------------------------------------------------------------- */
@@ -492,6 +498,24 @@ a:hover { color: var(--ink-strong); text-decoration-color: currentColor; }
   text-anchor: middle; pointer-events: none; letter-spacing: .04em;
 }
 .node:hover .node__label { fill: var(--pac); }
+
+/* --- summary figures -------------------------------------------------------- */
+
+.fig { margin: 0; }
+.fig__scroll {
+  overflow-x: auto;
+  border: 1px solid var(--maze-dim);
+  border-radius: 10px;
+  background: var(--grid-bg);
+}
+/* Scales to the column, but never below a width where the labels stop being
+   readable — past that the figure scrolls instead of shrinking. */
+.fig__svg { display: block; width: 100%; height: auto; min-width: 780px; }
+.fig__cap {
+  margin: var(--s4) 0 0;
+  font-size: 14.5px; line-height: 1.6; color: var(--ink-dim);
+  max-width: var(--measure);
+}
 
 /* --- the playable maze ------------------------------------------------------ */
 

@@ -14,6 +14,9 @@ import { dirname, join } from 'node:path';
 
 import { md, esc, plain } from './md.mjs';
 import { renderMaze, mazeData, assertReachable, icon } from './maze.mjs';
+import { figure, kit } from './diagram.mjs';
+
+const { default: diagrams } = await import('../data/diagrams.mjs');
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
@@ -200,6 +203,19 @@ function modulePage(m, modules) {
           ${m.prereqs?.length ? `<span>▸ needs: ${m.prereqs.map(esc).join(', ')}</span>` : ''}
         </div>
       </div>
+
+      ${diagrams[m.n] ? `<section class="section" id="at-a-glance">
+        <p class="eyebrow" style="margin-bottom:var(--s5)">AT A GLANCE · THE WHOLE LEVEL ON ONE PAGE</p>
+        ${figure({
+          w: diagrams[m.n].w,
+          h: diagrams[m.n].h,
+          id: `fig${m.n}`,
+          title: diagrams[m.n].title,
+          desc: diagrams[m.n].desc,
+          caption: diagrams[m.n].caption,
+          body: diagrams[m.n].draw(kit, `fig${m.n}`),
+        })}
+      </section>` : ''}
 
       <section class="section ghost ghost--pinky" id="big-idea">
         ${ghostTag('bigIdea')}

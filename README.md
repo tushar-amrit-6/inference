@@ -44,6 +44,11 @@ roles match how each ghost actually behaves in the arcade game:
 | **Blinky** (red) | Pitfalls | They come straight at you |
 | **Power pellet** | Checkpoint | Eat it and the ghosts turn blue |
 
+Every level opens with a **grid-notes summary figure** — the whole level as one diagram on graph
+paper: the residual stream's shape at every step, the KV-cache formula built up term by term, the
+roofline with prefill and decode plotted on it, the draft-and-verify timeline. They are SVG, so
+they re-theme with the site rather than being baked images.
+
 ## Running it
 
 Everything is static. Open `index.html`, or serve the directory:
@@ -61,14 +66,30 @@ build step. To regenerate after editing content:
 node build/build.mjs
 ```
 
-No dependencies and no install step — Node 18+ is the only requirement.
+No dependencies and no install step for the build — Node 18+ is the only requirement.
+
+The build refuses to ship a broken figure: it asserts every maze node is reachable from
+Pac-Man's start tile, and that the two copies of the light palette (one under
+`prefers-color-scheme`, one under `[data-theme]`) have not drifted apart. Diagram labels are
+checked separately, because estimating text extents from character counts is not trustworthy:
+
+```bash
+npm install          # playwright, the only dev dependency
+npm run check:figures
+```
+
+That loads each page in a real browser, measures the actual `getBBox` of every label, and fails
+on any overlap or anything drawn outside the canvas.
 
 ```
 data/modules/m*.mjs    course content, one file per level
 data/reference.mjs     timeline, hardware table, engines, frontier, how-to
+data/diagrams.mjs      the per-level summary figures
 build/build.mjs        the generator
 build/md.mjs           a small dependency-free Markdown renderer
 build/maze.mjs         the maze, rendered to static SVG from a tile grid
+build/diagram.mjs      grid-paper drawing primitives, authored in grid cells
+build/check-figures.mjs  measures rendered label boxes and fails on collisions
 assets/css/arcade.css  the design system
 assets/js/app.js       progress tracking, scroll spy, keyboard nav
 start.md               the original course outline this was built from
