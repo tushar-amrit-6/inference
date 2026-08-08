@@ -48,9 +48,10 @@
 
   /* --- chrome ------------------------------------------------------------ */
 
+  // class rather than an inline fill, so the theme can give it a keyline on paper
   var PAC =
-    '<svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true">' +
-    '<path d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z" fill="var(--pac)"/></svg>';
+    '<svg class="life-pac" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true">' +
+    '<path d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg>';
 
   function paint() {
     var n = cleared.length;
@@ -126,6 +127,47 @@
       maze.addEventListener('focusout', hide);
     }
   }
+
+  /* --- theme -------------------------------------------------------------- */
+  // Default is whatever the OS asks for; an explicit choice overrides it and
+  // persists. The <head> applies a stored choice before first paint, so this
+  // only has to handle the toggle itself.
+  var THEME_KEY = 'llm-inference:theme';
+  var root = document.documentElement;
+
+  function systemTheme() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
+      ? 'light' : 'dark';
+  }
+  function activeTheme() {
+    return root.getAttribute('data-theme') || systemTheme();
+  }
+  function labelTheme() {
+    var next = activeTheme() === 'dark' ? 'light' : 'dark';
+    Array.prototype.forEach.call(document.querySelectorAll('[data-theme-toggle]'), function (b) {
+      b.setAttribute('aria-label', 'Switch to ' + next + ' mode');
+      b.setAttribute('title', 'Switch to ' + next + ' mode');
+    });
+  }
+
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('[data-theme-toggle]') : null;
+    if (!btn) return;
+    var next = activeTheme() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem(THEME_KEY, next); } catch (err) { /* private mode */ }
+    labelTheme();
+  });
+
+  // follow the OS if the user has not made an explicit choice
+  if (window.matchMedia) {
+    var mq = window.matchMedia('(prefers-color-scheme: light)');
+    var onChange = function () { if (!root.getAttribute('data-theme')) labelTheme(); };
+    if (mq.addEventListener) mq.addEventListener('change', onChange);
+    else if (mq.addListener) mq.addListener(onChange);
+  }
+
+  labelTheme();
 
   /* --- SVG link activation ------------------------------------------------ */
   // SVG <a> elements are focusable and Tab reaches them, but Chromium does not

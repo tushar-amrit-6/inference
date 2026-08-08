@@ -8,7 +8,7 @@
    root so GitHub Pages can serve it directly.
    ========================================================================== */
 
-import { readdir, writeFile, mkdir } from 'node:fs/promises';
+import { readdir, readFile, writeFile, mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -58,7 +58,10 @@ function layout({ title, description, body, depth = 0, bodyClass = '' }) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
 <meta name="description" content="${esc(description)}">
-<meta name="color-scheme" content="dark">
+<meta name="color-scheme" content="dark light">
+<script>/* set the stored theme before first paint, so there is no flash of the wrong one */
+(function(){try{var t=localStorage.getItem('llm-inference:theme');
+if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:type" content="website">
@@ -86,6 +89,10 @@ function scorebar(up, { level } = {}) {
   <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/11</span></span>
   <span class="scorebar__spacer"></span>
   <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
+  <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch theme">
+    <svg class="icon-moon" width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M6.2 1.4A6.6 6.6 0 1 0 14.6 9.8 5.2 5.2 0 0 1 6.2 1.4z"/></svg>
+    <svg class="icon-sun" width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="8" r="3.2"/><path d="M8 .8v2.1M8 13.1v2.1M.8 8h2.1M13.1 8h2.1M2.9 2.9l1.5 1.5M11.6 11.6l1.5 1.5M13.1 2.9l-1.5 1.5M4.4 11.6l-1.5 1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+  </button>
 </header>`;
 }
 
@@ -504,6 +511,42 @@ function proseRefPage(cfg, modules) {
   return refPage({ ...cfg, bodyHtml: `<section class="section"><div class="prose" style="max-width:none">${md(cfg.markdown)}</div></section>` }, modules);
 }
 
+/* --- guards ------------------------------------------------------------------ */
+
+/**
+ * The light palette is written twice — once under `prefers-color-scheme` and
+ * once under an explicit `[data-theme="light"]` — because CSS cannot share one
+ * declaration block between a media query and a plain selector. Nothing stops
+ * the two drifting apart, and a drift would only show up as one theme path
+ * looking subtly wrong. So the build compares them and fails on any mismatch.
+ */
+async function assertThemeParity() {
+  const css = await readFile(join(ROOT, 'assets', 'css', 'arcade.css'), 'utf8');
+  const tokens = (src) =>
+    [...src.matchAll(/(--[\w-]+):\s*([^;]+);/g)]
+      .map((m) => `${m[1]}=${m[2].trim().replace(/\s*\/\*.*$/, '').trim()}`);
+
+  const media = css.match(/:root:not\(\[data-theme="dark"\]\)\s*\{([\s\S]*?)\n {2}\}/);
+  const explicit = css.match(/:root\[data-theme="light"\]\s*\{([\s\S]*?)\n\}/);
+  if (!media || !explicit) throw new Error('theme: could not find both light palette blocks');
+
+  const a = tokens(media[1]);
+  const b = tokens(explicit[1]);
+  const setA = new Set(a);
+  const setB = new Set(b);
+  const onlyA = a.filter((t) => !setB.has(t));
+  const onlyB = b.filter((t) => !setA.has(t));
+
+  if (onlyA.length || onlyB.length) {
+    throw new Error(
+      'theme: the two light palettes have drifted apart.\n' +
+      (onlyA.length ? `  only under prefers-color-scheme: ${onlyA.join(', ')}\n` : '') +
+      (onlyB.length ? `  only under [data-theme="light"]: ${onlyB.join(', ')}\n` : '')
+    );
+  }
+  return a.length;
+}
+
 /* --- main ------------------------------------------------------------------- */
 
 async function main() {
@@ -524,6 +567,9 @@ async function main() {
   // fail the build rather than ship a level the game cannot drive to
   const walkable = assertReachable();
   console.log(`\n  maze: ${walkable} walkable tiles, all 11 nodes reachable`);
+
+  const themeTokens = await assertThemeParity();
+  console.log(`  theme: light palette has ${themeTokens} tokens, both copies in step`);
 
   await mkdir(join(ROOT, 'modules'), { recursive: true });
   await mkdir(join(ROOT, 'reference'), { recursive: true });
