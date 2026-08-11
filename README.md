@@ -3,8 +3,8 @@
 A self-paced course on how LLM inference works and why it is hard, built as a static site with a
 Pac-Man arcade theme.
 
-Eleven levels, from the transformer forward pass to distributed serving, organised around one
-idea:
+Twelve levels, from the transformer forward pass to distributed serving and the architecture zoo,
+organised around one idea:
 
 > Generating a token requires reading **every** model weight from memory. Moving those bytes takes
 > far longer than the arithmetic performed on them, so decoding a single sequence leaves the GPU
@@ -28,6 +28,7 @@ Pac-Man is memory-bound too — one pellet per move, however fast he runs.
 | 08 | Speculative decoding | 6–8 |
 | 09 | Distributed inference | 7–9 |
 | 10 | Systems and the frontier | 6–8 |
+| 11 | Model architectures | 7–9 |
 
 Plus reference pages: a GPU spec table with ridge points, a timeline of the field, a serving-engine
 comparison, open problems, and a combined glossary.
@@ -68,8 +69,8 @@ node build/build.mjs
 
 No dependencies and no install step for the build — Node 18+ is the only requirement.
 
-The build refuses to ship a broken figure: it asserts every maze node is reachable from
-Pac-Man's start tile, and that the two copies of the light palette (one under
+The build refuses to ship a broken figure: it asserts every level has a tile on the map and that
+every node is reachable from Pac-Man's start tile, and that the two copies of the light palette (one under
 `prefers-color-scheme`, one under `[data-theme]`) have not drifted apart. Diagram labels are
 checked separately, because estimating text extents from character counts is not trustworthy:
 
@@ -95,7 +96,7 @@ assets/js/app.js       progress tracking, scroll spy, keyboard nav
 start.md               the original course outline this was built from
 ```
 
-The maze on the landing page is authored as a 21×15 tile grid in `build/maze.mjs`, the same way the
+The maze on the landing page is authored as a 21×19 tile grid in `build/maze.mjs`, the same way the
 real game does it, and rendered to SVG at build time — so it works with JavaScript disabled.
 Progress is stored in `localStorage`; nothing is sent anywhere and there is no account. Arrow keys
 move between levels.

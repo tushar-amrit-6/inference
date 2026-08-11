@@ -488,7 +488,7 @@ work gets done.
      HOW TO USE
      ====================================================================== */
   howToLede:
-    'Eleven levels, roughly three months at a few hours a week. Levels 00 to 03 are the foundation — do not rush them.',
+    'Twelve levels, roughly three months at a few hours a week. Levels 00 to 03 are the foundation — do not rush them.',
 
   howTo: `## The one idea that organizes everything
 
@@ -548,6 +548,7 @@ about it.
 | **04** | The analytical core. If you only truly master one level, make it this one — the rest of the course is applied roofline reasoning. |
 | **05–07** | Systems and kernels. Faster going, because you now have the framework. |
 | **08–10** | The frontier. More reading, less arithmetic. |
+| **11** | The architecture zoo. Read it any time after 06 — it is the level that makes the others compose. |
 
 At a few hours a week this is roughly three months. There is no benefit to going faster; the
 checkpoints are honest gates and the material compounds.
@@ -563,7 +564,7 @@ checkpoints are honest gates and the material compounds.
 
 Marking a level cleared stores it in your browser's local storage. Nothing is sent anywhere,
 there is no account, and clearing your browser data resets it. The score is cosmetic: 2,200
-points a level, 24,200 for all eleven, which is the Pac-Man perfect-game score.
+points a level, 26,400 for all twelve.
 
 Arrow keys move between levels.
 

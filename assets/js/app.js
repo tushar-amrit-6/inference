@@ -10,8 +10,8 @@
   'use strict';
 
   var KEY = 'llm-inference:cleared';
-  var TOTAL = 11;
-  var POINTS = 2200;          // per level. 11 x 2200 = 24200, the Pac-Man perfect-game score.
+  var TOTAL = 12;
+  var POINTS = 2200;          // per level. 12 x 2200 = 26400 for a clean sweep.
 
   /* --- state ------------------------------------------------------------- */
 

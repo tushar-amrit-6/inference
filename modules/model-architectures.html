@@ -1,0 +1,712 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>11 · MODEL ARCHITECTURES — LLM INFERENCE</title>
+<meta name="description" content="Every architecture is a different answer to one question: which bytes have to move to produce the next token?">
+<meta name="color-scheme" content="dark light">
+<script>/* set the stored theme before first paint, so there is no flash of the wrong one */
+(function(){try{var t=localStorage.getItem('llm-inference:theme');
+if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<meta property="og:title" content="11 · MODEL ARCHITECTURES — LLM INFERENCE">
+<meta property="og:description" content="Every architecture is a different answer to one question: which bytes have to move to produce the next token?">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/arcade.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20fill%3D%22%23000%22%2F%3E%3Cpath%20d%3D%22M16%2C16%20L29%2C9%20A15%2C15%200%201%200%2029%2C23%20Z%22%20fill%3D%22%23FFE800%22%2F%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="scorebar">
+  <a class="scorebar__home" href="../index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="currentColor" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
+  <span class="scorebar__item"><span class="scorebar__label">LEVEL</span><span class="scorebar__value scorebar__value--pac">11</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/12</span></span>
+  <span class="scorebar__spacer"></span>
+  <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
+  <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch theme">
+    <svg class="icon-moon" width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M6.2 1.4A6.6 6.6 0 1 0 14.6 9.8 5.2 5.2 0 0 1 6.2 1.4z"/></svg>
+    <svg class="icon-sun" width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="8" r="3.2"/><path d="M8 .8v2.1M8 13.1v2.1M.8 8h2.1M13.1 8h2.1M2.9 2.9l1.5 1.5M11.6 11.6l1.5 1.5M13.1 2.9l-1.5 1.5M4.4 11.6l-1.5 1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+  </button>
+</header>
+<div class="wrap">
+  <div class="shell">
+    <nav class="rail" aria-label="Module contents">
+  <p class="rail__head">ON THIS LEVEL</p>
+  <ul class="rail__list">
+    <li><a class="rail__link" href="#big-idea" data-kind="dot"><span class="rail__dot"></span><span>The big idea</span></a></li><li><a class="rail__link" href="#concept-0" data-kind="dot"><span class="rail__dot"></span><span>The decode-step bill: active bytes and cache bytes</span></a></li><li><a class="rail__link" href="#concept-1" data-kind="dot"><span class="rail__dot"></span><span>Decoder-only, and the two shapes it beat</span></a></li><li><a class="rail__link" href="#concept-2" data-kind="dot"><span class="rail__dot"></span><span>The cache axis: MHA, MQA, GQA, MLA, and sharing across layers</span></a></li><li><a class="rail__link" href="#concept-3" data-kind="dot"><span class="rail__dot"></span><span>The weight axis: mixture of experts</span></a></li><li><a class="rail__link" href="#concept-4" data-kind="dot"><span class="rail__dot"></span><span>The context axis: sliding windows and local-global stacks</span></a></li><li><a class="rail__link" href="#concept-5" data-kind="dot"><span class="rail__dot"></span><span>Removing the cache: recurrent states and hybrid stacks</span></a></li><li><a class="rail__link" href="#concept-6" data-kind="dot"><span class="rail__dot"></span><span>The boring shapes that decide how it serves</span></a></li><li><a class="rail__link" href="#concept-7" data-kind="dot"><span class="rail__dot"></span><span>Multimodal: the architecture that changes the shape of the prefill</span></a></li><li><a class="rail__link" href="#math-lab" data-kind="dot"><span class="rail__dot"></span><span>Math by hand</span></a></li><li><a class="rail__link" href="#code-lab" data-kind="dot"><span class="rail__dot"></span><span>Code lab</span></a></li><li><a class="rail__link" href="#papers" data-kind="dot"><span class="rail__dot"></span><span>Papers</span></a></li><li><a class="rail__link" href="#pitfalls" data-kind="dot"><span class="rail__dot"></span><span>Pitfalls</span></a></li><li><a class="rail__link" href="#checkpoint" data-kind="power"><span class="rail__dot"></span><span>Checkpoint</span></a></li><li><a class="rail__link" href="#glossary" data-kind="dot"><span class="rail__dot"></span><span>Glossary</span></a></li>
+  </ul>
+  <div class="rail__nav">
+    <a class="rail__step" href="systems-and-frontier.html">◀ 10 SYSTEMS AND THE FRONTIER</a>
+    <a class="rail__step" href="../index.html">▲ ALL LEVELS</a>
+    
+  </div>
+</nav>
+    <main id="main">
+
+      <div class="mod-head">
+        <p class="mod-head__level">LEVEL 11</p>
+        <h1 class="mod-head__title">MODEL ARCHITECTURES</h1>
+        <p class="mod-head__tag">Every architecture is a different answer to one question: which bytes have to move to produce the next token?</p>
+        <div class="mod-head__meta">
+          <span>⏱ 7–9 hours</span>
+          <span>● 8 concepts</span>
+          <span>📄 5 papers</span>
+          <span>▸ needs: Module 0, Module 2, Module 4</span>
+        </div>
+      </div>
+
+      <section class="section" id="at-a-glance">
+        <p class="eyebrow" style="margin-bottom:var(--s5)">AT A GLANCE · THE WHOLE LEVEL ON ONE PAGE</p>
+        <figure class="fig"><div class="fig__scroll"><svg class="fig__svg" viewBox="0 0 1044 504" width="1044" height="504" role="img" aria-labelledby="fig11-t fig11-d" xmlns="http://www.w3.org/2000/svg"><title id="fig11-t">The two numbers that price any architecture</title><desc id="fig11-d">A decode step costs active weight bytes, paid once per step, plus cache bytes, paid once per sequence. Mixture of experts attacks the first term and pays in memory capacity. Grouped-query attention, latent attention, sliding windows and recurrent states attack the second and pay in exact recall. Measured per token at batch one, DeepSeek-V3 with 671 billion parameters moves 36.5 gigabytes while Llama-3-70B moves 139 gigabytes, and latent attention caches 68.6 kibibytes per token against 320 for grouped-query attention.</desc><defs><pattern id="fig11-grid" width="18" height="18" patternUnits="userSpaceOnUse"><path d="M 18 0 L 0 0 0 18" fill="none" stroke="var(--grid-line)" stroke-width="1"/></pattern><marker id="fig11-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--ink-dim)"/></marker><marker id="fig11-ah-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/></marker></defs><rect width="1044" height="504" fill="var(--grid-bg)"/><rect width="1044" height="504" fill="url(#fig11-grid)"/><text x="27" y="28.8" font-family="var(--display)" font-size="10.5" fill="var(--accent)" text-anchor="start" dominant-baseline="middle">LEVEL 11 · TWO NUMBERS PRICE ANY ARCHITECTURE</text><line x1="27" y1="43.2" x2="1017" y2="43.2" stroke="var(--ink-faint)" stroke-width="1"/><text x="27" y="66.6" font-family="var(--body)" font-size="15.5" font-style="italic" fill="var(--ink-faint)" text-anchor="start" dominant-baseline="middle">an architecture is a decision about which bytes must move — the rest is quality</text><text x="27" y="100.8" font-family="var(--display)" font-size="10.5" fill="var(--accent)" text-anchor="start" dominant-baseline="middle">THE DECODE-STEP BILL</text><g><rect x="27" y="115.2" width="198" height="46.8" rx="4" fill="color-mix(in srgb, var(--maze) 14%, transparent)" stroke="var(--accent)" stroke-width="1.6"/><text x="126" y="130.5" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">W_active</text><text x="126" y="148.5" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="middle" dominant-baseline="middle">once per STEP</text></g><text x="241.2" y="138.6" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink-dim)" text-anchor="middle" dominant-baseline="middle">+</text><g><rect x="257.4" y="115.2" width="255.6" height="46.8" rx="4" fill="var(--phosphor)" stroke="var(--inky)" stroke-width="1.6"/><text x="385.2" y="130.5" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">B × S × kv/token</text><text x="385.2" y="148.5" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="middle" dominant-baseline="middle">once per SEQUENCE</text></g><line x1="126" y1="165.6" x2="126" y2="190.8" stroke="var(--ink-dim)" stroke-width="1.5" marker-end="url(#fig11-ah)"/><line x1="385.2" y1="165.6" x2="385.2" y2="190.8" stroke="var(--ink-dim)" stroke-width="1.5" marker-end="url(#fig11-ah)"/><text x="126" y="203.4" font-family="var(--mono)" font-size="13.5" fill="var(--accent)" text-anchor="middle" dominant-baseline="middle">mixture of experts</text><text x="385.2" y="203.4" font-family="var(--mono)" font-size="13.5" fill="var(--inky)" text-anchor="middle" dominant-baseline="middle">GQA · MLA · window · state</text><text x="126" y="223.2" font-family="var(--display)" font-size="10.5" fill="var(--ink-faint)" text-anchor="middle" dominant-baseline="middle">PAYS IN CAPACITY</text><text x="385.2" y="223.2" font-family="var(--display)" font-size="10.5" fill="var(--ink-faint)" text-anchor="middle" dominant-baseline="middle">PAYS IN RECALL</text><text x="27" y="262.8" font-family="var(--display)" font-size="10.5" fill="var(--accent)" text-anchor="start" dominant-baseline="middle">FOUR FAMILIES, FOUR BETS</text><g><rect x="27" y="280.8" width="486" height="36" rx="4" fill="none" stroke="var(--accent)" stroke-width="1.6"/></g><text x="45" y="298.8" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--accent)" text-anchor="start" dominant-baseline="middle">mixture of experts</text><text x="237.6" y="298.8" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="start" dominant-baseline="middle">read k of E expert blocks</text><g><rect x="27" y="325.8" width="486" height="36" rx="4" fill="none" stroke="var(--inky)" stroke-width="1.6"/></g><text x="45" y="343.8" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--inky)" text-anchor="start" dominant-baseline="middle">GQA · MLA</text><text x="237.6" y="343.8" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="start" dominant-baseline="middle">cache fewer, smaller vectors</text><g><rect x="27" y="370.8" width="486" height="36" rx="4" fill="none" stroke="var(--clyde)" stroke-width="1.6"/></g><text x="45" y="388.8" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--clyde)" text-anchor="start" dominant-baseline="middle">sliding window</text><text x="237.6" y="388.8" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="start" dominant-baseline="middle">old tokens fall out of the cache</text><g><rect x="27" y="415.8" width="486" height="36" rx="4" fill="none" stroke="var(--pinky)" stroke-width="1.6"/></g><text x="45" y="433.8" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--pinky)" text-anchor="start" dominant-baseline="middle">SSM · hybrid</text><text x="237.6" y="433.8" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="start" dominant-baseline="middle">a fixed state replaces the cache</text><line x1="540" y1="82.8" x2="540" y2="460.8" stroke="var(--ink-faint)" stroke-width="1"/><text x="567" y="100.8" font-family="var(--display)" font-size="10.5" fill="var(--accent)" text-anchor="start" dominant-baseline="middle">WEIGHT BYTES READ PER TOKEN</text><text x="747" y="131.4" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="end" dominant-baseline="middle">Llama-3-8B  fp16</text><rect x="756" y="118.8" width="18.45" height="25.2" fill="var(--accent)" stroke="var(--maze-dim)" stroke-width="1"/><text x="1017" y="131.4" font-family="var(--mono)" font-size="14" font-weight="600" fill="var(--accent)" text-anchor="end" dominant-baseline="middle">15.0 GB</text><text x="747" y="171" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="end" dominant-baseline="middle">Llama-3-70B  fp16</text><rect x="756" y="158.4" width="171" height="25.2" fill="var(--blinky)" stroke="var(--maze-dim)" stroke-width="1"/><text x="1017" y="171" font-family="var(--mono)" font-size="14" font-weight="600" fill="var(--blinky)" text-anchor="end" dominant-baseline="middle">139.0 GB</text><text x="747" y="210.6" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="end" dominant-baseline="middle">Mixtral-8x7B  fp16</text><rect x="756" y="198" width="31.37" height="25.2" fill="var(--clyde)" stroke="var(--maze-dim)" stroke-width="1"/><text x="1017" y="210.6" font-family="var(--mono)" font-size="14" font-weight="600" fill="var(--clyde)" text-anchor="end" dominant-baseline="middle">25.5 GB</text><text x="747" y="250.2" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="end" dominant-baseline="middle">DeepSeek-V3  fp8</text><rect x="756" y="237.6" width="44.9" height="25.2" fill="var(--inky)" stroke="var(--maze-dim)" stroke-width="1"/><text x="1017" y="250.2" font-family="var(--mono)" font-size="14" font-weight="600" fill="var(--inky)" text-anchor="end" dominant-baseline="middle">36.5 GB</text><text x="567" y="273.6" font-family="var(--body)" font-size="15.5" font-style="italic" fill="var(--pac)" text-anchor="start" dominant-baseline="middle">671B moves less than 70B.</text><text x="567" y="302.4" font-family="var(--display)" font-size="10.5" fill="var(--accent)" text-anchor="start" dominant-baseline="middle">CACHE BYTES PER TOKEN</text><text x="747" y="329.4" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="end" dominant-baseline="middle">Llama-3-70B GQA-8</text><rect x="756" y="316.8" width="171" height="21.6" fill="var(--accent)" stroke="var(--maze-dim)" stroke-width="1"/><text x="1017" y="329.4" font-family="var(--mono)" font-size="14" font-weight="600" fill="var(--accent)" text-anchor="end" dominant-baseline="middle">320 KiB</text><text x="747" y="363.6" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="end" dominant-baseline="middle">DeepSeek-V3 MLA</text><rect x="756" y="351" width="36.66" height="21.6" fill="var(--inky)" stroke="var(--maze-dim)" stroke-width="1"/><text x="1017" y="363.6" font-family="var(--mono)" font-size="14" font-weight="600" fill="var(--inky)" text-anchor="end" dominant-baseline="middle">68.6 KiB</text><text x="747" y="397.8" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="end" dominant-baseline="middle">5:1 local-global, 8k</text><rect x="756" y="385.2" width="27.79" height="21.6" fill="var(--clyde)" stroke="var(--maze-dim)" stroke-width="1"/><text x="1017" y="397.8" font-family="var(--mono)" font-size="14" font-weight="600" fill="var(--clyde)" text-anchor="end" dominant-baseline="middle">52 KiB</text><text x="747" y="432" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="end" dominant-baseline="middle">recurrent layer</text><text x="756" y="432" font-family="var(--mono)" font-size="13.5" fill="var(--pinky)" text-anchor="start" dominant-baseline="middle">no cache — a fixed state</text><text x="567" y="460.8" font-family="var(--mono)" font-size="13.5" fill="var(--ink-faint)" text-anchor="start" dominant-baseline="middle">MHA at the 70B shape: 2,560 KiB, 8× off the axis.</text><line x1="27" y1="475.2" x2="1017" y2="475.2" stroke="var(--ink-faint)" stroke-width="1"/><text x="27" y="493.2" font-family="var(--body)" font-size="15.5" font-style="italic" fill="var(--ink-dim)" text-anchor="start" dominant-baseline="middle">Both terms are fixed at training time. On deployment day you get quantization, paging and batching — nothing else.</text></svg></div><figcaption class="fig__cap">Parameter count is not a speed number. Active bytes set the ceiling, resident bytes set the hardware you need to approach it, and the gap between them is where sparse models are won or lost.</figcaption></figure>
+      </section>
+
+      <section class="section ghost ghost--pinky" id="big-idea">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--pinky)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>PINKY · THE BIG IDEA</p>
+        <div class="prose"><p>Module 0 traced one architecture — dense, decoder-only, grouped-query attention — and ended on a ratio: about 15 GB moved to do 16 GFLOP of arithmetic. This module is the other half of that lesson. <strong>The model you traced is one point in a design space, and the space is organised almost entirely around that ratio.</strong></p>
+<p>The claim to hold on to is that you can price any language model with two numbers:</p>
+<ul><li><strong>active bytes</strong> — the weight bytes that must be read from memory to produce one token;</li><li><strong>cache bytes</strong> — the KV or state bytes that must be read per token, for each sequence in flight.</li></ul>
+<p>Everything else about an architecture is quality. Those two numbers are cost. A mixture of experts attacks the first. Grouped-query attention, latent attention, sliding windows and recurrent states attack the second. Hybrids attack both. And each of them pays for it somewhere: in memory capacity, in exact recall, or in being impossible to retrofit onto a model you already have.</p>
+<p>That last point is the practical one. Quantization, paging and batching are decisions you make on the day you deploy. Architecture is a decision someone else made months earlier, and by the time the weights are on your disk the two numbers are fixed. <strong>Choosing a model to serve is mostly choosing its bytes-per-token, and you cannot negotiate afterwards.</strong></p>
+<p>So this is a level about reading a config file and predicting a bill. By the end you should be able to look at <code>n_kv_heads</code>, <code>n_experts</code>, <code>top_k</code> and a layer count, and say — before you download anything — how fast it can possibly decode and how many users will fit beside it.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="concepts">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>PELLETS · CONCEPTS</p>
+        <article class="concept" id="concept-0">
+  <div class="concept__head">
+    <span class="concept__n">01</span>
+    <h3 class="concept__title">The decode-step bill: active bytes and cache bytes</h3>
+  </div>
+  <div class="prose"><p>Module 1 established that a decode step reads the weights once to produce one token. Module 2 added the cache that grows with context. Module 4 turned both into time. Put the three together and one line prices any architecture:</p>
+<pre><code>bytes per decode step  ~=  W_active  +  B x S x kv_per_token
+step time              ~=  bytes / achieved bandwidth</code></pre>
+<p><code>W_active</code> is the weight bytes actually read, <code>B</code> is the number of sequences in flight, <code>S</code> is their mean length. The asymmetry between the two terms is the thing to internalise: <strong>the weight term is paid once per step no matter how many sequences you are serving, and the cache term is paid once per sequence.</strong> That is the entire reason batching works, and it is why the two terms have to be tracked separately rather than added into a single &quot;model size&quot;.</p>
+<p>For Llama-3-8B at fp16, the two numbers are 15.0 GB and 128 KiB. At batch 1 and 8k context:</p>
+<pre><code>weights  15.0 GB
+cache     8192 x 131072 = 1.07 GB
+                          ---------
+                          16.1 GB  -&gt;  4.8 ms on an H100  -&gt;  208 tok/s</code></pre>
+<p>At batch 64 the weight term does not move and the cache term multiplies by 64, to 68.7 GB. The model has not changed. Which term you are paying has.</p>
+<p>Here is the whole level in one table — four families, four different bets:</p>
+<table><thead><tr><th>family</th><th>what it changes</th><th>term attacked</th><th>what it costs</th></tr></thead><tbody><tr><td>Dense transformer</td><td>nothing; the baseline</td><td>neither</td><td>it is the thing everything else is measured against</td></tr><tr><td>Mixture of experts</td><td>one MLP becomes <code>E</code> MLPs, <code>k</code> read per token</td><td><code>W_active</code></td><td>memory capacity — every expert must be resident</td></tr><tr><td>MQA · GQA · MLA · cross-layer sharing</td><td>fewer or smaller cached vectors</td><td><code>kv_per_token</code></td><td>quality, in amounts that vary from negligible to real</td></tr><tr><td>Sliding window · local-global</td><td>old tokens fall out of the window</td><td><code>S</code> in most layers</td><td>exact recall of distant tokens on those layers</td></tr><tr><td>SSM · linear attention · hybrid</td><td>a fixed-size state replaces the cache</td><td><code>S</code> entirely, in most layers</td><td>recall again, harder — Module 7 has the argument</td></tr></tbody></table>
+<p>Two warnings before the details. First, <strong>the axis an architecture does not attack tends to get worse</strong>, because designers spend the savings: MoE models are enormous, MLA models are dense, and hybrids that keep a few attention layers keep a cache for them. Second, quantization scales both terms and is not on this list, because it is a deployment choice rather than an architectural one. Module 6 covers it, and the two compose — a fp8 MoE moves half of a small number.</p></div>
+  <pre class="ascii" aria-label="diagram">  ONE DECODE STEP,  batch B,  mean context S
+
+  ┌──────────────────────────────┬──────────────────────────────────┐
+  │ W_active                     │ B x S x kv_per_token             │
+  │ read once per STEP           │ read once per SEQUENCE           │
+  │ independent of B and S       │ grows with BOTH                  │
+  └──────────────────────────────┴──────────────────────────────────┘
+             ^                                   ^
+             │                                   │
+     mixture of experts                 GQA · MLA · sliding window
+     cuts this term                     · recurrent state cut this one
+             │                                   │
+     pays in CAPACITY                    pays in RECALL</pre>
+  <p class="keypoint"><b>REMEMBER</b>Every architectural choice lands in one of two terms: weight bytes read per step, or cache bytes read per token per sequence.</p>
+</article>
+<article class="concept" id="concept-1">
+  <div class="concept__head">
+    <span class="concept__n">02</span>
+    <h3 class="concept__title">Decoder-only, and the two shapes it beat</h3>
+  </div>
+  <div class="prose"><p>Three shapes came out of the original transformer, and only one of them is what you serve today.</p>
+<p><strong>Encoder-only</strong> — BERT and its descendants. Bidirectional attention over a fixed input, no generation. Still the right tool for classification, retrieval embeddings and reranking, and still deployed everywhere in the retrieval half of a RAG system. It has no decode loop, so none of this course applies to it.</p>
+<p><strong>Encoder-decoder</strong> — T5, BART, Whisper. The encoder reads the input bidirectionally once. The decoder generates, and each decoder layer has two attention blocks: self-attention over what it has generated so far, and <strong>cross-attention</strong> over the encoder's output.</p>
+<p>The inference-relevant fact about that shape is one people usually get backwards. The cross-attention K and V are projections of the encoder output, so they are computed <strong>once per request and never grow</strong>. Only the decoder's self-attention cache grows, and it grows with the <em>output</em> length rather than the input length. For a task with a long input and a short output — summarization, translation, transcription — an encoder-decoder has a smaller and flatter cache profile than a decoder-only model doing the same job. Whisper is the surviving example most people have running: its encoder consumes a fixed 30-second window of mel spectrogram, so its cross-attention cache is a constant.</p>
+<p>So encoder-decoder is not the expensive shape. It is the <strong>inflexible</strong> one: two parameter sets to hold, an input that must be fully encoded before any output appears, and no way to append to the encoded region without recomputing it.</p>
+<p><strong>Decoder-only</strong> won, and it is worth being accurate about why. The engineering conveniences are real — one set of weights, one code path for prefill and decode, and a cache that stays valid as the sequence grows (Module 0's causality argument). But the published evidence is about quality: Wang et al. compared architectures and objectives head to head and found causal decoder-only models trained with a plain autoregressive objective had the strongest zero-shot generalization after unsupervised pretraining. The systems properties are why nobody has been tempted back.</p>
+<p><strong>Prefix-LM</strong> is the middle ground that keeps coming up and never quite arrives: bidirectional attention over the prompt, causal attention over the continuation. UL2's S-denoising is exactly this, and PaliGemma uses it so that image and prompt tokens see each other in both directions. The serving consequence is the one that keeps it niche — a bidirectional region cannot be extended without recomputing it, so multi-turn chat, where each turn appends to the previous prompt, loses the prefix caching from Module 6.</p></div>
+  <pre class="ascii" aria-label="diagram">  DECODER-ONLY                     ENCODER-DECODER
+
+  ┌───────────────────────┐        ┌────────────────────────┐
+  │ self-attn KV          │        │ cross-attn K,V         │  encoder output,
+  │ grows with            │        │ FIXED SIZE             │  projected ONCE
+  │ prompt + output       │        ├────────────────────────┤
+  └───────────────────────┘        │ self-attn KV           │  grows with
+                                   │ grows with OUTPUT only │  the generation
+  one parameter set                └────────────────────────┘
+  one code path                    two parameter sets
+  prefix caching works             input must be encoded first</pre>
+  <p class="keypoint"><b>REMEMBER</b>An encoder-decoder computes its cross-attention keys and values once per input and never grows them; what made decoder-only win was generalization, not caching.</p>
+</article>
+<article class="concept" id="concept-2">
+  <div class="concept__head">
+    <span class="concept__n">03</span>
+    <h3 class="concept__title">The cache axis: MHA, MQA, GQA, MLA, and sharing across layers</h3>
+  </div>
+  <div class="prose"><p>Module 2 derived the formula and Module 6 spent the savings. Here it is as a family tree, because the variants are usually presented as a list of tricks when they are a single idea applied at three different points:</p>
+<pre><code>cache bytes per token  =  2 x n_layers x n_kv_heads x head_dim x dtype_bytes
+                          ^        ^          ^          ^         ^
+                          |        |          |          |         └─ quantization (Module 6)
+                          |        |          |          └─ MLA compresses this jointly
+                          |        |          └─ MQA and GQA cut this
+                          |        └─ cross-layer sharing cuts this
+                          └─ MLA removes the factor of 2</code></pre>
+<p>Hold the Llama-3-70B shape fixed — 80 layers, <code>head_dim</code> 128, fp16 — and vary only the attention design:</p>
+<table><thead><tr><th>variant</th><th>cached per token per layer</th><th>bytes per token</th><th>vs MHA</th></tr></thead><tbody><tr><td>MHA, 64 KV heads</td><td><code>2 × 64 × 128</code> = 16,384 values</td><td>2.5 MiB</td><td>1×</td></tr><tr><td>GQA-8 (what Llama 3 ships)</td><td><code>2 × 8 × 128</code> = 2,048 values</td><td>320 KiB</td><td>8×</td></tr><tr><td>MQA, 1 KV head</td><td><code>2 × 1 × 128</code> = 256 values</td><td>40 KiB</td><td>64×</td></tr><tr><td>MLA, rank 512 + 64 rotary</td><td>576 values, K and V together</td><td>90 KiB</td><td>28×</td></tr></tbody></table>
+<p>MQA is not the winner despite the best number, because a single shared KV head costs more quality than most models can afford; GQA at 4 to 8 groups is where the field settled. Module 6 has the mechanism for MLA and the DeepSeek result — a 93% reduction against MHA with benchmark quality that went <em>up</em> rather than down.</p>
+<p>The term this level adds is the one on the left. <strong>Cross-layer KV sharing</strong> lets neighbouring layers reuse a single set of K and V, cutting <code>n_layers</code> in the formula rather than the head count. Character.AI reported stacking three of these attacks in production: MQA, a 5:1 pattern of local to global layers with a 1024-token horizon, and cross-layer sharing worth a further 2–3×, for a combined reduction of more than 20× with no quality regression they could measure. That is the shape of the modern answer — not one clever attention variant, but three multiplicative ones chosen because they compose.</p>
+<p>And the constraint that governs all of it, restated because it is the reason this level exists: <strong>these are training-time decisions.</strong> GQA has an uptraining recipe that costs about 5% of original pre-training compute. MLA does not — it must be trained from scratch. Cross-layer sharing changes what the model <em>is</em>. When you pick a model to serve you are picking a row of that table, and the row is not negotiable.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>The cache formula has exactly two architectural terms, n_kv_heads and head_dim, and every attention variant since 2019 is an attack on one of them — or on the layer count in front of them.</p>
+</article>
+<article class="concept" id="concept-3">
+  <div class="concept__head">
+    <span class="concept__n">04</span>
+    <h3 class="concept__title">The weight axis: mixture of experts</h3>
+  </div>
+  <div class="prose"><p>Module 9 covered how to <em>serve</em> a mixture of experts — expert parallelism, all-to-all, load imbalance. This is the architecture, and the arithmetic underneath the headline numbers.</p>
+<p>An MoE layer replaces the single MLP with <code>E</code> expert MLPs and a router — a small linear layer producing one score per expert — that sends each token to the top <code>k</code> of them. Routing is per token and per layer, so a token can use different experts at every depth.</p>
+<p>Start with the reconciliation everyone skips. Mixtral-8x7B is not 56B parameters, and it does not activate 14B. <strong>Only the MLP is replicated.</strong> Attention, embeddings and norms are shared by all experts:</p>
+<pre><code>per layer, attention (GQA-8, d_model 4096):        41,943,040
+per layer, one expert (SwiGLU, ffn 14336):        176,160,768
+per layer, eight experts:                       1,409,286,144
+per layer, total:                               1,451,229,184
+x 32 layers:                                   46,439,333,888
++ embedding and LM head (32000 x 4096, x2):       262,144,000
+                                               --------------
+                                               46,701,477,888   = 46.7B, the published figure
+
+active per token:  41,943,040 + 2 x 176,160,768 = 394,264,576
+x 32 layers + LM head:                           12,878,610,432   = 12.9B</code></pre>
+<p>The <strong>activation ratio</strong> — active over total — is the number to read off a model card. Mixtral is 12.9/46.7 = 28%. Qwen3-235B-A22B is 22/235 = 9%, with 128 experts and top-8 and no shared expert at all. DeepSeek-V3 is 37/671 = 5.5%, with 256 routed experts plus one shared expert and top-8 routing, the first three layers left dense. The trend is unmistakable: <strong>more experts, each smaller, a smaller fraction active.</strong> That is DeepSeekMoE's contribution — fine-grained expert segmentation, so routing decisions are finer, plus an isolated shared expert that every token reads and that therefore absorbs the knowledge which would otherwise be duplicated into all 256.</p>
+<p>Routing details worth knowing because they change behaviour under load: Switch Transformer routes to exactly one expert, GShard to at most two, and DeepSeek-V3 replaced softmax gating and auxiliary balancing losses with sigmoid affinities and a bias term adjusted during training to keep experts balanced without a loss that fights the objective.</p>
+<p>Now the part that the model card does not tell you. <strong>The activation ratio is a per-token number, and a batch does not read one token's experts — it reads the union of the batch's experts.</strong> Under uniform routing, a batch of <code>B</code> tokens touches</p>
+<pre><code>E x (1 - (1 - k/E)^B)   distinct experts</code></pre>
+<p>For Mixtral, that is 2 experts at batch 1, 7.2 at batch 8, and all 8 by batch 32. For DeepSeek-V3 it is 8 at batch 1, 163 at batch 32, and 252 of 256 by batch 128. The consequence, stated as carefully as it deserves:</p>
+<ul><li><strong>Bytes per step rise with batch</strong> for an MoE and are flat for a dense model. At a large enough</li></ul>
+<p>batch the step reads every expert, so it moves the bytes of its <em>total</em> size, not its active size.</p>
+<ul><li><strong>Bytes per token still fall</strong>, because those bytes are amortized over <code>B</code> tokens. MoE does not</li></ul>
+<p>stop working at scale.</p>
+<ul><li>What erodes is the <em>latency</em> advantage. An MoE at batch 1 decodes like a small model. The same</li></ul>
+<p>model at batch 512 has a step time set by its full weight footprint, and what it keeps is the FLOP saving — which matters on the other side of the ridge point, where Module 4 says you are compute-bound anyway.</p>
+<p>So the honest summary is that <strong>MoE is a bandwidth optimization at small batch and an arithmetic optimization at large batch</strong>, and it is worth knowing which one you are buying. Module 9's note that larger batches smooth routing imbalance is the same phenomenon seen from the scheduler's side: by the time the batch is big enough to balance, it is big enough to touch everything.</p>
+<p>One last practical fact. You can convert a dense checkpoint into an MoE — <strong>sparse upcycling</strong> copies the dense MLP into every expert, initialises a fresh router, and continues training, at roughly half the sunk cost of the original pretraining. It is the only entry in this level that is even partly retrofittable, and &quot;half of a pretraining run&quot; is not a deployment-day decision.</p></div>
+  <pre class="ascii" aria-label="diagram">  ROUTING, one MoE layer, top-2 of 8
+
+     token ──&gt; router ──&gt; scores [8] ──&gt; pick 2
+                                          │
+     ┌────┬────┬────┬────┬────┬────┬────┬─┴──┐
+     │ e0 │ e1 │ e2 │ e3 │ e4 │ e5 │ e6 │ e7 │   all 8 resident
+     └────┴────┴────┴─██─┴────┴────┴─██─┴────┘   2 of 8 read
+                      └─────┬─────────┘
+                            v  weighted sum back into the residual stream
+
+  batch 1:   2 of 8 experts read   -&gt;  22.6 GB per step
+  batch 8:   7.2 of 8               -&gt;  81.2 GB per step
+  batch 32:  8 of 8                 -&gt;  90.2 GB per step   &lt;- now it reads
+                                                              like a 47B dense</pre>
+  <p class="keypoint"><b>REMEMBER</b>MoE reads k of E expert blocks per token, which is a large win at batch 1 and a shrinking one as the batch grows, because a big enough batch touches every expert anyway.</p>
+</article>
+<article class="concept" id="concept-4">
+  <div class="concept__head">
+    <span class="concept__n">05</span>
+    <h3 class="concept__title">The context axis: sliding windows and local-global stacks</h3>
+  </div>
+  <div class="prose"><p>The cache term has one more factor that no attention variant touches: <code>S</code>, the number of tokens you keep. Bound it and the cache stops growing.</p>
+<p><strong>Sliding-window attention</strong> lets each position attend only to the last <code>w</code> tokens. Mistral 7B shipped with <code>w = 4096</code> inside an 8192-token context; later Mistral models dropped it and Ministral reintroduced it in interleaved form. The immediate objection — that the model then cannot use anything older than the window — is wrong, and worth working through. Attention composes across depth: a token at layer 2 attends to positions that themselves attended <code>w</code> tokens further back, so the <strong>receptive field grows roughly as <code>layers × w</code></strong>. What a window costs is not connectivity but <em>exact</em> recall, because information from far away arrives blurred through many layers rather than retrieved directly. That is the same trade Module 7 describes for state space models, applied per layer instead of per model.</p>
+<p><strong>Local-global interleaving</strong> buys the exact recall back cheaply. Make most layers local and a few global. Gemma 2 alternated 1:1 with a 4096-token window. Gemma 3 moved to 5:1 with a 1024-token window, and only the global layers carry the long-context RoPE scaling. Character.AI's production stack used the same 5:1 shape with a 1024 horizon.</p>
+<p>The arithmetic is the reason. Take 48 layers, GQA-8, <code>head_dim</code> 128, fp16 — 4 KiB per token per layer — and a 32k context:</p>
+<pre><code>all-global:      48 layers x 32768 tokens x 4 KiB        =  6.0 GiB
+5:1 local-global: 8 global x 32768 x 4 KiB               =  1.0 GiB
+                 40 local  x  1024 x 4 KiB               =  0.16 GiB
+                                                            ---------
+                                                            1.15 GiB   5.2x smaller</code></pre>
+<p>Note where the saving comes from and where it stops. The local layers are already saturated at 1024 tokens, so their contribution is <strong>constant from 1k of context onward</strong> — doubling the context doubles only the global part. As <code>S</code> grows the ratio approaches <code>L / (L/6)</code> = 6×, and it gets there quickly. This is the cheapest long-context lever there is, which is why every recent model family has adopted some version of it.</p>
+<p>Two things to watch when serving one. Prefix caching (Module 6) has to know the window, because a cached block older than <code>w</code> is useful to the global layers and dead weight for the local ones — engines that page uniformly across layers will happily store both. And the attention-sink result from Module 6 is the reason naive windowing was worse than it should have been: keep the first few tokens pinned alongside the window and quality recovers, because those positions absorb attention mass regardless of their content.</p></div>
+  <pre class="ascii" aria-label="diagram">  CACHE PER LAYER, 5:1 local-global, w = 1024
+
+  layer  1  local   [....1024....]                 constant
+  layer  2  local   [....1024....]                 constant
+  layer  3  local   [....1024....]                 constant
+  layer  4  local   [....1024....]                 constant
+  layer  5  local   [....1024....]                 constant
+  layer  6  GLOBAL  [...............32768.......]  grows with context
+  ...
+                     ^                          ^
+                     └── 5/6 of layers flat ─────┘  only 1/6 grows</pre>
+  <p class="keypoint"><b>REMEMBER</b>A window turns the cache from linear in context to constant, and interleaving a few global layers buys back the long-range recall the window gives up.</p>
+</article>
+<article class="concept" id="concept-5">
+  <div class="concept__head">
+    <span class="concept__n">06</span>
+    <h3 class="concept__title">Removing the cache: recurrent states and hybrid stacks</h3>
+  </div>
+  <div class="prose"><p>The last move is to delete the cache. A state space model or linear-attention layer carries a <strong>fixed-size recurrent state</strong> instead: every token updates it, and nothing accumulates. Module 7 covers the mechanism and the reason pure versions lost — a fixed state cannot hold an arbitrary amount of detail, so exact recall degrades in a way that is information-theoretic rather than an implementation shortfall. Here the question is only what it costs to serve.</p>
+<p>For Mamba-2 the state is <code>d_inner × d_state</code> values per layer, plus a small convolution cache a few timesteps wide. Take the 2.7B checkpoint — <code>d_model</code> 2560, expand 2, <code>d_state</code> 128, 64 layers:</p>
+<pre><code>per layer:   5120 x 128            =    655,360 values
+x 64 layers:                       = 41,943,040 values
+at bf16:                           =      83.9 MB per sequence</code></pre>
+<p>83.9 MB at 1k tokens. 83.9 MB at 1M tokens. <strong>The state does not know how long the sequence is.</strong> Compare that to a KV cache, which at 128k context and GQA-8 is measured in gigabytes per sequence, and the shape of the trade is clear: a recurrent model's memory scales with <strong>concurrency only</strong>, where a transformer's scales with concurrency <strong>times</strong> context.</p>
+<p>Nobody ships the pure version. <strong>Hybrids</strong> interleave a few full-attention layers among many recurrent ones, which is enough to restore exact retrieval while keeping most of the memory saving. The published ratios vary more than the folklore suggests:</p>
+<table><thead><tr><th>model</th><th>pattern</th><th>scale</th></tr></thead><tbody><tr><td>Jamba</td><td>1 attention : 7 Mamba, MoE every second layer</td><td>52B total, 12B active</td></tr><tr><td>MiniMax-01</td><td>7 lightning-attention layers : 1 softmax, 10 of 80</td><td>456B total, 45.9B active</td></tr><tr><td>Nemotron-H</td><td>Mamba-2 with roughly 8% attention layers</td><td>8B and 56B</td></tr><tr><td>Qwen3-Next</td><td>1 full attention per 3 linear-attention layers</td><td>80B total</td></tr><tr><td>Falcon-H1</td><td>attention and SSM heads run in <em>parallel</em> inside a block</td><td>0.5B to 34B</td></tr></tbody></table>
+<p>Jamba's own table is the cleanest statement of the payoff: at 256k context with a 16-bit cache it needs about <strong>4 GB</strong>, against 32 GB for Mixtral and 128 GB for Llama-2-70B at the same context. That is the entire argument for hybrids in one row.</p>
+<p>What it does to a serving stack is less advertised. You now have two allocators: a paged KV cache for the attention layers, and a constant-size state block per sequence for the rest. The state is allocated when the sequence starts and freed when it ends, which makes admission control simpler and preemption harder — you cannot evict half a state the way you can drop and recompute KV blocks. Prefix caching works only on the attention layers unless the engine also snapshots the recurrent state at block boundaries, and a snapshot costs the same fixed bytes whether the prefix is 100 tokens or 100,000.</p></div>
+  <pre class="ascii" aria-label="diagram">  CACHE BYTES vs CONTEXT, one sequence
+
+   bytes
+     ^
+     │                                        ,-'  transformer, GQA-8
+     │                                    ,-'      (linear in S)
+     │                                ,-'
+     │                            ,-'
+     │                        ,-'
+     │                    ,-'
+     │                ,-'          hybrid 1:7 (linear, 1/8 the slope)
+     │            ,-'         ...................................
+     │        ,-'   ..........
+     │    ,-'.......
+     │ ,.'..
+     ├───────────────────────────────────────────────  pure SSM: FLAT
+     └────────────────────────────────────────────────&gt;  context S
+       1k        8k        32k       128k      512k</pre>
+  <p class="keypoint"><b>REMEMBER</b>A recurrent layer stores the same bytes at 1k tokens as at 1M, which moves the capacity question from context length to concurrency.</p>
+</article>
+<article class="concept" id="concept-6">
+  <div class="concept__head">
+    <span class="concept__n">07</span>
+    <h3 class="concept__title">The boring shapes that decide how it serves</h3>
+  </div>
+  <div class="prose"><p>Three parts of a config file have nothing to do with the interesting architecture debates and quite a lot to do with your latency.</p>
+<p><strong>Depth.</strong> Under tensor parallelism a decode step costs two all-reduces per layer, one after attention and one after the MLP, so an 80-layer model pays 160 collectives per token. Those collectives carry small messages, so their cost is mostly fixed latency that does not shrink when you add GPUs — Module 9 measures it. The same is true of kernel launches, though CUDA graphs remove most of that particular tax. <strong>A deep-narrow model and a shallow-wide model with equal parameter counts do not decode equally</strong>, and the deep one loses. It often wins on quality per parameter, which is why the trade keeps being made.</p>
+<p><strong>Head counts.</strong> Tensor parallelism splits attention by heads, so <code>n_heads</code> must divide by the TP degree. The one that surprises people is the KV side. When the TP degree exceeds <code>n_kv_heads</code>, engines do not fail — they replicate. A GQA-8 model at TP=16 gives every rank one KV head, held twice across the group, so <strong>your KV cache costs 2× what the formula says</strong>. The cache arithmetic from Module 2 silently stops being right at the moment you scale past 8 ways, and nothing in the logs tells you.</p>
+<p><strong>Vocabulary.</strong> The LM head is a <code>d_model × vocab</code> matrix and it is read on every decode step. It has grown: GPT-2 at 50,257, Llama-2 at 32,000, Llama-3 at 128,256, Qwen3 at 151,936, Gemma 3 at 262,208. On Llama-3-8B that is <code>4096 × 128256 × 2</code> = 1.05 GB of the 15.0 GB read per token — 7%, noticeable but not decisive. On a 0.6B model with a 151,936-token vocabulary it is 311 MB of about 1.2 GB, <strong>a quarter of the entire decode cost spent on the output projection</strong>. This is why small models tie their embeddings: Gemma ties at every size, Qwen3 ties at 4B and below, and Llama does not tie at all. Tying saves one <code>vocab × d_model</code> matrix, which is rounding error on a 70B model and a design constraint on a 600M one.</p>
+<p>The general lesson is that the config fields nobody argues about on release day are the ones that decide whether the model shards cleanly, and a model that does not shard cleanly is a model you serve at 2× the cache cost forever.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Layer count sets how many fixed costs you pay per token, head counts set how many ways you can shard, and vocabulary sets a floor that small models cannot get under.</p>
+</article>
+<article class="concept" id="concept-7">
+  <div class="concept__head">
+    <span class="concept__n">08</span>
+    <h3 class="concept__title">Multimodal: the architecture that changes the shape of the prefill</h3>
+  </div>
+  <div class="prose"><p>A vision-language model is usually three parts: a <strong>vision encoder</strong> (a ViT such as CLIP or SigLIP), a <strong>projector</strong> that maps its output into the language model's embedding space, and the language model itself. LLaVA-1.5 uses CLIP ViT-L/14 at 336px with a two-layer MLP projector; PaliGemma pairs SigLIP with Gemma; Qwen2-VL uses a ViT with an MLP token merger.</p>
+<p>The arithmetic that matters is how many positions an image becomes. A ViT at 336px with patch size 14 produces <code>(336/14)² = 24 × 24 = 576</code> patches, and LLaVA-1.5 passes all of them through, so one image is 576 tokens. Higher-resolution schemes tile: LLaVA-NeXT's grid reaches 2,880 tokens per image, and Qwen2-VL's dynamic resolution maps any input size to a variable count bounded in the thousands.</p>
+<p>Then the point of this level: <strong>those are ordinary positions.</strong> They cost the same prefill FLOPs per token, and the same cache bytes per token, as text. On a Llama-3-8B-shaped model at 128 KiB per token:</p>
+<pre><code>one 576-token image:    576 x 131072   =  72 MiB of KV
+one 2880-token image:  2880 x 131072   = 360 MiB of KV
+a 40-token text prompt:   40 x 131072  = 5.0 MiB</code></pre>
+<p>A single image is worth fourteen to seventy text prompts. So in an image-heavy request with a short question, prefill is dominated by pixels, the cache is dominated by pixels, and every scheduling decision from Module 5 — chunked prefill, admission control, the prefill/decode interference trade — is being made about image tokens whether or not the scheduler knows it.</p>
+<p>The exception is the <strong>cross-attention</strong> family: Flamingo and Llama 3.2 Vision feed image features into the language model through dedicated cross-attention layers instead of inserting them into the sequence. Image content then never enters the self-attention cache at all; it adds a separate, fixed-size K and V, exactly the encoder-decoder structure from earlier in this level. It costs extra parameters and buys a cache that does not grow with image count — the same trade, made in a different place, for the third time in this module.</p>
+<p>Two practical notes. The vision encoder is a second model resident on the same GPU, with its own weights and its own batch behaviour, and it runs in the prefill phase only. And prefix caching over images requires hashing the image content rather than the token ids, which most engines now do — worth checking, because in a multi-turn conversation about one image the image is precisely the part that repeats.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>In the dominant VLM design an image becomes several hundred to several thousand ordinary positions, each costing exactly what a text token costs.</p>
+</article>
+      </section>
+
+      <section class="section ghost ghost--inky" id="math-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--inky)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>INKY · MATH BY HAND</p>
+        <h2 class="section__title">Math by hand</h2>
+        <div class="prose"><p>Price three architectures on the same hardware, then explain the number that comes out wrong. Assume H100 SXM: 3.35 TB/s, 80 GB, call it 76 GB usable after activations and workspace.</p>
+<pre><code>A. Llama-3-70B          fp16 weights, fp16 cache
+   n_layers 80, d_model 8192, n_heads 64, n_kv_heads 8, head_dim 128
+   ffn 28672 (SwiGLU, three matrices), vocab 128256, untied
+
+B. Mixtral-8x7B         fp16 weights, fp16 cache
+   n_layers 32, d_model 4096, n_heads 32, n_kv_heads 8, head_dim 128
+   ffn 14336 per expert, 8 experts, top-2, vocab 32000, untied
+
+C. DeepSeek-V3          fp8 weights, bf16 cache
+   n_layers 61 — the first 3 dense, the remaining 58 MoE
+   d_model 7168, ffn 18432 in a dense layer, 2048 per expert
+   256 routed experts + 1 shared, top-8, vocab 129280, untied
+   MLA caches kv_lora_rank 512 plus a 64-wide decoupled RoPE key
+   MLA projections per layer:  q_a 7168x1536,  q_b 1536x24576,
+                               kv_a 7168x576,  kv_b 512x32768,  o 16384x7168</code></pre>
+<ol><li>Weight bytes read per decode token, for each. The input embedding is a lookup, not a matmul.</li><li>Cache bytes per token per sequence, for each.</li><li>Resident bytes, and the minimum number of H100s that can hold the weights.</li><li>The batch-1 decode step at 8k context, assuming you get the full aggregate bandwidth of that many GPUs. Convert to tokens per second.</li><li>The context length at which the cache term equals the weight term, at batch 1 and at batch 64.</li><li>Your answer to question 4 for DeepSeek-V3 is a number nobody has ever measured at batch 1. What does the arithmetic assume that the deployment does not deliver?</li></ol></div>
+        <details class="spoiler">
+          <summary>SHOW THE WORKED SOLUTION</summary>
+          <div class="spoiler__body prose"><p><strong>1. Weight bytes per token</strong></p>
+<p><strong>A. Llama-3-70B.</strong> Per layer:</p>
+<pre><code>attention:  W_q  8192 x 8192  =  67,108,864
+            W_k  8192 x 1024  =   8,388,608
+            W_v  8192 x 1024  =   8,388,608
+            W_o  8192 x 8192  =  67,108,864
+                                 -----------
+                                 150,994,944
+
+mlp:        3 x 8192 x 28672  = 704,643,072
+per layer:                      855,638,016
+x 80 layers:                 68,451,041,280
++ embedding  128256 x 8192  =  1,050,673,152
++ lm_head    8192 x 128256  =  1,050,673,152
+                              --------------
+                              70,552,387,584   = 70.55B</code></pre>
+<p>At fp16 that is 141.10 GB resident. Subtract the embedding table, which is a row lookup: <strong>139.00 GB read per token.</strong></p>
+<p><strong>B. Mixtral-8x7B.</strong> The trap is that 8 × 7B is not 56B — only the MLP is replicated:</p>
+<pre><code>attention per layer:                        41,943,040
+one expert, 3 x 4096 x 14336:              176,160,768
+eight experts:                           1,409,286,144
+per layer total:                         1,451,229,184
+x 32:                                   46,439,333,888
++ embedding + lm_head, 2 x 32000 x 4096:   262,144,000
+                                        --------------
+                                        46,701,477,888   = 46.70B  -&gt; 93.40 GB at fp16
+
+active: 41,943,040 + 2 x 176,160,768   =   394,264,576
+x 32 + lm_head 131,072,000              = 12,747,538,432 read</code></pre>
+<p><strong>25.50 GB read per token.</strong> (Counting the embedding table too gives the 12.9B on the model card; only 12.75B of it is actually read.)</p>
+<p><strong>C. DeepSeek-V3.</strong> Four groups:</p>
+<pre><code>one expert, 3 x 7168 x 2048:                    44,040,192
+257 experts (256 routed + 1 shared) per layer: 11,318,329,344
+x 58 MoE layers:                              656,463,101,952
+
+3 dense layers, 3 x 3 x 7168 x 18432:           1,189,085,184
+
+MLA per layer:  q_a  7168 x 1536  =  11,010,048
+                q_b  1536 x 24576 =  37,748,736
+                kv_a 7168 x 576   =   4,128,768
+                kv_b 512 x 32768  =  16,777,216
+                o    16384 x 7168 = 117,440,512
+                                    -----------
+                                    187,105,280   x 61 = 11,413,422,080
+
+embedding + lm_head, 2 x 129280 x 7168:         1,853,358,080
+                                              ---------------
+                                              670,918,967,296   = 670.9B  ✓ &quot;671B&quot;</code></pre>
+<p>Active: 9 experts of 257 per MoE layer, everything else unchanged.</p>
+<pre><code>9 x 44,040,192 x 58    = 22,988,980,224
++ dense layers          =  1,189,085,184
++ MLA, all 61 layers    = 11,413,422,080
++ lm_head               =    926,679,040
+                          --------------
+                          36,518,166,528   = 36.5B  ✓ &quot;37B&quot;</code></pre>
+<p>At fp8, <strong>36.5 GB read per token</strong> out of 671 GB resident.</p>
+<p><strong>2. Cache bytes per token</strong></p>
+<pre><code>A:  2 x 80 x 8 x 128 x 2  = 327,680 B = 320 KiB
+B:  2 x 32 x 8 x 128 x 2  = 131,072 B = 128 KiB
+C:      61 x 576     x 2  =  70,272 B = 68.6 KiB      no factor of 2 — the latent is K and V</code></pre>
+<p><strong>3. Resident bytes and GPUs</strong></p>
+<pre><code>A:  141.10 GB / 76  = 1.86  -&gt;  2 H100s
+B:   93.40 GB / 76  = 1.23  -&gt;  2 H100s
+C:  671.0  GB / 76  = 8.83  -&gt;  9, in practice 16 H100s or 8 H200s (1,128 GB)</code></pre>
+<p>Note what just happened to B. Mixtral reads 25.50 GB per token, less than a dense 13B — but it needs the same two GPUs as the 70B, because capacity is set by the total and bandwidth by the active. <strong>That is the MoE trade in one line.</strong></p>
+<p><strong>4. The batch-1 step at 8k</strong></p>
+<pre><code>A:  139.00 + 8192 x 327,680 = 139.00 + 2.68 = 141.68 GB / 6.70 TB/s = 21.1 ms -&gt;    47 tok/s
+B:   25.50 + 8192 x 131,072 =  25.50 + 1.07 =  26.57 GB / 6.70 TB/s =  4.0 ms -&gt;   252 tok/s
+C:   36.50 + 8192 x  70,272 =  36.50 + 0.58 =  37.08 GB / 53.6 TB/s =  0.7 ms -&gt; 1,446 tok/s</code></pre>
+<p>A 671B model looks nine times faster than a 70B one. The first part of that is real and is the whole point of the level: <strong>36.5 GB moved beats 139.00 GB moved, and parameter count did not enter the calculation.</strong> The second part is not, which is question 6.</p>
+<p><strong>5. Where the cache catches the weights</strong></p>
+<p>Set <code>W = B × S × kv</code> and solve for <code>S</code>:</p>
+<pre><code>              batch 1        batch 64
+A:   139.00e9 / 327,680   =  424,000 tokens      6,600 tokens
+B:    25.50e9 / 131,072   =  195,000 tokens      3,000 tokens
+C:    36.50e9 /  70,272   =  520,000 tokens      8,100 tokens</code></pre>
+<p>At batch 1 the cache is irrelevant for every architecture here — you would need a context longer than any of them supports. At batch 64 it dominates from a few thousand tokens onward. <strong>The cache term is a concurrency problem wearing a context-length costume</strong>, which is why Module 6 is about fitting more sequences and not about fitting longer ones.</p>
+<p><strong>6. What the arithmetic assumes</strong></p>
+<p>It assumes all 16 GPUs are streaming useful bytes at the same time. At batch 1 with expert parallelism, they are not. A GPU holding 16 of the 256 experts is asked for zero or one of the eight the token selected, so most of the fleet reads nothing it needs and contributes none of its bandwidth. On top of that, each MoE layer costs two all-to-alls whose latency does not shrink as you add GPUs (Module 9), and there are 58 of them.</p>
+<p>Aggregate bandwidth only becomes real when the batch is large enough to keep every expert busy — and from the routing arithmetic, that is roughly the batch at which the model reads all 656 GB of its experts anyway. <strong>Batch 1 on a 671B sparse model is the worst operating point the architecture has</strong>, and it was designed by people who intended to run it at the other end.</p></div>
+        </details>
+      </section>
+
+      <section class="section ghost ghost--clyde" id="code-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--clyde)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>CLYDE · CODE LAB</p>
+        <h2 class="section__title">Code lab</h2>
+        <div class="prose"><p>Write the cost model as code: a config in, the two numbers out. Then use it to see the thing that is hard to see from a model card — that an MoE's step reads more of itself as the batch grows, until it reads all of itself.</p>
+<p>No GPU, no dependencies, and no model downloads. The point is that everything in this level is derivable from a config file, and once you have typed the derivation once you will read config files differently.</p></div>
+        <div class="prose" style="max-width:none"><pre><code class="lang-python">&quot;&quot;&quot;Price an architecture in two numbers: active bytes and cache bytes.
+
+    python3 arch_cost.py        # standard library only
+
+Every model below is described by its config, not by its marketing size. The
+point of the exercise is that the two numbers -- not the parameter count --
+predict the decode step.
+&quot;&quot;&quot;
+
+from dataclasses import dataclass
+
+BW = 3350.0e9          # H100 SXM, bytes/second
+GB = 1e9
+
+
+@dataclass
+class Arch:
+    name: str
+    n_layers: int
+    d_model: int
+    n_heads: int
+    n_kv_heads: int
+    head_dim: int
+    ffn: int
+    vocab: int
+    n_experts: int = 1        # 1 means a dense MLP
+    top_k: int = 1
+    n_shared: int = 0         # DeepSeek-style always-on expert
+    w_bytes: float = 2.0      # bytes per weight
+    kv_bytes: float = 2.0     # bytes per cached value
+    latent: int = 0           # MLA: values cached per token per layer
+    window: int = 0           # sliding-window size, 0 = every layer sees everything
+    global_every: int = 1     # 1 = every layer is global
+    reported: tuple = ()      # (total, active) from the tech report, for models
+                              # the generic formula below does not describe
+
+
+def params(a):
+    &quot;&quot;&quot;(total, active-per-token) parameter counts, ignoring norms and router.&quot;&quot;&quot;
+    if a.reported:
+        return a.reported
+    attn = (a.d_model * a.n_heads * a.head_dim
+            + 2 * a.d_model * a.n_kv_heads * a.head_dim
+            + a.n_heads * a.head_dim * a.d_model)
+    expert = 3 * a.d_model * a.ffn
+    per_layer_total = attn + expert * (a.n_experts + a.n_shared)
+    per_layer_active = attn + expert * (a.top_k + a.n_shared)
+    emb = a.vocab * a.d_model
+    total = 2 * emb + a.n_layers * per_layer_total
+    # the input embedding is a row lookup, not a matmul: only the LM head is read
+    active = emb + a.n_layers * per_layer_active
+    return total, active
+
+
+def kv_bytes_per_token(a):
+    &quot;&quot;&quot;Cache bytes for one token in one global layer.&quot;&quot;&quot;
+    values = a.latent if a.latent else 2 * a.n_kv_heads * a.head_dim
+    return values * a.kv_bytes
+
+
+def kv_total(a, ctx):
+    &quot;&quot;&quot;Cache bytes for one sequence at this context length.&quot;&quot;&quot;
+    per_layer = kv_bytes_per_token(a)
+    n_global = a.n_layers // a.global_every
+    n_local = a.n_layers - n_global
+    kept_local = min(ctx, a.window) if a.window else ctx
+    return per_layer * (n_global * ctx + n_local * kept_local)
+
+
+def step(a, batch, ctx):
+    total, active = params(a)
+    w_read = active * a.w_bytes
+    cache = batch * kv_total(a, ctx)
+    ms = (w_read + cache) / BW * 1e3
+    return dict(total=total, active=active, w_read=w_read, cache=cache,
+                resident=total * a.w_bytes, ms=ms)
+
+
+MODELS = [
+    Arch(&quot;Llama-3-8B&quot;, 32, 4096, 32, 8, 128, 14336, 128256),
+    Arch(&quot;Llama-3-70B&quot;, 80, 8192, 64, 8, 128, 28672, 128256),
+    Arch(&quot;Mixtral-8x7B&quot;, 32, 4096, 32, 8, 128, 14336, 32000, n_experts=8, top_k=2),
+    # MLA changes the q and kv projections and the first three layers are dense,
+    # so the formula above does not describe it. Take the two headline numbers
+    # from the technical report and derive only the cache term.
+    Arch(&quot;DeepSeek-V3 (fp8)&quot;, 61, 7168, 128, 128, 128, 2048, 129280,
+         n_experts=256, top_k=8, n_shared=1, w_bytes=1.0, latent=576,
+         reported=(671e9, 37e9)),
+    Arch(&quot;local-global 5:1&quot;, 48, 4096, 32, 8, 128, 14336, 128256,
+         window=1024, global_every=6),
+]
+
+print(&quot;=== Part 1: the two numbers ===\n&quot;)
+print(f&quot;{'model':20s} {'total':&gt;9s} {'active':&gt;9s} {'resident':&gt;10s} &quot;
+      f&quot;{'read/token':&gt;11s} {'KV/token':&gt;10s}&quot;)
+for a in MODELS:
+    s = step(a, 1, 8192)
+    kvt = kv_total(a, 8192) / 8192
+    print(f&quot;{a.name:20s} {s['total']/1e9:8.1f}B {s['active']/1e9:8.1f}B &quot;
+          f&quot;{s['resident']/GB:9.1f}G {s['w_read']/GB:10.1f}G {kvt/1024:9.1f}K&quot;)
+
+print(&quot;\n=== Part 2: the decode step, batch 1 and batch 64 ===\n&quot;)
+print(f&quot;{'model':20s} {'B=1 8k':&gt;10s} {'B=64 8k':&gt;10s} {'B=64 128k':&gt;11s}&quot;)
+for a in MODELS:
+    print(f&quot;{a.name:20s} {step(a, 1, 8192)['ms']:9.1f}ms &quot;
+          f&quot;{step(a, 64, 8192)['ms']:9.1f}ms {step(a, 64, 131072)['ms']:10.1f}ms&quot;)
+
+print(&quot;\n=== Part 3: where the cache term overtakes the weights ===\n&quot;)
+for a in MODELS:
+    _, active = params(a)
+    w = active * a.w_bytes
+    per_tok = kv_total(a, 131072) / 131072
+    for batch in (1, 64):
+        print(f&quot;  {a.name:20s} batch {batch:3d}: cache == weights at &quot;
+              f&quot;{w / (batch * per_tok):9,.0f} tokens of context&quot;)
+
+print(&quot;\n=== Part 4: an MoE reads more of itself as the batch grows ===\n&quot;)
+
+
+def distinct_experts(E, k, B):
+    &quot;&quot;&quot;Expected distinct experts touched by B tokens under uniform top-k routing.&quot;&quot;&quot;
+    return E * (1.0 - (1.0 - k / E) ** B)
+
+
+for (E, k, expert_gb, label) in [
+        (8, 2, 90.2, &quot;Mixtral-8x7B    8 experts, top-2, 90.2 GB of expert weights&quot;),
+        (256, 8, 656.5, &quot;DeepSeek-V3   256 experts, top-8, 656 GB of expert weights at fp8&quot;)]:
+    print(f&quot;  {label}&quot;)
+    print(f&quot;    {'batch':&gt;7s} {'experts touched':&gt;17s} {'GB per step':&gt;12s} {'GB per token':&gt;13s}&quot;)
+    for B in (1, 8, 32, 128, 512):
+        d = distinct_experts(E, k, B)
+        per_step = expert_gb * d / E
+        print(f&quot;    {B:7d} {d:9.1f} of {E:3d} {per_step:12.1f} {per_step/B:13.2f}&quot;)
+    print()
+
+# --- TODO for you ---------------------------------------------------------
+#   1. Add a hybrid: replace the KV cache of 7 layers out of 8 with a constant
+#      per-sequence state of d_inner x d_state values. Find the context length
+#      at which it beats the GQA model on total cache bytes at batch 64.
+#   2. Teach Arch to express MLA properly (q_a, q_b, kv_a, kv_b, o) and check
+#      that you reproduce 671B total and 37B active without the override.
+#   3. Real routers are not uniform. Re-run Part 4 with a skewed distribution
+#      -- expert i chosen with probability proportional to 1/(i+1) -- and say
+#      which way the curve moves, and why that is bad news for the GPU holding
+#      expert 0.
+</code></pre></div>
+        <div class="prose"><h3>What you should see</h3><p>Part 1 reproduces every number this level has quoted: 15.0 GB and 128 KiB for Llama-3-8B, 139.0 GB and 320 KiB for the 70B, 25.5 GB read against 93.4 GB resident for Mixtral, 36.5 GB read against 671 GB resident for DeepSeek-V3, and 68.6 KiB per token for MLA against 320 KiB for GQA-8. If your Mixtral total is 56B you replicated the attention block as well as the MLP.</p>
+<p>Part 2 is the level's headline: at batch 1 and 8k context Mixtral steps in 7.9 ms against Llama-3-70B's 42.3 ms, despite holding two thirds of its parameters. The last column is the other lesson — at batch 64 and 128k context every model is dominated by the cache term, and the ranking changes: the local-global model at 91.8 ms beats the dense 8B at 332.7 ms, because five of every six of its layers stopped growing at 1,024 tokens.</p>
+<p>Part 3 prints the crossover contexts: ~424,000 tokens for Llama-3-70B at batch 1, but 6,628 at batch 64. Every model shows the same 64× collapse, which is the point — the cache term is about concurrency.</p>
+<p>Part 4 is the one worth staring at. Mixtral touches 2 of 8 experts at batch 1 and all 8 by batch 32, so bytes per step go 22.6 GB, 81.2 GB, 90.2 GB while bytes per token fall 22.55, 10.15, 2.82. Both statements are true simultaneously and people usually only know one of them. DeepSeek-V3 shows the same curve stretched: 8 of 256 at batch 1, 163 at batch 32, 252 at batch 128.</p>
+<p>These are single-device figures. In a real expert-parallel deployment those bytes are spread across GPUs and the step is also paying for two all-to-alls per MoE layer, which is Module 9's subject and the reason the math lab's 1,446 tok/s is fiction.</p></div>
+        <div class="prose"><h3>Stretch</h3><p>Pull three real <code>config.json</code> files from HuggingFace — pick a dense model, an MoE and a hybrid — and feed their actual fields into <code>Arch</code> without adjusting anything. Two things will happen. Some fields will not fit the dataclass, which tells you where that family's cost model genuinely differs. And at least one model's total will come out wrong, which tells you which parameters the config does not mention. Track down the discrepancy; it is usually a shared expert, a tied embedding, or a first-<code>k</code>-layers-dense rule.</p>
+<p>Then plot step time against batch size for a dense model and an MoE on the same axes, from batch 1 to 512, at 8k context. The dense line is flat until the cache term bites. The MoE line rises steeply, then flattens once every expert is touched. Where they cross is the batch size at which you should stop describing your MoE as &quot;decodes like a 13B model&quot;.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pac" id="papers">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>THE KEY · PAPERS</p>
+        <h2 class="section__title">Papers, with a reading frame</h2>
+        <div class="papers">
+          <article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2101.03961" target="_blank" rel="noopener">Switch Transformers: Scaling to Trillion Parameter Models with Simple and Efficient Sparsity</a></h3>
+            <p class="paper__by">Fedus, Zoph &amp; Shazeer, 2021</p>
+            <p class="paper__why">The paper that made sparse routing simple enough to be default: one expert per token, and a clear account of what that buys and what it costs to keep balanced.</p>
+            <div class="paper__frame"><p>Read <strong>Section 2</strong> for the routing mechanism and the argument for top-1, which had been assumed impossible. <strong>Section 2.2</strong> on expert capacity and the capacity factor is the piece that shows up in every serving system since. Skim the training-stability material in Section 3 and the distillation results at the end unless you are training one yourself.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2412.19437" target="_blank" rel="noopener">DeepSeek-V3 Technical Report</a></h3>
+            <p class="paper__by">DeepSeek-AI, 2024</p>
+            <p class="paper__why">The clearest example of a model whose architecture was chosen for its inference bill: latent attention for the cache term, fine-grained sparsity for the weight term, fp8 for both.</p>
+            <div class="paper__frame"><p><strong>Section 2.1</strong> is the architecture: read MLA and DeepSeekMoE together and notice that they attack different terms of the same equation. <strong>Section 2.1.2</strong> on auxiliary-loss-free load balancing is the newest idea in the paper. Then work out the parameter breakdown yourself from the config numbers and check that it lands on 671B and 37B — the math lab in this level does exactly that. Skip the training infrastructure sections on a first pass, then come back to them after Module 9.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2403.19887" target="_blank" rel="noopener">Jamba: A Hybrid Transformer-Mamba Language Model</a></h3>
+            <p class="paper__by">Lieber et al. (AI21), 2024</p>
+            <p class="paper__why">A production hybrid with the cache numbers stated plainly: 4 GB at 256k context against 32 GB for Mixtral and 128 GB for Llama-2-70B.</p>
+            <div class="paper__frame"><p><strong>Table 1</strong> is the argument — read it before anything else and make sure you can derive why the numbers differ. <strong>Section 3.1</strong> gives the block structure: 1 attention layer per 7 Mamba layers, MoE every second layer. The ablations in <strong>Section 6</strong> on how few attention layers you can get away with are the interesting part; they are measuring exactly the recall trade Module 7 describes.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2503.19786" target="_blank" rel="noopener">Gemma 3 Technical Report</a></h3>
+            <p class="paper__by">Google DeepMind, 2025</p>
+            <p class="paper__why">The clearest published statement of local-global interleaving as a KV-cache decision rather than a modelling one, including what moving from 1:1 to 5:1 cost in quality.</p>
+            <div class="paper__frame"><p>Read the architecture section on the 5:1 local-global pattern and the 1024-token window, and note that only the global layers get long-context RoPE scaling. The KV-cache ablations are the payload — they show the memory curve flattening while perplexity barely moves. Skim the distillation and evaluation sections.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2204.05832" target="_blank" rel="noopener">What Language Model Architecture and Pretraining Objective Work Best for Zero-Shot Generalization?</a></h3>
+            <p class="paper__by">Wang et al., 2022</p>
+            <p class="paper__why">The controlled comparison behind the claim that decoder-only won, rather than the folklore version of it.</p>
+            <div class="paper__frame"><p>Read the setup in <strong>Section 3</strong> carefully — the whole value of the paper is that architecture, objective and adaptation are varied independently, which almost nothing else in this literature does. The result to extract is conditional: causal decoder-only plus autoregressive pretraining wins zero-shot, while non-causal encoder-decoder plus masked pretraining wins once you allow multitask finetuning. Skip the adaptation experiments unless the conditionality surprises you, in which case they are the reason to believe it.</p></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--blinky" id="pitfalls">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--blinky)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>BLINKY · PITFALLS</p>
+        <h2 class="section__title">What people get wrong</h2>
+        <div class="pitfall">
+          <p class="pitfall__wrong"><span>Parameter count tells you how fast a model will decode.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>It tells you how much memory you need to hold it, which is a different question. Decode speed at small batch is set by <strong>active bytes</strong>: DeepSeek-V3 has 671B parameters and reads 36.5 GB per token at fp8, while Llama-3-70B has one tenth the parameters and reads 139 GB at fp16. The sparse model moves 3.8× fewer bytes per token than the model that is 9.5× smaller. Parameter count and decode cost were joined at the hip for exactly as long as every model was dense, and people have not updated. Read the activation ratio, then the dtype, then the layer count — and only then the number in the model's name.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>A model with no KV cache has no per-sequence memory cost.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>The recurrent state is per sequence and per layer — it is constant in context length, not zero. Mamba-2 at 2.7B carries <code>5120 × 128</code> values per layer across 64 layers, about 83.9 MB per sequence at bf16, whether the sequence is 1,000 tokens or 1,000,000. At batch 64 that is 5.4 GB of state you must have. What changes is <em>which</em> variable your memory scales with: concurrency instead of concurrency times context. And every hybrid keeps real attention layers, so it keeps a real KV cache for them — Jamba's 4 GB at 256k is small, not absent.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Sliding-window attention means the model cannot see beyond the window.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>Attention composes across depth. A token attends to <code>w</code> positions, each of which attended to <code>w</code> positions of its own, so the receptive field grows roughly as <code>layers × w</code> and reaches far past the window. What a window bounds is the <strong>cache</strong>, and what it degrades is <em>exact</em> recall — retrieving one specific distant token, which is what long-context benchmarks measure. That is why local-global interleaving exists: a few full-attention layers restore the exact path while the local majority keeps the cache flat. Judge a windowed model on retrieval evaluations, not on the arithmetic of its receptive field.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Architecture is something you can choose at deployment time.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>Almost none of it is. GQA can be uptrained from an MHA checkpoint at about 5% of original pre-training compute; MLA cannot be retrofitted at all; sparse upcycling turns a dense model into an MoE at roughly half the original pretraining cost. Those are training budgets, not config flags. What you genuinely control on deployment day is quantization, paging, batching and scheduling — Modules 5 and 6 — and they operate on whatever bytes-per-token the architecture handed you. This is the practical reason to be able to read a config file: <strong>by the time you can measure a model, its two numbers have been fixed for months.</strong></p></div></div>
+        </div>
+      </section>
+
+      <section class="section" id="checkpoint">
+        <div class="wall checkpoint">
+          <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>POWER PELLET · CHECKPOINT</p>
+          <p class="checkpoint__claim">You can read an unfamiliar model's config file and produce its two numbers — weight
+bytes read per token, and cache bytes per token per sequence — without downloading anything. And
+you can say which architectural family each field belongs to, what that family is buying, and what
+it is paying with.</p>
+          <details class="qa">
+            <summary>Mixtral-8x7B holds 46.7B parameters, not 56B, and activates 12.9B, not 14B. Why both?</summary>
+            <div class="qa__a prose"><p>Because only the MLP block is replicated across experts. Attention, the embeddings, the LM head and the norms are shared by every expert, so eight experts multiply one part of the layer and leave the rest alone. Per layer: attention is 41,943,040 parameters and one SwiGLU expert is <code>3 × 4096 × 14336</code> = 176,160,768, so eight experts plus shared attention is 1,451,229,184 rather than eight times a whole 7B model. Times 32 layers plus 262,144,000 for the two embedding matrices gives 46,701,477,888. The same logic caps the active count: a token reads attention once plus two experts, <code>41,943,040 + 2 × 176,160,768</code> = 394,264,576 per layer, which over 32 layers plus the LM head is 12.88B. The operational point is that the shared part is a floor — you cannot make an MoE arbitrarily cheap per token by adding experts, because attention is read every time regardless.</p></div>
+          </details>
+<details class="qa">
+            <summary>An MoE has an activation ratio of 5%. Does that mean the decode step reads 5% of the weights?</summary>
+            <div class="qa__a prose"><p>Only at batch 1. The ratio is a per-token property, and a batch reads the <em>union</em> of its tokens' experts. With top-<code>k</code> of <code>E</code> under roughly uniform routing, a batch of <code>B</code> tokens touches <code>E × (1 − (1 − k/E)^B)</code> distinct experts: for 256 experts and top-8 that is 8 at batch 1, 163 at batch 32, and 252 by batch 128. So bytes per <em>step</em> climb toward the full weight footprint as you batch, while bytes per <em>token</em> keep falling because they are amortized over more tokens. Both are true at once. What actually degrades is the latency advantage — an MoE at batch 1 steps like a small dense model, and the same MoE at batch 512 steps like a dense model of its total size while doing a small fraction of the arithmetic. It changes from a bandwidth optimization into a FLOP optimization somewhere in between, which is fine, because by then Module 4 says you are on the compute-bound side of the ridge.</p></div>
+          </details>
+<details class="qa">
+            <summary>A 48-layer model moves from all-global attention to 5:1 local-global with a 1024-token window. What happens to the cache at 32k context, and what happens at 256k?</summary>
+            <div class="qa__a prose"><p>At GQA-8 and <code>head_dim</code> 128 in fp16, each layer stores 4 KiB per token. All-global at 32k is <code>48 × 32768 × 4 KiB</code> = 6.0 GiB. With 5:1, the 8 global layers still store everything — <code>8 × 32768 × 4 KiB</code> = 1.0 GiB — while the 40 local layers saturated at 1,024 tokens and hold <code>40 × 1024 × 4 KiB</code> = 0.16 GiB, for 1.15 GiB total, a 5.2× reduction. At 256k the local part is unchanged, because it stopped growing at 1k, so the total is dominated by the global layers and the ratio approaches <code>L / (L/6)</code> = 6×. That is the appeal: the saving is largest exactly where the problem is worst, and it is achieved by making five sixths of the model stop caring about context length. What it costs is exact recall on the local layers — information from beyond the window still reaches a token through stacked layers, but blurred rather than retrieved.</p></div>
+          </details>
+<details class="qa">
+            <summary>You are choosing between a 70B dense model and a 671B sparse one for a latency-sensitive single-user deployment. The sparse model reads 36.5 GB per token and the dense one 139 GB. Is the sparse model the right answer?</summary>
+            <div class="qa__a prose"><p>On bytes moved per token, yes, and by a factor of 3.8 — which is the whole argument of this level, since parameter count did not enter it. On everything else, probably not. The 671B model needs 671 GB resident, so 9 H100s minimum and 16 in practice against 2 for the dense model, and at batch 1 with expert parallelism most of those GPUs contribute no useful bandwidth: a GPU holding 16 of 256 experts is asked for zero or one of the eight a token selects. You also pay two all-to-alls per MoE layer, 58 of them, with latency that does not shrink as you add GPUs. The sparse model's arithmetic is designed for a batch large enough to keep every expert busy, and a single-user deployment is the operating point it was least designed for. The general rule this gives you: <strong>active bytes tell you the ceiling, resident bytes tell you what hardware you need to approach it, and the gap between those two is where sparse models are won or lost.</strong></p></div>
+          </details>
+<details class="qa">
+            <summary>Why is a KV cache formula that was correct for a model on 8 GPUs sometimes wrong on 16?</summary>
+            <div class="qa__a prose"><p>Because tensor parallelism splits attention by heads, and a GQA model usually has 8 KV heads. At TP=8 each rank holds one KV head and the formula <code>2 × n_layers × n_kv_heads × head_dim × dtype_bytes</code> is exact. At TP=16 there are not enough KV heads to go around, so engines replicate: every rank still holds one KV head, but each head now exists on two ranks. Aggregate cache memory is 2× what the formula predicts, your maximum batch size falls accordingly, and nothing in the logs mentions it — you scaled out for bandwidth and paid for it in the term that caps concurrency. It is the clearest case of a &quot;boring&quot; config field (<code>n_kv_heads</code>) setting a hard limit on how a model can be deployed, and it is decided at training time.</p></div>
+          </details>
+          <p style="margin-top:var(--s7)">
+            <button class="done-toggle" type="button" data-complete="11" aria-pressed="false">
+              MARK LEVEL 11 CLEARED
+            </button>
+          </p>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="glossary">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>GLOSSARY</p>
+        <h2 class="section__title">Glossary</h2>
+        <div class="gloss">
+          <div class="gloss__row"><div class="gloss__term">active parameters</div><div class="gloss__def">The parameters read to produce one token. Equal to the total in a dense model; a small fraction of it in a sparse one.</div></div><div class="gloss__row"><div class="gloss__term">activation ratio</div><div class="gloss__def">Active parameters divided by total parameters. DeepSeek-V3 is 5.5%, Qwen3-235B-A22B is 9%, Mixtral-8x7B is 28%.</div></div><div class="gloss__row"><div class="gloss__term">router</div><div class="gloss__def">The small linear layer in an MoE that scores every expert for a token, so the top k can be selected. Runs per token, per layer.</div></div><div class="gloss__row"><div class="gloss__term">top-k routing</div><div class="gloss__def">Sending each token to the k highest-scoring experts. Switch Transformer uses k=1, GShard and Mixtral k=2, DeepSeek-V3 k=8 of 256.</div></div><div class="gloss__row"><div class="gloss__term">shared expert</div><div class="gloss__def">An expert every token reads, alongside its routed ones. Absorbs the common knowledge that would otherwise be duplicated into every expert.</div></div><div class="gloss__row"><div class="gloss__term">fine-grained experts</div><div class="gloss__def">Many small experts instead of a few large ones, so routing is finer-grained at the same active parameter count. The DeepSeekMoE design.</div></div><div class="gloss__row"><div class="gloss__term">sparse upcycling</div><div class="gloss__def">Turning a dense checkpoint into an MoE by copying its MLP into every expert and continuing training. Costs roughly half the original pretraining.</div></div><div class="gloss__row"><div class="gloss__term">cross-layer KV sharing</div><div class="gloss__def">Letting neighbouring layers reuse one set of K and V, cutting n_layers in the cache formula rather than the head count.</div></div><div class="gloss__row"><div class="gloss__term">sliding-window attention</div><div class="gloss__def">Attending only to the last w positions, which makes the cache constant in context rather than linear. Bounds the cache, not the receptive field.</div></div><div class="gloss__row"><div class="gloss__term">local-global interleaving</div><div class="gloss__def">A stack of mostly windowed layers with occasional full-attention layers. Gemma 2 used 1:1 at 4096; Gemma 3 uses 5:1 at 1024.</div></div><div class="gloss__row"><div class="gloss__term">recurrent state</div><div class="gloss__def">The fixed-size per-sequence memory of an SSM or linear-attention layer. Constant in context length, so it scales with concurrency alone.</div></div><div class="gloss__row"><div class="gloss__term">cross-attention</div><div class="gloss__def">Decoder attention over an encoder output. Its K and V are computed once per input and never grow, unlike self-attention KV.</div></div><div class="gloss__row"><div class="gloss__term">tied embeddings</div><div class="gloss__def">Reusing the input embedding matrix as the LM head. Saves vocab x d_model parameters — rounding error at 70B, a quarter of a 0.6B model.</div></div><div class="gloss__row"><div class="gloss__term">image tokens</div><div class="gloss__def">The positions a vision encoder and projector contribute to the language model sequence. 576 for LLaVA-1.5, thousands under tiling schemes.</div></div>
+        </div>
+      </section>
+
+      <nav class="pagenav">
+        <a href="systems-and-frontier.html" data-nav="prev"><span>◀ PREVIOUS LEVEL</span>10 SYSTEMS AND THE FRONTIER</a>
+        <span></span>
+      </nav>
+
+    </main>
+  </div>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <p class="foot__h">LEVELS</p>
+        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">&nbsp;</p>
+        <ul><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li><li><a href="../modules/model-architectures.html">11 · MODEL ARCHITECTURES</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">REFERENCE</p>
+        <ul>
+          <li><a href="../reference/timeline.html">Timeline</a></li>
+          <li><a href="../reference/hardware.html">GPU spec table</a></li>
+          <li><a href="../reference/engines.html">Serving engines</a></li>
+          <li><a href="../reference/frontier.html">Open problems</a></li>
+          <li><a href="../reference/glossary.html">Glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="foot__h">SOURCE</p>
+        <ul>
+          <li><a href="https://github.com/tushar-amrit-6/inference">GitHub repository</a></li>
+          <li><a href="../reference/how-to-use.html">How to work through this</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
+    do the arithmetic yourself.</p>
+  </div>
+</footer>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

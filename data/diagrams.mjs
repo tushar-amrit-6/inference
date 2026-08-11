@@ -643,4 +643,95 @@ export default {
       ].join('');
     },
   },
+
+  /* ---------------------------------------------------------------- 11 --- */
+  11: {
+    w: 58, h: 28,
+    title: 'The two numbers that price any architecture',
+    desc: 'A decode step costs active weight bytes, paid once per step, plus cache bytes, paid ' +
+      'once per sequence. Mixture of experts attacks the first term and pays in memory capacity. ' +
+      'Grouped-query attention, latent attention, sliding windows and recurrent states attack the ' +
+      'second and pay in exact recall. Measured per token at batch one, DeepSeek-V3 with 671 ' +
+      'billion parameters moves 36.5 gigabytes while Llama-3-70B moves 139 gigabytes, and latent ' +
+      'attention caches 68.6 kibibytes per token against 320 for grouped-query attention.',
+    caption: 'Parameter count is not a speed number. Active bytes set the ceiling, resident bytes ' +
+      'set the hardware you need to approach it, and the gap between them is where sparse models ' +
+      'are won or lost.',
+    draw: (g, id) => {
+      // bars stop well short of the value column: the longest one must not run
+      // under its own number
+      const wScale = 9.5 / 139, kScale = 9.5 / 320;
+      const weights = [
+        ['Llama-3-8B  fp16', 15.0, A],
+        ['Llama-3-70B  fp16', 139.0, BLINKY],
+        ['Mixtral-8x7B  fp16', 25.5, CLYDE],
+        ['DeepSeek-V3  fp8', 36.5, INKY],
+      ];
+      // each row is a real model at its own layer count — the cache term is not
+      // comparable across shapes, and pretending otherwise is the usual mistake
+      const cache = [
+        ['Llama-3-70B GQA-8', 320, A],
+        ['DeepSeek-V3 MLA', 68.6, INKY],
+        ['5:1 local-global, 8k', 52, CLYDE],
+      ];
+      return [
+        g.heading(1.5, 1.6, 'LEVEL 11 · TWO NUMBERS PRICE ANY ARCHITECTURE'),
+        g.line(1.5, 2.4, 56.5, 2.4, { stroke: FAINT, width: 1 }),
+        g.note(1.5, 3.7, ['an architecture is a decision about which bytes must move — the rest is quality'],
+          { fill: FAINT }),
+
+        /* --- the bill ------------------------------------------------- */
+        g.heading(1.5, 5.6, 'THE DECODE-STEP BILL'),
+        g.box(1.5, 6.4, 11, 2.6, 'W_active', { sub: 'once per STEP', accent: A, fill: TINT }),
+        g.text(13.4, 7.7, '+', { font: 'label', fill: DIM, anchor: 'middle' }),
+        g.box(14.3, 6.4, 14.2, 2.6, 'B × S × kv/token', { sub: 'once per SEQUENCE', accent: INKY }),
+        g.arrow(7, 9.2, 7, 10.6, { id }),
+        g.arrow(21.4, 9.2, 21.4, 10.6, { id }),
+        g.text(7, 11.3, 'mixture of experts', { font: 'sub', fill: A, anchor: 'middle' }),
+        g.text(21.4, 11.3, 'GQA · MLA · window · state', { font: 'sub', fill: INKY, anchor: 'middle' }),
+        g.text(7, 12.4, 'PAYS IN CAPACITY', { font: 'tag', fill: FAINT, anchor: 'middle' }),
+        g.text(21.4, 12.4, 'PAYS IN RECALL', { font: 'tag', fill: FAINT, anchor: 'middle' }),
+
+        /* --- four families -------------------------------------------- */
+        g.heading(1.5, 14.6, 'FOUR FAMILIES, FOUR BETS'),
+        ...[
+          ['mixture of experts', 'read k of E expert blocks', A],
+          ['GQA · MLA', 'cache fewer, smaller vectors', INKY],
+          ['sliding window', 'old tokens fall out of the cache', CLYDE],
+          ['SSM · hybrid', 'a fixed state replaces the cache', PINKY],
+        ].map((r, i) => [
+          g.box(1.5, 15.6 + i * 2.5, 27, 2, null, { accent: r[2], fill: 'none' }),
+          g.text(2.5, 16.6 + i * 2.5, r[0], { font: 'label', fill: r[2] }),
+          g.text(13.2, 16.6 + i * 2.5, r[1], { font: 'sub', fill: DIM }),
+        ].join('')),
+
+        g.line(30, 4.6, 30, 25.6, { stroke: FAINT, width: 1 }),
+
+        /* --- weight bytes --------------------------------------------- */
+        g.heading(31.5, 5.6, 'WEIGHT BYTES READ PER TOKEN'),
+        ...weights.map((r, i) => [
+          g.text(41.5, 7.3 + i * 2.2, r[0], { font: 'sub', fill: DIM, anchor: 'end' }),
+          g.bar(42, 6.6 + i * 2.2, 1.4, [{ w: Math.max(0.3, r[1] * wScale), fill: r[2], label: '' }]),
+          g.text(56.5, 7.3 + i * 2.2, `${r[1].toFixed(1)} GB`, { font: 'num', fill: r[2], anchor: 'end' }),
+        ].join('')),
+        g.note(31.5, 15.2, ['671B moves less than 70B.'], { fill: PAC }),
+
+        /* --- cache bytes ---------------------------------------------- */
+        g.heading(31.5, 16.8, 'CACHE BYTES PER TOKEN'),
+        ...cache.map((r, i) => [
+          g.text(41.5, 18.3 + i * 1.9, r[0], { font: 'sub', fill: DIM, anchor: 'end' }),
+          g.bar(42, 17.6 + i * 1.9, 1.2, [{ w: Math.max(0.3, r[1] * kScale), fill: r[2], label: '' }]),
+          g.text(56.5, 18.3 + i * 1.9, `${r[1]} KiB`, { font: 'num', fill: r[2], anchor: 'end' }),
+        ].join('')),
+        g.text(41.5, 24.0, 'recurrent layer', { font: 'sub', fill: DIM, anchor: 'end' }),
+        g.text(42, 24.0, 'no cache — a fixed state', { font: 'sub', fill: PINKY }),
+        g.text(31.5, 25.6, 'MHA at the 70B shape: 2,560 KiB, 8× off the axis.', { font: 'sub', fill: FAINT }),
+
+        g.line(1.5, 26.4, 56.5, 26.4, { stroke: FAINT, width: 1 }),
+        g.note(1.5, 27.4, [
+          'Both terms are fixed at training time. On deployment day you get quantization, paging and batching — nothing else.',
+        ], { fill: DIM }),
+      ].join('');
+    },
+  },
 };

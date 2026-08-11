@@ -2,11 +2,11 @@
    Maze renderer — builds the course map as static SVG at build time.
 
    The map is a tile grid, the way the real game is (Pac-Man is a 28x36 grid
-   of 8px tiles). Ours is 21x15 with bigger tiles so the module discs have
+   of 8px tiles). Ours is 21x19 with bigger tiles so the module discs have
    room to sit in the corridors.
 
      #  wall        .  pellet       o  power pellet
-     (space) void   0-9,A  module node (A = module 10)
+     (space) void   0-9,A,B  module node (A = module 10, B = module 11)
 
    Walls render as rounded outlines, not fills — that is how the arcade maze
    is actually drawn.
@@ -24,11 +24,20 @@ export const MAP = [
   '#.#.......#.......#.#',
   '#.#.#####.#.#####.#.#',
   '#.6.......7.......8.#',
+  '#.#.#####.#.#####.#.#',
+  '#.#.......#.......#.#',
+  '#.#.#####.#.#####.#.#',
+  '#.9.......A.......B.#',
   '#.###.#########.###.#',
   '#.....#       #.....#',
-  '#.o.9.#       #.A.o.#',
+  '#.o...#       #...o.#',
   '#####################',
 ];
+
+/** Node tiles are labelled 0-9 then A, B, … so one character stays one tile. */
+const NODE_CHARS = '0123456789AB';
+const nodeNum = (ch) => NODE_CHARS.indexOf(ch);
+const isNode = (ch) => NODE_CHARS.includes(ch);
 
 const T = 32;      // tile size
 const PAD = 18;    // breathing room inside the frame
@@ -42,18 +51,18 @@ export const PAC_START = [1, 15];
  * The four ghosts. `seat` is their idle x-offset inside the house; `spawn` is
  * the corridor tile they take up station on when a game begins. The house has
  * no gate in the tilemap, so rather than fake one we simply station them on
- * row 10 — the long corridor that runs directly above it.
+ * row 14 — the long corridor that runs directly above it.
  */
 export const GHOSTS = [
-  { name: 'blinky', seat: -42, spawn: [10, 8], style: 'chase' },
-  { name: 'pinky', seat: -14, spawn: [10, 9], style: 'ambush' },
-  { name: 'inky', seat: 14, spawn: [10, 11], style: 'flank' },
-  { name: 'clyde', seat: 42, spawn: [10, 12], style: 'shy' },
+  { name: 'blinky', seat: -42, spawn: [14, 8], style: 'chase' },
+  { name: 'pinky', seat: -14, spawn: [14, 9], style: 'ambush' },
+  { name: 'inky', seat: 14, spawn: [14, 11], style: 'flank' },
+  { name: 'clyde', seat: 42, spawn: [14, 12], style: 'shy' },
 ];
 
 /** A tile you can walk on: corridor, pellet, power pellet, or a module node. */
 const isOpen = (r, c) =>
-  r >= 0 && r < ROWS && c >= 0 && c < COLS && /[.o0-9A]/.test(MAP[r][c]);
+  r >= 0 && r < ROWS && c >= 0 && c < COLS && (MAP[r][c] === '.' || MAP[r][c] === 'o' || isNode(MAP[r][c]));
 
 const cx = (c) => PAD + c * T + T / 2;
 const cy = (r) => PAD + r * T + T / 2;
@@ -183,15 +192,15 @@ export function renderMaze(modules) {
         out.push(`<circle class="maze__pellet" data-pellet="${r}-${c}" cx="${cx(c)}" cy="${cy(r)}" r="2.7"/>`);
       } else if (ch === 'o') {
         out.push(`<circle class="maze__power" data-pellet="${r}-${c}" data-power="1" cx="${cx(c)}" cy="${cy(r)}" r="6.5"/>`);
-      } else if (/[0-9A]/.test(ch)) {
-        nodeAt.set(ch === 'A' ? 10 : Number(ch), [r, c]);
+      } else if (isNode(ch)) {
+        nodeAt.set(nodeNum(ch), [r, c]);
       }
     }
   }
 
   // ghost house residents — the four pedagogical modes live here.
   // These are their idle seats; the game moves them out onto the corridors.
-  const houseX = cx(10), houseY = cy(12) + 10;
+  const houseX = cx(10), houseY = cy(16) + 10;
   for (let i = 0; i < GHOSTS.length; i++) {
     const g = GHOSTS[i];
     out.push(ghost(houseX + g.seat, houseY, `var(--${g.name})`, 22, `ghost-${i}`));
@@ -217,7 +226,7 @@ export function renderMaze(modules) {
 
   return (
     `<svg class="maze" viewBox="0 0 ${W} ${H}" role="group" ` +
-    `aria-label="Course map: 11 modules laid out as a Pac-Man maze" ` +
+    `aria-label="Course map: ${modules.length} modules laid out as a Pac-Man maze" ` +
     `xmlns="http://www.w3.org/2000/svg">${out.join('')}</svg>`
   );
 }
@@ -234,18 +243,19 @@ function nodePositions() {
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       const ch = MAP[r][c];
-      if (/[0-9A]/.test(ch)) at.set(ch === 'A' ? 10 : Number(ch), [r, c]);
+      if (isNode(ch)) at.set(nodeNum(ch), [r, c]);
     }
   }
   return at;
 }
 
 /**
- * Build-time sanity check: every module node must be walkable-reachable from
- * Pac-Man's start tile. If a map edit ever strands a node, the build fails
- * here rather than shipping a level nobody can drive to.
+ * Build-time sanity check: every module needs a node on the map, and every
+ * node must be walkable-reachable from Pac-Man's start tile. If a map edit
+ * ever strands a node — or a new level is added without giving it a tile —
+ * the build fails here rather than shipping a level nobody can drive to.
  */
-export function assertReachable() {
+export function assertReachable(modules = []) {
   const seen = new Set([PAC_START.join(',')]);
   const q = [PAC_START];
   while (q.length) {
@@ -255,14 +265,20 @@ export function assertReachable() {
       if (isOpen(nr, nc) && !seen.has(k)) { seen.add(k); q.push([nr, nc]); }
     }
   }
+  const at = nodePositions();
   const unreachable = [];
-  for (const [n, [r, c]] of nodePositions()) {
+  for (const [n, [r, c]] of at) {
     if (!seen.has(r + ',' + c)) unreachable.push(n);
   }
   if (unreachable.length) {
     throw new Error(`maze: module nodes unreachable from Pac-Man's start: ${unreachable.join(', ')}`);
   }
-  return seen.size;
+
+  const homeless = modules.filter((m) => !at.has(m.n)).map((m) => m.n);
+  if (homeless.length) {
+    throw new Error(`maze: no tile on the map for module(s) ${homeless.join(', ')} — add them to MAP`);
+  }
+  return { walkable: seen.size, nodes: at.size };
 }
 
 /**

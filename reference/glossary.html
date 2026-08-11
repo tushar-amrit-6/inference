@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GLOSSARY — LLM INFERENCE</title>
-<meta name="description" content="97 terms from across all eleven levels, each linked back to where it is explained.">
+<meta name="description" content="111 terms from across all twelve levels, each linked back to where it is explained.">
 <meta name="color-scheme" content="dark light">
 <script>/* set the stored theme before first paint, so there is no flash of the wrong one */
 (function(){try{var t=localStorage.getItem('llm-inference:theme');
 if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <meta property="og:title" content="GLOSSARY — LLM INFERENCE">
-<meta property="og:description" content="97 terms from across all eleven levels, each linked back to where it is explained.">
+<meta property="og:description" content="111 terms from across all twelve levels, each linked back to where it is explained.">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,7 +24,7 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
   <a class="scorebar__home" href="../index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="currentColor" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
   
   <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
-  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/11</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/12</span></span>
   <span class="scorebar__spacer"></span>
   <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
   <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch theme">
@@ -37,7 +37,7 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
     <div class="mod-head">
       <p class="mod-head__level">REFERENCE</p>
       <h1 class="mod-head__title">GLOSSARY</h1>
-      <p class="mod-head__tag">97 terms from across all eleven levels, each linked back to where it is explained.</p>
+      <p class="mod-head__tag">111 terms from across all twelve levels, each linked back to where it is explained.</p>
     </div>
     <section class="section">
     <div class="gloss">
@@ -47,6 +47,12 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
       </div><div class="gloss__row">
         <div class="gloss__term">achieved bandwidth<br><a href="../modules/roofline.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 04</a></div>
         <div class="gloss__def">The fraction of peak HBM bandwidth a real kernel reaches. Typically 70-85%.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">activation ratio<br><a href="../modules/model-architectures.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 11</a></div>
+        <div class="gloss__def">Active parameters divided by total parameters. DeepSeek-V3 is 5.5%, Qwen3-235B-A22B is 9%, Mixtral-8x7B is 28%.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">active parameters<br><a href="../modules/model-architectures.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 11</a></div>
+        <div class="gloss__def">The parameters read to produce one token. Equal to the total in a dense model; a small fraction of it in a sparse one.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">admission control<br><a href="../modules/batching.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 05</a></div>
         <div class="gloss__def">Deciding how many sequences to admit given that their eventual lengths, and therefore memory needs, are unknown.</div>
@@ -99,6 +105,12 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="gloss__term">copy-on-write<br><a href="../modules/memory-optimization.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 06</a></div>
         <div class="gloss__def">Sequences sharing a prefix point at the same physical blocks; a block is duplicated only when one of them writes to it.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">cross-attention<br><a href="../modules/model-architectures.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 11</a></div>
+        <div class="gloss__def">Decoder attention over an encoder output. Its K and V are computed once per input and never grow, unlike self-attention KV.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">cross-layer KV sharing<br><a href="../modules/model-architectures.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 11</a></div>
+        <div class="gloss__def">Letting neighbouring layers reuse one set of K and V, cutting n_layers in the cache formula rather than the head count.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">crossover point<br><a href="../modules/kv-cache.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 02</a></div>
         <div class="gloss__def">The number of cached tokens in flight at which KV traffic overtakes weight traffic. About 114k tokens for Llama-3-8B at fp16.</div>
       </div><div class="gloss__row">
@@ -129,6 +141,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="gloss__term">external fragmentation<br><a href="../modules/kv-cache.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 02</a></div>
         <div class="gloss__def">Free memory that exists but is broken into pieces too small to satisfy a contiguous allocation.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">fine-grained experts<br><a href="../modules/model-architectures.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 11</a></div>
+        <div class="gloss__def">Many small experts instead of a few large ones, so routing is finer-grained at the same active parameter count. The DeepSeekMoE design.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">FlashAttention<br><a href="../modules/attention-kernels.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 07</a></div>
         <div class="gloss__def">Tiled exact attention that never materializes the N x N score matrix in HBM. Cuts HBM accesses to O(N^2 d^2 / M).</div>
       </div><div class="gloss__row">
@@ -156,6 +171,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="gloss__term">hidden state<br><a href="../modules/transformer-fundamentals.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 00</a></div>
         <div class="gloss__def">One d_model-length slice of the residual stream, at one position and one layer.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">image tokens<br><a href="../modules/model-architectures.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 11</a></div>
+        <div class="gloss__def">The positions a vision encoder and projector contribute to the language model sequence. 576 for LLaVA-1.5, thousands under tiling schemes.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">internal fragmentation<br><a href="../modules/kv-cache.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 02</a></div>
         <div class="gloss__def">Memory reserved inside a sequence allocation that the sequence never uses. The dominant waste in naive allocators.</div>
       </div><div class="gloss__row">
@@ -176,6 +194,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
       </div><div class="gloss__row">
         <div class="gloss__term">llama.cpp<br><a href="../modules/systems-and-frontier.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 10</a></div>
         <div class="gloss__def">Local-inference engine optimized for the weight-dominated regime: aggressive weight quantization, CPU and partial-offload support.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">local-global interleaving<br><a href="../modules/model-architectures.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 11</a></div>
+        <div class="gloss__def">A stack of mostly windowed layers with occasional full-attention layers. Gemma 2 used 1:1 at 4096; Gemma 3 uses 5:1 at 1024.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">logits<br><a href="../modules/transformer-fundamentals.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 00</a></div>
         <div class="gloss__def">The unnormalized [.., vocab_size] scores produced by the LM head, before any softmax or sampling.</div>
@@ -240,6 +261,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="gloss__term">reasoning workload<br><a href="../modules/systems-and-frontier.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 10</a></div>
         <div class="gloss__def">Requests that generate thousands of hidden chain-of-thought tokens, shifting nearly all wall-clock into memory-bound decode.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">recurrent state<br><a href="../modules/model-architectures.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 11</a></div>
+        <div class="gloss__def">The fixed-size per-sequence memory of an SSM or linear-attention layer. Constant in context length, so it scales with concurrency alone.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">repetition penalty<br><a href="../modules/decoding-and-sampling.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 03</a></div>
         <div class="gloss__def">Divides logits of already-seen tokens by r &gt; 1. Blunt, and harmful for code and structured output.</div>
       </div><div class="gloss__row">
@@ -261,6 +285,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="gloss__term">RoPE<br><a href="../modules/transformer-fundamentals.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 00</a></div>
         <div class="gloss__def">Rotary position embedding. Rotates Q and K by an angle proportional to absolute position so their dot product depends only on relative distance.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">router<br><a href="../modules/model-architectures.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 11</a></div>
+        <div class="gloss__def">The small linear layer in an MoE that scores every expert for a token, so the top k can be selected. Runs per token, per layer.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">RULER<br><a href="../modules/memory-optimization.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 06</a></div>
         <div class="gloss__def">A long-context benchmark testing multi-needle retrieval, aggregation and tracing. Far more informative than perplexity for evaluating KV compression.</div>
       </div><div class="gloss__row">
@@ -276,11 +303,20 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="gloss__term">SGLang<br><a href="../modules/systems-and-frontier.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 10</a></div>
         <div class="gloss__def">Serving engine organized around structured, prefix-sharing workloads: RadixAttention plus a frontend programming language.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">shared expert<br><a href="../modules/model-architectures.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 11</a></div>
+        <div class="gloss__def">An expert every token reads, alongside its routed ones. Absorbs the common knowledge that would otherwise be duplicated into every expert.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">shared memory / SRAM<br><a href="../modules/attention-kernels.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 07</a></div>
         <div class="gloss__def">On-chip memory, ~228 KB per SM on Hopper, with roughly 6x the bandwidth of HBM. The tier FlashAttention keeps its tiles in.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">sliding-window attention<br><a href="../modules/model-architectures.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 11</a></div>
+        <div class="gloss__def">Attending only to the last w positions, which makes the cache constant in context rather than linear. Bounds the cache, not the receptive field.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">SmoothQuant<br><a href="../modules/memory-optimization.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 06</a></div>
         <div class="gloss__def">Migrates activation outliers into the weights via per-channel scaling, enabling int8 for both operands.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">sparse upcycling<br><a href="../modules/model-architectures.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 11</a></div>
+        <div class="gloss__def">Turning a dense checkpoint into an MoE by copying its MLP into every expert and continuing training. Costs roughly half the original pretraining.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">split-K<br><a href="../modules/attention-kernels.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 07</a></div>
         <div class="gloss__def">Partitioning a reduction across parallel workers and combining their partial results afterward.</div>
@@ -306,11 +342,17 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="gloss__term">TensorRT-LLM<br><a href="../modules/systems-and-frontier.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 10</a></div>
         <div class="gloss__def">NVIDIA serving engine that compiles a model into a hardware-specific engine ahead of time. Fastest and least flexible.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">tied embeddings<br><a href="../modules/model-architectures.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 11</a></div>
+        <div class="gloss__def">Reusing the input embedding matrix as the LM head. Saves vocab x d_model parameters — rounding error at 70B, a quarter of a 0.6B model.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">token budget<br><a href="../modules/batching.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 05</a></div>
         <div class="gloss__def">The cap on tokens processed per scheduler iteration. Decode tokens are admitted first, prefill chunks fill the rest.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">top-k<br><a href="../modules/decoding-and-sampling.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 03</a></div>
         <div class="gloss__def">Keep the k highest-probability tokens. Fixed count, does not adapt to the distribution.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">top-k routing<br><a href="../modules/model-architectures.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 11</a></div>
+        <div class="gloss__def">Sending each token to the k highest-scoring experts. Switch Transformer uses k=1, GShard and Mixtral k=2, DeepSeek-V3 k=8 of 256.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">top-p / nucleus<br><a href="../modules/decoding-and-sampling.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 03</a></div>
         <div class="gloss__def">Keep the smallest set whose cumulative probability reaches p. Fixed mass, adaptive count.</div>
@@ -346,7 +388,7 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
       </div>
       <div>
         <p class="foot__h">&nbsp;</p>
-        <ul><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li></ul>
+        <ul><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li><li><a href="../modules/model-architectures.html">11 · MODEL ARCHITECTURES</a></li></ul>
       </div>
       <div>
         <p class="foot__h">REFERENCE</p>
