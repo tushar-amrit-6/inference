@@ -89,7 +89,7 @@ function scorebar(up, { level } = {}) {
   <a class="scorebar__home" href="${up}index.html">${icon.pac(14)} LLM INFERENCE</a>
   ${level != null ? `<span class="scorebar__item"><span class="scorebar__label">LEVEL</span><span class="scorebar__value scorebar__value--pac">${String(level).padStart(2, '0')}</span></span>` : ''}
   <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
-  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/12</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/13</span></span>
   <span class="scorebar__spacer"></span>
   <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
   <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch theme">
@@ -336,7 +336,7 @@ function indexPage(modules) {
     <section class="hero">
       <div class="hero__grid">
         <div>
-          <p class="eyebrow hero__kicker">A COURSE IN TWELVE LEVELS</p>
+          <p class="eyebrow hero__kicker">A COURSE IN THIRTEEN LEVELS</p>
           <h1 class="hero__title">LLM<br>INFERENCE</h1>
           <p class="hero__thesis">Pac-Man is <b>memory-bound</b>. One pellet per move, however fast he runs.</p>
           <p class="hero__body">So is your GPU. Generating a single token means reading
@@ -448,7 +448,7 @@ function indexPage(modules) {
         <li><a class="level" href="reference/glossary.html">
           <span class="level__num">A–Z</span>
           <span><span class="level__title">GLOSSARY</span>
-          <span class="level__tag">Every term defined across all twelve levels, in one place.</span></span>
+          <span class="level__tag">Every term defined across all thirteen levels, in one place.</span></span>
           <span class="level__meta">reference</span></a></li>
       </ol>
     </section>
@@ -462,7 +462,7 @@ ${footer('', modules)}
   return layout({
     title: `${SITE.title} — ${SITE.subtitle}`,
     description:
-      'A self-paced course on how LLM inference works and why it is hard. Twelve levels, from the transformer forward pass to distributed serving and the architecture zoo, organized around one idea: decoding is memory-bound.',
+      'A self-paced course on how LLM inference works and why it is hard. Thirteen levels, from the transformer forward pass to distributed serving, the architecture zoo, and inside vLLM itself, organized around one idea: decoding is memory-bound.',
     body,
   });
 }
@@ -518,7 +518,7 @@ function glossaryPage(modules) {
   </section>`;
   return refPage({
     slug: 'glossary', title: 'GLOSSARY', eyebrow: 'REFERENCE',
-    lede: `${sorted.length} terms from across all twelve levels, each linked back to where it is explained.`,
+    lede: `${sorted.length} terms from across all thirteen levels, each linked back to where it is explained.`,
     bodyHtml: html,
   }, modules);
 }

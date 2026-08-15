@@ -3,8 +3,8 @@
 A self-paced course on how LLM inference works and why it is hard, built as a static site with a
 Pac-Man arcade theme.
 
-Twelve levels, from the transformer forward pass to distributed serving and the architecture zoo,
-organised around one idea:
+Thirteen levels, from the transformer forward pass to distributed serving, the architecture zoo,
+and inside vLLM itself, organised around one idea:
 
 > Generating a token requires reading **every** model weight from memory. Moving those bytes takes
 > far longer than the arithmetic performed on them, so decoding a single sequence leaves the GPU
@@ -29,6 +29,7 @@ Pac-Man is memory-bound too — one pellet per move, however fast he runs.
 | 09 | Distributed inference | 7–9 |
 | 10 | Systems and the frontier | 6–8 |
 | 11 | Model architectures | 7–9 |
+| 12 | How vLLM works | 6–8 |
 
 Plus reference pages: a GPU spec table with ridge points, a timeline of the field, a serving-engine
 comparison, open problems, and a combined glossary.

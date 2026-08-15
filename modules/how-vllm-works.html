@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>12 · HOW VLLM WORKS — LLM INFERENCE</title>
+<meta name="description" content="The serving-engines reference gave you the philosophy. This level is the mechanism: the block table, the scheduler loop, and the arithmetic behind preemption.">
+<meta name="color-scheme" content="dark light">
+<script>/* set the stored theme before first paint, so there is no flash of the wrong one */
+(function(){try{var t=localStorage.getItem('llm-inference:theme');
+if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<meta property="og:title" content="12 · HOW VLLM WORKS — LLM INFERENCE">
+<meta property="og:description" content="The serving-engines reference gave you the philosophy. This level is the mechanism: the block table, the scheduler loop, and the arithmetic behind preemption.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/arcade.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20fill%3D%22%23000%22%2F%3E%3Cpath%20d%3D%22M16%2C16%20L29%2C9%20A15%2C15%200%201%200%2029%2C23%20Z%22%20fill%3D%22%23FFE800%22%2F%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="scorebar">
+  <a class="scorebar__home" href="../index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="currentColor" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
+  <span class="scorebar__item"><span class="scorebar__label">LEVEL</span><span class="scorebar__value scorebar__value--pac">12</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/13</span></span>
+  <span class="scorebar__spacer"></span>
+  <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
+  <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch theme">
+    <svg class="icon-moon" width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M6.2 1.4A6.6 6.6 0 1 0 14.6 9.8 5.2 5.2 0 0 1 6.2 1.4z"/></svg>
+    <svg class="icon-sun" width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="8" r="3.2"/><path d="M8 .8v2.1M8 13.1v2.1M.8 8h2.1M13.1 8h2.1M2.9 2.9l1.5 1.5M11.6 11.6l1.5 1.5M13.1 2.9l-1.5 1.5M4.4 11.6l-1.5 1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+  </button>
+</header>
+<div class="wrap">
+  <div class="shell">
+    <nav class="rail" aria-label="Module contents">
+  <p class="rail__head">ON THIS LEVEL</p>
+  <ul class="rail__list">
+    <li><a class="rail__link" href="#big-idea" data-kind="dot"><span class="rail__dot"></span><span>The big idea</span></a></li><li><a class="rail__link" href="#concept-0" data-kind="dot"><span class="rail__dot"></span><span>The block table: PagedAttention as OS-style paging</span></a></li><li><a class="rail__link" href="#concept-1" data-kind="dot"><span class="rail__dot"></span><span>The scheduler: continuous batching as a loop, not a batch</span></a></li><li><a class="rail__link" href="#concept-2" data-kind="dot"><span class="rail__dot"></span><span>Preemption: what happens when the pool runs dry</span></a></li><li><a class="rail__link" href="#concept-3" data-kind="dot"><span class="rail__dot"></span><span>Copy-on-write and reference counting: sharing without copying</span></a></li><li><a class="rail__link" href="#concept-4" data-kind="dot"><span class="rail__dot"></span><span>Automatic prefix caching: sharing without being asked</span></a></li><li><a class="rail__link" href="#concept-5" data-kind="dot"><span class="rail__dot"></span><span>Multi-GPU: one scheduler, many workers</span></a></li><li><a class="rail__link" href="#math-lab" data-kind="dot"><span class="rail__dot"></span><span>Math by hand</span></a></li><li><a class="rail__link" href="#code-lab" data-kind="dot"><span class="rail__dot"></span><span>Code lab</span></a></li><li><a class="rail__link" href="#papers" data-kind="dot"><span class="rail__dot"></span><span>Papers</span></a></li><li><a class="rail__link" href="#pitfalls" data-kind="dot"><span class="rail__dot"></span><span>Pitfalls</span></a></li><li><a class="rail__link" href="#checkpoint" data-kind="power"><span class="rail__dot"></span><span>Checkpoint</span></a></li><li><a class="rail__link" href="#glossary" data-kind="dot"><span class="rail__dot"></span><span>Glossary</span></a></li>
+  </ul>
+  <div class="rail__nav">
+    <a class="rail__step" href="model-architectures.html">◀ 11 MODEL ARCHITECTURES</a>
+    <a class="rail__step" href="../index.html">▲ ALL LEVELS</a>
+    
+  </div>
+</nav>
+    <main id="main">
+
+      <div class="mod-head">
+        <p class="mod-head__level">LEVEL 12</p>
+        <h1 class="mod-head__title">HOW VLLM WORKS</h1>
+        <p class="mod-head__tag">The serving-engines reference gave you the philosophy. This level is the mechanism: the block table, the scheduler loop, and the arithmetic behind preemption.</p>
+        <div class="mod-head__meta">
+          <span>⏱ 6–8 hours</span>
+          <span>● 6 concepts</span>
+          <span>📄 5 papers</span>
+          <span>▸ needs: Module 5, Module 6, Module 9</span>
+        </div>
+      </div>
+
+      <section class="section" id="at-a-glance">
+        <p class="eyebrow" style="margin-bottom:var(--s5)">AT A GLANCE · THE WHOLE LEVEL ON ONE PAGE</p>
+        <figure class="fig"><div class="fig__scroll"><svg class="fig__svg" viewBox="0 0 1044 504" width="1044" height="504" role="img" aria-labelledby="fig12-t fig12-d" xmlns="http://www.w3.org/2000/svg"><title id="fig12-t">The block table and the scheduler loop</title><desc id="fig12-d">One sequence’s logical blocks point into a shared physical pool of eight; block 2 is referenced by two sequences and marked shared. On the right, the scheduler moves sequences between waiting, running and swapped once per iteration, preempting a running sequence into swapped, or dropping and recomputing it, whenever no free block is left for one that needs to grow.</desc><defs><pattern id="fig12-grid" width="18" height="18" patternUnits="userSpaceOnUse"><path d="M 18 0 L 0 0 0 18" fill="none" stroke="var(--grid-line)" stroke-width="1"/></pattern><marker id="fig12-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--ink-dim)"/></marker><marker id="fig12-ah-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/></marker></defs><rect width="1044" height="504" fill="var(--grid-bg)"/><rect width="1044" height="504" fill="url(#fig12-grid)"/><text x="27" y="28.8" font-family="var(--display)" font-size="10.5" fill="var(--accent)" text-anchor="start" dominant-baseline="middle">LEVEL 12 · THE BLOCK TABLE AND THE SCHEDULER LOOP</text><line x1="27" y1="43.2" x2="1017" y2="43.2" stroke="var(--ink-faint)" stroke-width="1"/><text x="27" y="75.6" font-family="var(--display)" font-size="10.5" fill="var(--accent)" text-anchor="start" dominant-baseline="middle">SEQ A — LOGICAL BLOCKS INTO THE POOL</text><g><rect x="27" y="108" width="117" height="54" rx="4" fill="var(--phosphor)" stroke="var(--ink-dim)" stroke-width="1.6"/><text x="85.5" y="126.9" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">L0</text><text x="85.5" y="144.9" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="middle" dominant-baseline="middle">logical</text></g><g><rect x="158.4" y="108" width="117" height="54" rx="4" fill="var(--phosphor)" stroke="var(--ink-dim)" stroke-width="1.6"/><text x="216.9" y="126.9" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">L1</text><text x="216.9" y="144.9" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="middle" dominant-baseline="middle">logical</text></g><g><rect x="289.8" y="108" width="117" height="54" rx="4" fill="var(--phosphor)" stroke="var(--ink-dim)" stroke-width="1.6"/><text x="348.3" y="126.9" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">L2</text><text x="348.3" y="144.9" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="middle" dominant-baseline="middle">logical</text></g><line x1="85.5" y1="162" x2="158.4" y2="273.6" stroke="var(--ink-dim)" stroke-width="1.5" marker-end="url(#fig12-ah)"/><line x1="216.9" y1="162" x2="320.4" y2="273.6" stroke="var(--ink-dim)" stroke-width="1.5" marker-end="url(#fig12-ah)"/><line x1="348.3" y1="162" x2="428.4" y2="273.6" stroke="var(--ink-dim)" stroke-width="1.5" marker-end="url(#fig12-ah)"/><g><rect x="92.5" y="216" width="131.8" height="27" rx="3" fill="none" stroke="var(--pinky)" stroke-width="1.2" stroke-dasharray="3 2.5"/><text x="158.4" y="229.5" font-family="var(--mono)" font-size="14" fill="var(--pinky)" text-anchor="middle" dominant-baseline="middle">×2 — SEQ B TOO</text></g><g><rect x="27" y="273.6" width="46.8" height="54" rx="4" fill="none" stroke="var(--ink-faint)" stroke-width="1.6"/><text x="50.4" y="300.6" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">P0</text></g><g><rect x="81" y="273.6" width="46.8" height="54" rx="4" fill="none" stroke="var(--ink-faint)" stroke-width="1.6"/><text x="104.4" y="300.6" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">P1</text></g><g><rect x="135" y="273.6" width="46.8" height="54" rx="4" fill="var(--phosphor)" stroke="var(--pinky)" stroke-width="1.6"/><text x="158.4" y="300.6" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">P2</text></g><g><rect x="189" y="273.6" width="46.8" height="54" rx="4" fill="none" stroke="var(--ink-faint)" stroke-width="1.6"/><text x="212.4" y="300.6" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">P3</text></g><g><rect x="243" y="273.6" width="46.8" height="54" rx="4" fill="none" stroke="var(--ink-faint)" stroke-width="1.6"/><text x="266.4" y="300.6" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">P4</text></g><g><rect x="297" y="273.6" width="46.8" height="54" rx="4" fill="var(--phosphor)" stroke="var(--accent)" stroke-width="1.6"/><text x="320.4" y="300.6" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">P5</text></g><g><rect x="351" y="273.6" width="46.8" height="54" rx="4" fill="none" stroke="var(--ink-faint)" stroke-width="1.6"/><text x="374.4" y="300.6" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">P6</text></g><g><rect x="405" y="273.6" width="46.8" height="54" rx="4" fill="var(--phosphor)" stroke="var(--accent)" stroke-width="1.6"/><text x="428.4" y="300.6" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">P7</text></g><text x="27" y="354.6" font-family="var(--body)" font-size="15.5" font-style="italic" fill="var(--ink-faint)" text-anchor="start" dominant-baseline="middle">5 of 8 blocks free — claimed only when a</text><text x="27" y="372.6" font-family="var(--body)" font-size="15.5" font-style="italic" fill="var(--ink-faint)" text-anchor="start" dominant-baseline="middle">sequence actually fills the one it has.</text><text x="27" y="394.2" font-family="var(--body)" font-size="15.5" font-style="italic" fill="var(--ink-dim)" text-anchor="start" dominant-baseline="middle">P2 forks the instant Seq A or B writes to it —</text><text x="27" y="412.2" font-family="var(--body)" font-size="15.5" font-style="italic" fill="var(--ink-dim)" text-anchor="start" dominant-baseline="middle">copy-on-write, not copy-on-read.</text><text x="513" y="75.6" font-family="var(--display)" font-size="10.5" fill="var(--accent)" text-anchor="start" dominant-baseline="middle">THE SCHEDULER — ONE STEP, ONE FORWARD PASS</text><g><rect x="513" y="117" width="144" height="57.6" rx="4" fill="var(--phosphor)" stroke="var(--ink-dim)" stroke-width="1.6"/><text x="585" y="137.7" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">WAITING</text><text x="585" y="155.7" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="middle" dominant-baseline="middle">2 seqs</text></g><line x1="657" y1="145.8" x2="689.4" y2="145.8" stroke="var(--ink-dim)" stroke-width="1.5" marker-end="url(#fig12-ah)"/><text x="673.2" y="127.8" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="middle" dominant-baseline="middle">admit</text><g><rect x="693" y="117" width="144" height="57.6" rx="4" fill="var(--phosphor)" stroke="var(--accent)" stroke-width="1.6"/><text x="765" y="137.7" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">RUNNING</text><text x="765" y="155.7" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="middle" dominant-baseline="middle">3 seqs</text></g><line x1="837" y1="145.8" x2="869.4" y2="145.8" stroke="var(--ink-dim)" stroke-width="1.5" marker-end="url(#fig12-ah)"/><text x="853.2" y="127.8" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="middle" dominant-baseline="middle">done</text><g><rect x="873" y="117" width="144" height="57.6" rx="4" fill="var(--phosphor)" stroke="var(--ink-faint)" stroke-width="1.6"/><text x="945" y="137.7" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">DONE</text><text x="945" y="155.7" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="middle" dominant-baseline="middle">blocks freed</text></g><line x1="738" y1="178.2" x2="738" y2="234" stroke="var(--blinky)" stroke-width="1.5" marker-end="url(#fig12-ah)"/><text x="748.8" y="206.1" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="start" dominant-baseline="middle">preempt</text><line x1="828" y1="234" x2="828" y2="178.2" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#fig12-ah)"/><text x="838.8" y="206.1" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="start" dominant-baseline="middle">resume</text><g><rect x="693" y="237.6" width="144" height="57.6" rx="4" fill="var(--phosphor)" stroke="var(--clyde)" stroke-width="1.6"/><text x="765" y="258.3" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">SWAPPED</text><text x="765" y="276.3" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="middle" dominant-baseline="middle">1 seq</text></g><text x="693" y="311.4" font-family="var(--body)" font-size="15.5" font-style="italic" fill="var(--ink-faint)" text-anchor="start" dominant-baseline="middle">or: drop entirely and recompute</text><text x="693" y="329.4" font-family="var(--body)" font-size="15.5" font-style="italic" fill="var(--ink-faint)" text-anchor="start" dominant-baseline="middle">from scratch on readmission</text><text x="873" y="226.8" font-family="var(--body)" font-size="15.5" font-style="italic" fill="var(--ink-faint)" text-anchor="start" dominant-baseline="middle">blocks return</text><text x="873" y="244.8" font-family="var(--body)" font-size="15.5" font-style="italic" fill="var(--ink-faint)" text-anchor="start" dominant-baseline="middle">to the free list</text><text x="513" y="370.8" font-family="var(--body)" font-size="15.5" font-style="italic" fill="var(--ink-dim)" text-anchor="start" dominant-baseline="middle">A sequence joins or leaves RUNNING on any step —</text><text x="513" y="388.8" font-family="var(--body)" font-size="15.5" font-style="italic" fill="var(--ink-dim)" text-anchor="start" dominant-baseline="middle">nothing waits for a fixed-size batch to drain.</text><line x1="27" y1="424.8" x2="1017" y2="424.8" stroke="var(--ink-faint)" stroke-width="1"/><text x="27" y="450" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--accent)" text-anchor="start" dominant-baseline="middle">admit if free_blocks ≥ blocks_needed(next_waiting), else preempt and retry</text><text x="27" y="473.4" font-family="var(--body)" font-size="15.5" font-style="italic" fill="var(--ink-dim)" text-anchor="start" dominant-baseline="middle">One scheduler, one block pool, one step at a time —</text><text x="27" y="491.4" font-family="var(--body)" font-size="15.5" font-style="italic" fill="var(--ink-dim)" text-anchor="start" dominant-baseline="middle">this is Module 5 and Module 6, meeting inside a single system.</text></svg></div><figcaption class="fig__cap">Admission only ever needs one free block, not a sequence’s eventual length — that asymmetry is what makes evicting and re-admitting a sequence every single iteration affordable.</figcaption></figure>
+      </section>
+
+      <section class="section ghost ghost--pinky" id="big-idea">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--pinky)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>PINKY · THE BIG IDEA</p>
+        <div class="prose"><p>Every serving engine needs exactly two things: an allocator that does not waste memory, and a scheduler that does not waste time. The reference page on serving engines told you vLLM's answer to both in one sentence — PagedAttention for the first, continuous batching for the second — and that they are not really two techniques. <strong>The scheduler cannot do its job without the allocator, and the allocator has no reason to exist without the scheduler.</strong></p>
+<p>A scheduler that adds and evicts sequences every iteration needs allocation and freeing to be cheap and fine-grained, or the bookkeeping eats the throughput it was trying to buy. An allocator that hands out fixed-size blocks on demand only pays for that flexibility if something is actually admitting and evicting sequences fast enough to use it. Module 6 gave you the first half — the block table, and the fragmentation arithmetic it fixes. Module 5 gave you the second — the running/waiting model, and why iteration-level scheduling beats static batching. This level is where they turn out to be one system, and goes to the places neither module had room for: what the scheduler actually does when the block pool runs dry, what sharing a block costs and who pays for it, and what changes when the scheduler is handing work to eight GPUs instead of one.</p>
+<p>By the end you should be able to read vLLM's own scheduler and block-manager source and recognise every piece of it — because you will have built a working, if miniature, copy of both yourself.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="concepts">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>PELLETS · CONCEPTS</p>
+        <article class="concept" id="concept-0">
+  <div class="concept__head">
+    <span class="concept__n">01</span>
+    <h3 class="concept__title">The block table: PagedAttention as OS-style paging</h3>
+  </div>
+  <div class="prose"><p>Module 6 derived how much memory paging recovers. This concept is about the data structure that recovers it.</p>
+<p>The KV cache is never reserved for a sequence's maximum possible length. Instead it is carved into fixed-size <strong>blocks</strong> — 16 tokens each, in vLLM's original design — drawn from a single pool shared by every sequence resident on the GPU. Each sequence owns a <strong>block table</strong>: a small array mapping its logical block indices (0, 1, 2, …, in the order the sequence filled them) to physical block indices anywhere in that shared pool. That is exactly the indirection an operating system uses for virtual-memory pages, mapped onto a much smaller address space — a sequence at 8k context needs 512 logical blocks, not the millions of pages a real OS manages, so the whole table for one sequence is a couple of kilobytes (the math lab makes this precise).</p>
+<p>A sequence claims a new physical block only when its current one fills — after its 17th token, not before. Allocation tracks <em>actual</em> usage instead of a worst-case reservation, which is the entire mechanism behind Module 6's fragmentation numbers: nothing is wasted because nothing is reserved ahead of need.</p>
+<p>The attention kernel has to cooperate with this or the indirection is pointless. Given a block table and a <strong>slot mapping</strong> — which physical slot each token in the current step's batch belongs to — a paged-attention kernel gathers the right K and V vectors from scattered physical memory instead of assuming one contiguous run per sequence. This is the detail Module 7's kernel material calls out: paging changes the <em>memory access pattern</em> attention has to support, not just the allocator sitting above it. A kernel written for a contiguous cache cannot serve a paged one; the two were co-designed.</p>
+<p>One consequence worth stating plainly, because it explains why the mechanism is boring rather than clever: <strong>nothing here is lossy.</strong> Every byte in the cache is still exactly the K and V vectors the model would have produced with a contiguous buffer. Paging is pure bookkeeping — it changes <em>where</em> bytes live, never <em>what</em> they are — which is why Module 6 could call it free.</p></div>
+  <pre class="ascii" aria-label="diagram">  LOGICAL (per sequence)              PHYSICAL POOL (shared)
+
+  seq A block table                    ┌───┬───┬───┬───┬───┬───┬───┬───┐
+  L0 ──────────────────┐               │ P0│ P1│ P2│ P3│ P4│ P5│ P6│ P7│
+  L1 ──────────┐        └────────────► │   │   │███│   │   │███│   │███│
+  L2 ──┐        │                      └───┴───┴───┴───┴───┴───┴───┴───┘
+       │        └───────────────────►                 ▲       ▲       ▲
+       └────────────────────────────────────────────► L2      L1      L0
+                                                     (16 tokens each, non-contiguous)</pre>
+  <p class="keypoint"><b>REMEMBER</b>A block table is a small array of physical block ids; the attention kernel reads through it instead of assuming one contiguous buffer per sequence.</p>
+</article>
+<article class="concept" id="concept-1">
+  <div class="concept__head">
+    <span class="concept__n">02</span>
+    <h3 class="concept__title">The scheduler: continuous batching as a loop, not a batch</h3>
+  </div>
+  <div class="prose"><p>Module 5 established why continuous batching beats static batching: intensity equals batch size, so an idle slot is wasted arithmetic, and a static batch runs at the speed of its slowest member. This concept is the loop that implements that idea inside vLLM specifically.</p>
+<p>The scheduler runs once per <strong>iteration</strong>, and one iteration is one forward pass — not one request processed to completion. Every sequence vLLM is tracking sits in one of three states: <strong>running</strong> (it will advance by one token this iteration, if it can), <strong>waiting</strong> (admitted to the system but not yet given a first block), or <strong>swapped</strong> (preempted, its cache moved to host memory rather than dropped — the alternative to the recomputation policy the next concept covers). Each step, the scheduler decides who moves between those states before anyone's forward pass runs.</p>
+<p>Admission is deliberately cheap: a waiting sequence only needs <em>one</em> free block to start, not its eventual total, because paging means &quot;start&quot; and &quot;reserve everything you might need&quot; are different operations for the first time. That is what makes iteration-level scheduling affordable — Orca established the scheduling idea in 2022, a year before PagedAttention, using a coarser memory model; vLLM's contribution was making the memory side cheap enough that the scheduling side could run this fine-grained.</p>
+<p>Chunked prefill (Module 5's Sarathi-Serve material) is not a separate scheduling mode bolted on afterward — it is one more admission rule inside the same loop. Instead of running a long prompt's prefill as one uninterrupted unit that blocks every decode step behind it, the scheduler caps how many prefill tokens it will admit in a single iteration and carries the rest over to the next one, interleaving those chunks with whatever decode work is already running. The loop does not change; what counts as &quot;one iteration's work&quot; gets more flexible.</p>
+<p>The property worth holding onto, because the next two concepts are both about what threatens it: <strong>a sequence can enter or leave the batch on any single step.</strong> Nothing waits for a fixed-size batch to drain. That is only true as long as the scheduler can always find a free block for whoever needs one next — which is exactly the condition the next concept is about losing.</p></div>
+  <pre class="ascii" aria-label="diagram">  ONE ITERATION = ONE FORWARD PASS
+
+  WAITING  ──admit, if a block is free──►  RUNNING  ──finishes──►  done, blocks freed
+     ▲                                        │  │
+     │                                        │  └──preempt, if the pool is empty──┐
+     └───────────────re-admit later◄──────────┘                                    ▼
+                                                                                 SWAPPED
+                                                                          (or dropped and
+                                                                        recomputed — next)</pre>
+  <p class="keypoint"><b>REMEMBER</b>The scheduler runs once per token, not once per request; a sequence can join or leave the batch on any step instead of waiting for a fixed-size batch to finish.</p>
+</article>
+<article class="concept" id="concept-2">
+  <div class="concept__head">
+    <span class="concept__n">03</span>
+    <h3 class="concept__title">Preemption: what happens when the pool runs dry</h3>
+  </div>
+  <div class="prose"><p>Every promise the last concept made — cheap admission, a sequence joining or leaving on any step — depends on a free block being available when a running sequence needs one. Sometimes none is. The scheduler then <strong>preempts</strong> the lowest-priority running sequence rather than failing the request in front of it.</p>
+<p>There are two ways to do it. <strong>Swap</strong> copies the victim's blocks to host DRAM over PCIe and copies them back when the sequence is re-admitted — the cache survives, at the cost of a round trip over a link roughly 50 to 60 times slower than HBM. <strong>Recompute</strong> simply drops the blocks and reruns prefill over the sequence's tokens-so-far once it is rescheduled — no host memory required, at the cost of redoing work the GPU had already done once.</p>
+<p>The intuition most people reach for is &quot;recompute is cheap for short sequences, swap wins once a sequence is long enough that its cache is expensive to redo.&quot; The math lab in this level does the arithmetic and that intuition turns out to be <em>incomplete</em>: under the same linear-in-length approximation this course uses for prefill FLOPs everywhere else, both costs scale with sequence length, which means their <strong>ratio is constant</strong> — for Llama-3-8B on an H100 with a real PCIe link, swap comes out cheaper than recompute at every length, not just long ones. What actually produces a length-dependent crossover is something the simple bytes-and-FLOPs model leaves out entirely: a <strong>fixed per-transfer overhead</strong> on the swap path — DMA setup, driver bookkeeping, synchronization — that does not shrink with sequence length. Work through the math lab and you will find that overhead only has to be small for the crossover to sit at a handful of tokens, which reframes the folklore rather than simply confirming it.</p>
+<p>Victim selection is its own small policy question, independent of swap-versus-recompute. FCFS — preempt whoever was admitted most recently — is simple, requires no bookkeeping about how close anyone is to finishing, and is close to what vLLM defaults to. It is not obviously optimal: a sequence one token from completion is a strange thing to throw away over a sequence that just started, and the code lab's stretch goal asks you to try a policy that accounts for it.</p>
+<p>One thing every version of preemption costs that neither policy avoids: <strong>it is visible to the preempted request as a latency spike</strong>, not a throughput loss. The GPU is still working the whole time; the victim's user is the one waiting.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>When no block is free, the scheduler preempts a running sequence by swapping its blocks to host memory or by dropping them and recomputing later; which is cheaper is not simply a function of sequence length.</p>
+</article>
+<article class="concept" id="concept-3">
+  <div class="concept__head">
+    <span class="concept__n">04</span>
+    <h3 class="concept__title">Copy-on-write and reference counting: sharing without copying</h3>
+  </div>
+  <div class="prose"><p>Parallel sampling (several completions from one prompt) and beam search both start several sequences from an identical prefix. Duplicating that prefix's cache once per sequence would waste exactly the kind of memory Module 6 spent an entire level recovering.</p>
+<p>Because the block table is already an indirection, sharing costs nothing extra to <em>represent</em> — two sequences' block tables can simply point at the same physical block. What they need beyond that is a <strong>reference count</strong> per physical block, so the allocator knows a block is still in use by someone even after one of its sharers releases it.</p>
+<p>Sharing only works cleanly as long as nobody writes to a shared block. The moment two sequences' continuations diverge — sequence A generates one token, sequence B generates a different one, and the position that used to hold &quot;the next slot in the shared prefix&quot; now needs to hold two different things — the block that both were about to write into gets <strong>copied</strong> first, for whichever sequence is doing the writing, and the two block tables split there. This is copy-on-write, the identical idea operating systems use for <code>fork()</code>: shared as long as possible, copied at the last possible moment, and only the one block that actually diverged, not the whole cache either sequence holds.</p>
+<p>The cost model this produces is worth stating precisely, because it is easy to overestimate. Two sequences sharing a 500-token prompt (32 blocks at the standard block size) pay for 32 shared blocks plus exactly one new block each, the moment they first diverge — not 64 blocks, and not a full duplicate cache re-copied on every subsequent token. Copy-on-write is a one-time fork per divergence point, not an ongoing tax.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Two sequences that share tokens can point their block tables at the same physical block, tracked by a reference count; a write forks only the one block being written to.</p>
+</article>
+<article class="concept" id="concept-4">
+  <div class="concept__head">
+    <span class="concept__n">05</span>
+    <h3 class="concept__title">Automatic prefix caching: sharing without being asked</h3>
+  </div>
+  <div class="prose"><p>Copy-on-write shares a prefix between sequences that started life sharing it — one prompt, several samples. It does nothing for two <em>unrelated</em> requests that happen to carry the same 2,000-token system prompt, because as far as the block manager is concerned they are unrelated requests with unrelated block tables. <strong>Automatic prefix caching</strong> is the mechanism that catches that case too.</p>
+<p>Each physical block is hashed on its own token contents, chained with the hash of the block before it — so the hash of block <em>k</em> commits to every token from the start of the sequence through the end of block <em>k</em>, not just the 16 tokens inside it. A new request's first block is hashed and looked up in a table of existing blocks; on a hit, its block table points at the existing physical block (reference-counted, exactly as in copy-on-write) instead of allocating and writing a new one. The lookup then continues into the request's second block using the chained hash, and keeps matching for as long as the new request's prefix keeps agreeing with something already cached — which is why the mechanism only recognises a shared prefix down to a <strong>block boundary</strong>: a match that starts one token off from where an existing block began is not a match at all under this scheme, hash chains included.</p>
+<p>This is the same problem SGLang's RadixAttention solves, with a different structure and a different trade-off. A radix tree matches at the token, not the block, and evicts by tree structure rather than a flat LRU list — more precise, and more machinery. A hash chain over fixed blocks is coarser but is the same block manager every other feature in this level already needs; there is no second data structure to keep consistent with the first. Neither is strictly better; they are the two answers you get from optimizing the same idea against two different constraints, which is exactly the contrast the serving-engines reference page draws between the two projects.</p>
+<p>The payoff shows up as time, not memory. A cache hit is prefill work the GPU never does — the math lab prices exactly this for a system prompt shared across fifty concurrent requests, and it shows up as a drop in time-to-first-token, not a change in how many sequences fit.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>Blocks are hashed on their token contents chained with the previous block’s hash, so identical prefixes across unrelated requests resolve to the same physical blocks without anyone requesting it.</p>
+</article>
+<article class="concept" id="concept-5">
+  <div class="concept__head">
+    <span class="concept__n">06</span>
+    <h3 class="concept__title">Multi-GPU: one scheduler, many workers</h3>
+  </div>
+  <div class="prose"><p>Module 9 covered tensor and pipeline parallelism as a way of splitting a model too large for one GPU across several. What it did not cover is who runs the scheduler once the model is split — a question this level is now equipped to answer, because the scheduler this level has been describing is a single piece of sequential logic making yes/no decisions about admission and preemption, and that logic cannot simply be duplicated once per GPU without every replica disagreeing about which blocks are free.</p>
+<p>vLLM's answer is a <strong>driver process plus worker processes</strong>. The driver owns the scheduler and the authoritative block tables — the same structures this level has been describing all along, just now living in exactly one place instead of one per GPU. Each iteration, it decides the batch the way a single-GPU deployment would, then broadcasts that decision — which sequences, which token positions, which block tables — to one worker process per GPU. Each worker holds its shard of the model's weights and runs its slice of the forward pass; under tensor parallelism the workers exchange partial activations through NCCL collectives at the points Module 9 identified, once per attention block and once per MLP block.</p>
+<p>The block manager staying single-writer is the detail that makes this whole level's machinery port to multiple GPUs without a redesign. Workers do not negotiate allocation, do not run their own copy of the scheduler, and do not need to agree with each other about which physical block holds which sequence — they simply execute against the block table and slot mapping the driver already computed for them. Every mechanism above — admission, preemption, copy-on-write, prefix-cache lookup — is a decision made exactly once per iteration, by exactly one process, regardless of how many GPUs are executing the result.</p>
+<p>What this buys you is that nothing in this level's first five concepts needed to know a second GPU existed. What it costs is a broadcast every iteration and a driver process that is now a sequential bottleneck other systems can choose to remove — which is precisely DistServe's argument in this level's papers, and the reason it is here as the closing citation rather than a footnote.</p></div>
+  
+  <p class="keypoint"><b>REMEMBER</b>A single driver process holds the scheduler and the block tables and broadcasts each step’s batch to one worker per GPU; the block manager itself stays single-writer.</p>
+</article>
+      </section>
+
+      <section class="section ghost ghost--inky" id="math-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--inky)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>INKY · MATH BY HAND</p>
+        <h2 class="section__title">Math by hand</h2>
+        <div class="prose"><p>All of this reuses figures already established elsewhere in the course rather than inventing new ones — Llama-3-8B's 8.03e9 active parameters and its 131,072 B (128 KiB) per-token cache, the ~50 GB/s achieved PCIe bandwidth from Module 5's swap example, and the 16-token block size from Module 6. One new number: back out the achieved H100 compute throughput implied by Module 5's own worked example — &quot;32k tokens on Llama-3-8B is roughly 2 × 8.03e9 × 32000 = 514 TFLOP, about 740 ms at realistic H100 throughput&quot; — and use <em>that</em> derived figure everywhere below, so this level's arithmetic is a strict continuation of Module 5's rather than a second, disagreeing estimate.</p>
+<pre><code>recompute_time(S)  ~=  2 x N_active x S / C            # C = achieved compute, FLOP/s
+swap_time(S)       ~=  2 x kv_per_token x S / BW_pcie   # round trip: out, then back</code></pre>
+<ol><li>Derive <code>C</code>, the achieved H100 compute throughput, from Module 5's own numbers.</li><li>Module 5's checkpoint gives a worked example: &quot;a 2.5 GiB cache at ~50 GB/s is roughly 50 ms out and 50 ms back.&quot; What sequence length <code>S</code> does 2.5 GiB correspond to for Llama-3-8B, and what are the precise (unrounded) single-leg and round-trip swap times?</li><li>Compute the recompute time at that same <code>S</code>. Which policy actually wins, and by how much?</li><li><code>recompute_time(S)</code> and <code>swap_time(S)</code> are both linear in <code>S</code>. What does that imply about their ratio as <code>S</code> varies? Derive the ratio symbolically, evaluate it for Llama-3-8B on this hardware, and check it at <code>S</code> = 10, 1,000 and 100,000 tokens to confirm what the algebra predicts.</li><li>Question 4 should have surprised you if you believed &quot;short sequences favour recompute.&quot; Assume swap carries a fixed overhead of about 200 microseconds per transfer — DMA setup and synchronization that the pure bytes/bandwidth model above omits — that recompute does not pay. At what <code>S</code> does recompute start winning? Recompute the crossover for 500 μs, 1 ms and 2 ms of overhead as well, and say what this implies about how short &quot;short&quot; really has to be for the folklore to hold.</li><li>A sequence table entry is one 4-byte physical block id per logical block. At 8,192 tokens of context, how many blocks does a Llama-3-8B sequence need, how many bytes does its block table cost, and what fraction is that of the KV bytes those blocks actually hold?</li><li>Fifty concurrent requests share an identical 2,000-token system prompt. Using automatic prefix caching, only the first pays full prefill on those 2,000 tokens. How much prefill compute (FLOP) and wall-clock GPU time does caching save the other forty-nine, at the achieved throughput from question 1?</li><li>What does the arithmetic in questions 4 and 5 assume that a real multi-tenant deployment does not deliver?</li></ol></div>
+        <details class="spoiler">
+          <summary>SHOW THE WORKED SOLUTION</summary>
+          <div class="spoiler__body prose"><p><strong>1. Achieved compute throughput</strong></p>
+<pre><code>2 x 8.03e9 x 32000 = 5.1392e14 FLOP = 513.9 TFLOP   (matches Module 5's &quot;~514 TFLOP&quot;)
+C = 513.9 TFLOP / 0.740 s = 694.5 TFLOP/s            (70.2% of the H100's 989 TFLOP/s peak)</code></pre>
+<p>A 70% achieved fraction on a compute-bound matmul is a believable real-world figure, and it is the number question 3 onward is built on.</p>
+<p><strong>2. What 2.5 GiB means</strong></p>
+<pre><code>S = 2.5 x 2^30 B / 131,072 B  =  20,480 tokens
+single leg  = 2.5 x 2^30 / 50e9  =  0.0537 s  = 53.7 ms   (Module 5 rounds this to &quot;~50 ms&quot;)
+round trip  = 2 x 53.7 ms        =  107.4 ms              (Module 5's &quot;50 out and 50 back&quot;)</code></pre>
+<p>The rounding in Module 5's checkpoint answer was for readability, not error — 53.7 rounds comfortably to &quot;roughly 50.&quot;</p>
+<p><strong>3. Recompute at the same S = 20,480</strong></p>
+<pre><code>recompute_time(20480) = 2 x 8.03e9 x 20480 / 694.5e12  =  0.4736 s  =  473.6 ms
+swap round trip                                         =  107.4 ms</code></pre>
+<p>Swap wins here by <strong>4.41×</strong> — consistent with &quot;long sequences favour swap.&quot; So far the folklore holds.</p>
+<p><strong>4. The ratio is S-independent</strong></p>
+<p>Both times are <code>(constant) x S</code>, so:</p>
+<pre><code>recompute_time(S) / swap_time(S)  =  (2 N_active / C) / (2 kv_per_token / BW_pcie)
+                                   =  (N_active x BW_pcie) / (C x kv_per_token)</code></pre>
+<p><code>S</code> cancels completely. Plugging in numbers:</p>
+<pre><code>(8.03e9 x 50e9) / (694.5e12 x 131,072)  =  4.41</code></pre>
+<p>Checking directly at three lengths:</p>
+<pre><code>S =     10:  recompute = 0.231 ms   swap = 0.052 ms   ratio = 4.41x
+S =  1,000:  recompute = 23.13 ms   swap = 5.24 ms     ratio = 4.41x
+S = 100,000: recompute = 2312.5 ms  swap = 524.3 ms    ratio = 4.41x</code></pre>
+<p>The ratio is exactly 4.41 at every length. Under this linear model, <strong>swap is cheaper than recompute at every sequence length, including very short ones</strong> — not just long ones. The &quot;short favours recompute&quot; intuition does not survive contact with the arithmetic, at least not for this model and this hardware pair.</p>
+<p><strong>5. Where a real crossover would have to come from</strong></p>
+<p>Per-token cost:</p>
+<pre><code>recompute: 2 x 8.03e9 / 694.5e12  =  23.12 us/token
+swap:      2 x 131,072 / 50e9     =  5.24 us/token
+gap:       17.88 us/token</code></pre>
+<p>A fixed swap overhead <code>OVERHEAD</code> produces a crossover where <code>OVERHEAD = S x gap</code>, so <code>S* = OVERHEAD / gap</code>:</p>
+<pre><code>  200 us overhead  -&gt;  S* = 11.2 tokens
+  500 us overhead  -&gt;  S* = 28.0 tokens
+1,000 us overhead  -&gt;  S* = 55.9 tokens
+2,000 us overhead  -&gt;  S* = 111.8 tokens</code></pre>
+<p>Even a generous 2 ms of fixed transfer overhead only buys recompute a win below about 112 tokens — a handful of turns into a conversation. If real deployments do see recompute favoured over a wider range than that, the reason is very unlikely to be pure DMA latency (the hardware table's PCIe figure is ~10 μs, two orders of magnitude below what would be needed); it is more likely <strong>contention</strong> — a swap consumes PCIe bandwidth that other transfers also want, which Module 5's checkpoint already flags as a separate reason to prefer recompute under load, independent of the bytes-and-FLOPs comparison this question is making.</p>
+<p><strong>6. Block-table overhead</strong></p>
+<pre><code>blocks needed at 8,192 tokens: ceil(8192 / 16) = 512
+block-table bytes: 512 x 4 B = 2,048 B = 2.00 KiB
+KV bytes those blocks hold:  8192 x 131,072 B = 1,073,741,824 B = 1024.0 MiB
+overhead fraction: 2,048 / 1,073,741,824 = 0.0002%</code></pre>
+<p>The indirection this entire level is about costs two kilobytes to save a gigabyte. That ratio is why &quot;the block table adds overhead&quot; is true and irrelevant in the same breath.</p>
+<p><strong>7. Prefix-cache savings, 50 requests, 2,000-token shared prompt</strong></p>
+<pre><code>FLOPs saved = 2 x 8.03e9 x 2000 x 49 = 1.5739e15 FLOP = 1,573.9 TFLOP
+time saved  = 1,573.9e12 / 694.5e12  = 2.266 s of GPU time</code></pre>
+<p>Over two seconds of prefill compute the GPU never has to spend, recovered by one hash lookup per block on 49 of the 50 requests. That is the number that shows up to users as a shorter time-to-first-token, not as a change in how many sequences fit in memory — prefix caching is a latency win dressed up as a memory feature.</p>
+<p><strong>8. What the arithmetic assumes</strong></p>
+<p>That the PCIe link is otherwise idle, that host memory is actually provisioned and pinned for however many sequences you might want to swap out simultaneously, and that the <em>linear</em> prefill FLOPs approximation used everywhere in this course holds — it undercounts recompute's true cost at very long context, where attention's quadratic term stops being negligible, which if anything makes recompute look <em>relatively better</em> here than it actually is and would push the true crossover even shorter. None of those hold under real multi-tenant load: PCIe bandwidth is shared with weight loading, tensor-parallel activation transfers and other sequences' swaps at the same moment; pinned host memory has its own capacity ceiling; and a deployment under enough memory pressure to be preempting sequences at all is precisely the deployment where &quot;otherwise idle&quot; is least true. The honest conclusion is not &quot;swap is always better&quot; — it is that a length-based threshold is the wrong lever to reach for first, and contention for shared resources is a bigger factor than the bytes-and-FLOPs comparison this question modeled.</p></div>
+        </details>
+      </section>
+
+      <section class="section ghost ghost--clyde" id="code-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--clyde)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>CLYDE · CODE LAB</p>
+        <h2 class="section__title">Code lab</h2>
+        <div class="prose"><p>Build a working, miniature copy of vLLM's block manager and scheduler — paged allocation, admission control, and preemption by recomputation — then use it to reproduce two claims from this level: that paging supports far more concurrent sequences than reserving each one's maximum length up front, and that pushing the admission cap past a certain point buys almost no throughput for a steep rise in preemption. No GPU, no attention, no dependencies — the point is the bookkeeping, isolated from everything it is bookkeeping for.</p></div>
+        <div class="prose" style="max-width:none"><pre><code class="lang-python">&quot;&quot;&quot;A toy version of vLLM's block manager and scheduler: paged allocation,
+continuous batching, admission control, and preemption by recomputation.
+
+    python3 vllm_scheduler.py        # standard library only
+
+Every design choice below has a real counterpart: BLOCK_SIZE is vLLM's
+original default, the block table is a list of physical block ids,
+max_num_seqs is the same admission-control knob vLLM exposes, and
+admission/preemption run once per simulated decode step -- one step is one
+forward pass. Preemption drops a sequence's blocks and sends it back to the
+queue: the recompute policy from the math lab. What is missing on purpose:
+attention, swap, prefix caching, anything that touches a GPU. The point is
+the bookkeeping, isolated from everything it is bookkeeping for.
+&quot;&quot;&quot;
+
+import random
+from collections import deque
+
+BLOCK_SIZE = 16            # tokens per physical block, vLLM's original default
+TOTAL_BLOCKS = 400          # the whole simulated KV-cache budget, in blocks
+MAX_LEN = 512               # longest any one sequence can run (prompt + output)
+
+
+def ceil_div(a, b):
+    return -(-a // b)
+
+
+class Seq:
+    __slots__ = (&quot;id&quot;, &quot;target_len&quot;, &quot;len&quot;, &quot;blocks&quot;, &quot;preemptions&quot;)
+
+    def __init__(self, sid, target_len):
+        self.id = sid
+        self.target_len = target_len
+        self.len = 0
+        self.blocks = []
+        self.preemptions = 0
+
+
+class BlockPool:
+    &quot;&quot;&quot;A free list of physical block ids. Allocation is O(1) and does not
+    care which sequence a block belonged to a moment ago.&quot;&quot;&quot;
+
+    def __init__(self, total):
+        self.free = list(range(total))
+        self.total = total
+
+    def alloc(self):
+        return self.free.pop() if self.free else None
+
+    def release(self, block_ids):
+        self.free.extend(block_ids)
+
+    @property
+    def used(self):
+        return self.total - len(self.free)
+
+
+class Scheduler:
+    &quot;&quot;&quot;Iteration-level scheduling: one call to step() is one forward pass.
+    Sequences move WAITING -&gt; RUNNING -&gt; DONE, or RUNNING -&gt; WAITING again if
+    preempted. max_num_seqs is the same admission-control cap vLLM exposes,
+    independent of block availability -- both can be the reason a waiting
+    sequence does not get in. Preemption priority is simple FCFS: the
+    sequence admitted least recently goes first, the newest guest in the
+    room. vLLM's default policy is close to this.&quot;&quot;&quot;
+
+    def __init__(self, pool, max_num_seqs):
+        self.pool = pool
+        self.max_num_seqs = max_num_seqs
+        self.waiting = deque()
+        self.running = []
+        self.done = []
+        self.preemptions = 0
+        self.util_samples = []
+
+    def submit(self, seq):
+        self.waiting.append(seq)
+
+    def _admit(self):
+        while self.waiting and self.pool.free and len(self.running) &lt; self.max_num_seqs:
+            seq = self.waiting.popleft()
+            seq.blocks.append(self.pool.alloc())
+            self.running.append(seq)
+
+    def step(self):
+        self._admit()
+        i = 0
+        while i &lt; len(self.running):
+            seq = self.running[i]
+            needed = ceil_div(seq.len + 1, BLOCK_SIZE)
+
+            while needed &gt; len(seq.blocks) and not self.pool.free:
+                if len(self.running) - 1 &lt;= i:
+                    break  # nobody left to preempt for seq; it stalls this step
+                victim = self.running.pop()
+                self.pool.release(victim.blocks)
+                victim.blocks = []
+                victim.len = 0
+                victim.preemptions += 1
+                self.preemptions += 1
+                self.waiting.appendleft(victim)
+
+            if needed &gt; len(seq.blocks) and self.pool.free:
+                seq.blocks.append(self.pool.alloc())
+
+            if needed &lt;= len(seq.blocks):
+                seq.len += 1
+
+            if seq.len &gt;= seq.target_len:
+                self.pool.release(seq.blocks)
+                seq.blocks = []
+                self.done.append(seq)
+                self.running.pop(i)
+                continue
+            i += 1
+
+        self.util_samples.append(self.pool.used / self.pool.total)
+
+
+def run_simulation(max_num_seqs, seed=7, n_requests=300, arrivals_per_step=2, max_steps=8000):
+    random.seed(seed)
+    pool = BlockPool(TOTAL_BLOCKS)
+    sched = Scheduler(pool, max_num_seqs)
+    arrivals = deque(Seq(i, random.randint(20, MAX_LEN)) for i in range(n_requests))
+
+    tokens_generated = 0
+    peak_concurrency = 0
+    step = 0
+    while (arrivals or sched.waiting or sched.running) and step &lt; max_steps:
+        for _ in range(min(arrivals_per_step, len(arrivals))):
+            sched.submit(arrivals.popleft())
+        sched.step()
+        tokens_generated += len(sched.running)  # one token per running seq this step
+        peak_concurrency = max(peak_concurrency, len(sched.running))
+        step += 1
+
+    return sched, step, tokens_generated, peak_concurrency
+
+
+if __name__ == &quot;__main__&quot;:
+    print(&quot;=== One run, max_num_seqs=32 ===\n&quot;)
+    sched, steps, tokens, peak = run_simulation(max_num_seqs=32)
+    avg_util = sum(sched.util_samples) / len(sched.util_samples)
+    completed = len(sched.done)
+    preempted_seqs = sum(1 for s in sched.done if s.preemptions)
+
+    print(f&quot;  requests completed:        {completed}&quot;)
+    print(f&quot;  simulated decode steps:    {steps}&quot;)
+    print(f&quot;  tokens generated:          {tokens}&quot;)
+    print(f&quot;  peak concurrent sequences: {peak}&quot;)
+    print(f&quot;  average pool utilization:  {avg_util * 100:.1f}%&quot;)
+    print(f&quot;  preemption events:         {sched.preemptions}&quot;)
+    print(f&quot;  sequences preempted &gt;=1x:  {preempted_seqs} of {completed}&quot;)
+    print(f&quot;  throughput:                {tokens / steps:.2f} tokens/step&quot;)
+
+    naive_blocks_per_seq = ceil_div(MAX_LEN, BLOCK_SIZE)
+    naive_max_concurrency = TOTAL_BLOCKS // naive_blocks_per_seq
+    print()
+    print(&quot;=== Naive comparison: reserve MAX_LEN contiguously, up front ===\n&quot;)
+    print(f&quot;  blocks reserved per sequence (worst case): {naive_blocks_per_seq}&quot;)
+    print(f&quot;  max concurrent sequences the same {TOTAL_BLOCKS}-block pool allows: {naive_max_concurrency}&quot;)
+    print(f&quot;  the paged run's peak concurrency was {peak / naive_max_concurrency:.1f}x that&quot;)
+
+    print()
+    print(&quot;=== Part 2: what max_num_seqs actually trades off ===\n&quot;)
+    print(f&quot;  {'cap':&gt;5} {'peak':&gt;6} {'util%':&gt;7} {'preempt_ev':&gt;11} {'preempt_seqs':&gt;13} {'tok/step':&gt;9}&quot;)
+    for cap in (16, 24, 32, 40, 48, 56, 64, 96, 128):
+        s, st, tk, pk = run_simulation(max_num_seqs=cap)
+        u = sum(s.util_samples) / len(s.util_samples)
+        pseq = sum(1 for sq in s.done if sq.preemptions)
+        print(f&quot;  {cap:5d} {pk:6d} {u*100:6.1f}% {s.preemptions:11d} {pseq:13d} {tk/st:9.2f}&quot;)
+
+# --- TODO for you ----------------------------------------------------------
+#   1. Swap policy: instead of dropping a preempted sequence's blocks, copy
+#      them into a Python list standing in for host memory, and restore them
+#      on readmission instead of resetting .len to 0. At what max_num_seqs
+#      does swap start beating recompute on total simulated steps to
+#      completion? Compare against the math lab's per-token ratio.
+#   2. Give ten sequences an identical 200-token prefix and add a prefix
+#      cache: a dict from (block index, token tuple) to a physical block id,
+#      consulted before allocating a fresh block for those positions. How
+#      many blocks does the run save?
+#   3. Replace FCFS preemption with shortest-remaining-first (preempt
+#      whoever is furthest from target_len). Does throughput improve, and
+#      what happens to the longest sequence in the batch?
+</code></pre></div>
+        <div class="prose"><h3>What you should see</h3><p>The single run at <code>max_num_seqs=32</code> completes all 300 requests in 2,739 simulated steps, generating 75,830 tokens (27.69 tokens/step), holding average pool utilization at 73.1%, with 77 preemption events touching 35 of the 300 sequences. The naive comparison shows why the cap was set where it was: reserving each sequence's full 512-token maximum up front (32 blocks each) caps the same 400-block pool at 12 concurrent sequences, so the paged run's 32-deep batch is <strong>2.7× that</strong> — and that is with the admission cap itself, not the pool, doing the limiting.</p>
+<p>Part 2 is the one worth reading as a curve rather than a single number:</p>
+<pre><code>  cap   peak   util%  preempt_ev  preempt_seqs  tok/step
+   16     16   39.8%           0             0     14.85
+   24     24   57.6%           0             0     21.50
+   32     32   73.1%          77            35     27.69
+   40     40   80.9%         564           166     33.20
+   48     48   85.2%       1,214           230     37.79
+   56     56   86.3%       1,864           236     40.37
+   64     64   87.1%       2,378           239     42.15
+   96     96   86.2%       3,267           238     43.71
+  128    128   86.4%       3,441           239     44.23</code></pre>
+<p>Below cap 32, preemption is zero — the pool never comes under enough pressure to evict anyone. From 32 to 64 the cap buys real throughput (27.69 to 42.15 tokens/step, +52%) at a steeply rising preemption cost (77 to 2,378 events). From 64 to 128 — doubling the cap again — throughput moves almost nothing (42.15 to 44.23, +5%) while preemption keeps climbing and utilization has already flattened around 86–87%. That flattening is the same knee Module 5's checkpoint describes for raw batch size: past a point you are not buying throughput, you are buying preemption. If you let the cap go effectively unbounded, this workload settles at a natural peak of 154 concurrent sequences — <strong>12.8× the naive ceiling</strong> — which is the number to reach for if someone asks what paging is &quot;really&quot; worth here, with the caveat that reaching it costs the most preemption of any row in the table.</p>
+<p>If your numbers differ, check three things first: that <code>random.seed(7)</code> is set before the arrivals are generated and nowhere else; that preemption pops from the <em>end</em> of <code>self.running</code> (the most recently admitted, not the current sequence); and that <code>_admit</code> checks <code>len(self.running) &lt; self.max_num_seqs</code> before allocating a block, not after — admitting first and checking the cap second silently turns the cap into a no-op.</p></div>
+        <div class="prose"><h3>Stretch</h3><p>Change the arrival distribution from <code>random.randint(20, MAX_LEN)</code> to something bimodal — say, 80% short requests (20–60 tokens) and 20% long ones (400–512) — matching the shape Module 5 describes for real chat traffic. Re-run the Part 2 sweep. The naive baseline does not move, because it is a function of <code>MAX_LEN</code> alone; the paged numbers should move quite a lot, because they are a function of what sequences actually cost, not their ceiling. That gap — one number that is blind to the traffic shape and one that tracks it — is the entire argument for paging in one experiment.</p>
+<p>Then implement TODO 3 (shortest-remaining-first preemption) for real and re-run the cap=64 row. vLLM does not do this by default; after you see the effect on tail latency for the longest sequence in the batch, you will understand why &quot;obviously better&quot; throughput policies are not always shipped.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pac" id="papers">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>THE KEY · PAPERS</p>
+        <h2 class="section__title">Papers, with a reading frame</h2>
+        <div class="papers">
+          <article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2309.06180" target="_blank" rel="noopener">Efficient Memory Management for Large Language Model Serving with PagedAttention</a></h3>
+            <p class="paper__by">Kwon et al., SOSP 2023</p>
+            <p class="paper__why">Module 6 read this for the fragmentation numbers and Module 5 for the scheduling policy in Section 4.3. This pass is for what both skip.</p>
+            <div class="paper__frame"><p>Read for the memory-sharing mechanism — copy-on-write over reference-counted blocks — and the distributed execution design, the driver/worker split this level's last concept describes. Notice how much of the systems design was already settled before a single kernel got optimized; the paper is a systems paper first and a kernel paper second, which the name makes easy to miss.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://www.usenix.org/conference/osdi22/presentation/yu" target="_blank" rel="noopener">Orca: A Distributed Serving System for Transformer-Based Generative Models</a></h3>
+            <p class="paper__by">Yu et al., OSDI 2022</p>
+            <p class="paper__why">The paper vLLM’s scheduler is downstream of. Continuous batching as a scheduling idea is Orca’s; PagedAttention is what let vLLM run it without the memory getting in the way, a year later.</p>
+            <div class="paper__frame"><p>Read for iteration-level scheduling on its own terms, independent of any particular memory manager — Orca predates PagedAttention and pays for it in memory reuse, not in the scheduling idea, which is exactly right. Compare its selective batching, which batches only the operations that can be batched across different-length sequences, against what a paged block table buys for free once it exists.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2403.02310" target="_blank" rel="noopener">Taming Throughput-Latency Tradeoff in LLM Inference with Sarathi-Serve</a></h3>
+            <p class="paper__by">Agrawal et al., OSDI 2024</p>
+            <p class="paper__why">The concrete algorithm behind &quot;chunked prefill slices a long prompt into pieces&quot; above. Module 5 covers the general prefill/decode interference argument; this pass is the scheduler-implementation angle.</p>
+            <div class="paper__frame"><p><strong>Section 4</strong>'s token-budget rule is the thing to extract: a per-iteration cap on prefill tokens, spent alongside whatever decode work is already scheduled. It slots directly into the running-queue loop this level describes — chunked prefill is not a separate scheduler, it is one more admission rule inside the same one.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2312.07104" target="_blank" rel="noopener">SGLang: Efficient Execution of Structured Language Model Programs</a></h3>
+            <p class="paper__by">Zheng et al., 2023</p>
+            <p class="paper__why">The same prefix-sharing problem vLLM’s automatic prefix caching solves, solved with a different data structure: a radix tree instead of a hash chain over fixed blocks.</p>
+            <div class="paper__frame"><p>Read the RadixAttention section against this level's prefix-caching concept side by side. A hash chain can only match a prefix at a block boundary and evicts by plain LRU; a radix tree matches at the token and evicts by tree structure. Worth having an opinion on which cost is worth which flexibility, rather than treating one as simply better.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2401.09670" target="_blank" rel="noopener">DistServe: Disaggregating Prefill and Decoding for Goodput-optimized Large Language Model Serving</a></h3>
+            <p class="paper__by">Zhong et al., OSDI 2024</p>
+            <p class="paper__why">Everything in this level describes one scheduler making prefill and decode decisions together, on the same GPUs. This is the paper arguing you should not.</p>
+            <div class="paper__frame"><p>Read it as the rebuttal to this level's architecture, not an extension of it — disaggregation gives up the single block pool and the cheap admission this level spent five concepts describing, in exchange for removing prefill/decode interference entirely. Module 9 has the KV-transfer mechanics; this is the argument for why you would pay for them.</p></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--blinky" id="pitfalls">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--blinky)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>BLINKY · PITFALLS</p>
+        <h2 class="section__title">What people get wrong</h2>
+        <div class="pitfall">
+          <p class="pitfall__wrong"><span>PagedAttention is a kernel optimization.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>It is a memory-management redesign that a kernel then has to be written to support. The saving Module 6 measures — internal fragmentation dropping from 60–80% to under 4% — comes entirely from changing what gets <em>allocated</em>, before a single FLOP is computed differently. What does live at the kernel level is the consequence: because the cache is no longer contiguous, the attention kernel has to gather K and V through a block table and slot mapping instead of reading a flat buffer, which is real engineering work but is downstream of the allocator decision, not the source of the saving. Confusing the two makes &quot;just write a faster paged-attention kernel&quot; sound like it could recover memory it cannot — the kernel makes the layout usable, the allocator is what made the layout smaller in the first place.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Swap is always cheaper than recomputing, because copying is faster than redoing work.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>Under the arithmetic this level works through for Llama-3-8B on an H100, that happens to be true — but it is true because of this specific model-and-hardware ratio, not as a general law, and even here it stops being clean once you account for what the simple model leaves out. The ratio <code>(N_active x BW_pcie) / (C x kv_per_token)</code> is what actually decides it, and every term is hardware- and model-specific: a slower PCIe link, a model with a larger cache per token relative to its active parameters, or a GPU with unusually high achieved compute throughput can all push the ratio the other way. Treat &quot;swap or recompute&quot; as an arithmetic question you re-derive for your own model and hardware, the way this level's math lab does, rather than folklore imported from somewhere else's numbers.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Copy-on-write means the two sequences’ caches stay in sync until you explicitly branch them.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>They diverge automatically, the instant generation produces different tokens — there is no explicit branch operation to forget to call. The block manager forks a block the moment a write to a shared block would make it disagree with what another sequence expects to find there; by the time you would think to ask whether the sequences have &quot;branched yet,&quot; the answer was decided by their first differing token, several tokens ago in wall-clock terms if you were not watching for it. The mental model to use is closer to a persistent data structure than to a manual git branch: sharing is the passive default, and copying is a side effect of writing, not a step anyone requests.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Automatic prefix caching means you no longer need to think about prompt structure.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>It means the <em>scheduler</em> no longer needs to be told about shared prefixes — it will find them on its own. It does not mean prompt structure stops mattering to the result. A cache hit requires the new request's prefix to match an existing one exactly, down to the token, up to a block boundary; a system prompt that gets reformatted, reordered, or has a timestamp spliced into it defeats the hash chain from the very first block, silently, with no error and no warning — the request just runs as a full-cost prefill and nobody is told why. If your team is not seeing the time-to-first-token improvement prefix caching should be delivering, check whether something upstream is mutating the &quot;identical&quot; prompt before it reaches the engine, because the caching layer will not tell you it happened.</p></div></div>
+        </div>
+      </section>
+
+      <section class="section" id="checkpoint">
+        <div class="wall checkpoint">
+          <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>POWER PELLET · CHECKPOINT</p>
+          <p class="checkpoint__claim">You can read vLLM's own scheduler and block-manager source and recognise every piece
+of it: the block table as page-table indirection, the running/waiting/swapped loop, swap-versus-
+recompute as an arithmetic question rather than a rule of thumb, copy-on-write as a reference
+count plus a fork on divergence, prefix caching as a hash chain over the same blocks, and the
+driver/worker split that lets all of it run unmodified across many GPUs.</p>
+          <details class="qa">
+            <summary>A colleague says PagedAttention and continuous batching are two separate vLLM features you could in principle ship independently. What is wrong with that claim?</summary>
+            <div class="qa__a prose"><p>They are separable in name only. Continuous batching needs to cheaply admit and evict sequences every iteration, which means allocating and freeing memory in small, fast operations — exactly what a block table provides and a contiguous per-sequence reservation does not. Run continuous batching over a contiguous allocator and admitting a new sequence mid-flight means finding a free reservation-sized hole, which is the fragmentation problem Module 6 measured at 60–80% waste; you would be paying that cost on every single admission decision. PagedAttention, in turn, has no reason to exist without a scheduler that actually adds and evicts sequences fine- grainedly enough to use the flexibility — a system that runs static batches to completion gets almost nothing from paging, since it allocates once per batch and frees once per batch regardless of how cheap allocation is. Orca proved the scheduling idea works; PagedAttention is what let vLLM run it without the memory getting in the way. Neither paper's system is the other's without both pieces.</p></div>
+          </details>
+<details class="qa">
+            <summary>Work through the swap-versus-recompute arithmetic for Llama-3-8B on an H100 with a real PCIe link. Which one actually wins, and does it depend on sequence length?</summary>
+            <div class="qa__a prose"><p>Under the linear approximation this course uses for prefill FLOPs everywhere else, recompute costs about 23.1 microseconds per token and swap costs about 5.2 microseconds per token — a ratio of 4.41, and because both scale linearly in sequence length, that ratio is the same at 10 tokens and at 100,000. Swap wins at every length under this model, which contradicts the intuition that short sequences favour recomputation. A real crossover has to come from something the bytes-and-FLOPs model leaves out entirely — a fixed per-transfer overhead on the swap path, like DMA setup and driver synchronization — and even a generous 2 millisecond estimate for that overhead only pushes the crossover to around 112 tokens. The honest takeaway is not &quot;always swap.&quot; It is that a pure length threshold is the wrong first-order model, and that PCIe contention with other traffic — which the bytes/bandwidth comparison assumes away — is a more likely reason a real engine would still prefer recompute under load.</p></div>
+          </details>
+<details class="qa">
+            <summary>Two parallel samples share a 1,000-token prompt and then diverge at the very next token. How many physical blocks get copied at the moment of divergence?</summary>
+            <div class="qa__a prose"><p>One. At a 16-token block size, 1,000 shared tokens occupy 63 full blocks (1008 tokens' worth) with the 1,000th token sitting partway into the 63rd block — call it the boundary case and say the shared prefix cleanly fills 62 or 63 blocks; either way, only the single block that both sequences are about to write their next, different token into needs to fork. The other 61 or 62 already-full blocks stay shared, still reference-counted at two, because nothing about to be written touches them. Copy-on-write is a one-block operation triggered by a write, not a whole- cache duplication triggered by branching — the point of tracking divergence at block granularity rather than sequence granularity is that &quot;two sequences forked&quot; and &quot;one block forked&quot; are different events, and only the second one costs memory.</p></div>
+          </details>
+<details class="qa">
+            <summary>Automatic prefix caching and SGLang’s RadixAttention solve the same problem. Why might an engine choose the coarser, block-hash version anyway?</summary>
+            <div class="qa__a prose"><p>Because it is not a second system — it reuses the block table and the physical pool every other feature in this level already depends on, with no additional data structure to keep consistent as blocks are allocated, freed and shared. A hash chain only recognises a shared prefix down to a block boundary, so a prefix that diverges one token before the end of a block gets zero credit for that block, where a radix tree would still match everything up to the exact token. That imprecision is a real cost on workloads with lots of near-miss prefixes. But it buys operational simplicity: the same allocator, the same reference counting, the same admission logic, one fewer subsystem that can disagree with the rest of the engine about what is free. Whether that trade is worth it depends on how much of your traffic actually shares prefixes only up to odd token boundaries — which for a fixed system prompt or a repeated few-shot header, the common cases, is rarely the failure mode that matters.</p></div>
+          </details>
+<details class="qa">
+            <summary>You move a vLLM deployment from one GPU to eight, with tensor parallelism across all eight. What changes about the scheduler, and what does not?</summary>
+            <div class="qa__a prose"><p>The scheduler itself does not change — it is still one sequential process deciding admission and preemption once per iteration, and it still owns one set of block tables. What changes is that its decision is now broadcast to eight worker processes rather than executed in-process, and each worker runs its shard of the model against block tables and slot mappings it received rather than computed. The workers additionally exchange partial activations through NCCL collectives at the points tensor parallelism requires them, once per attention block and once per MLP block, which Module 9 prices in fixed per-collective latency that does not shrink as you add GPUs. What this design buys is that none of this level's first five concepts — the block table, the admit/preempt loop, copy-on-write, prefix caching — needed to be rewritten to run on eight GPUs instead of one. What it costs is a single driver process that is now a sequential bottleneck serving eight workers instead of doing the work itself, which is the architectural choice DistServe's disaggregation argument is aimed at.</p></div>
+          </details>
+          <p style="margin-top:var(--s7)">
+            <button class="done-toggle" type="button" data-complete="12" aria-pressed="false">
+              MARK LEVEL 12 CLEARED
+            </button>
+          </p>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="glossary">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>GLOSSARY</p>
+        <h2 class="section__title">Glossary</h2>
+        <div class="gloss">
+          <div class="gloss__row"><div class="gloss__term">block table</div><div class="gloss__def">A per-sequence array mapping logical block indices to physical block indices in the shared KV-cache pool. The core PagedAttention data structure.</div></div><div class="gloss__row"><div class="gloss__term">slot mapping</div><div class="gloss__def">The per-token mapping from a batch position to a physical KV-cache slot, which the attention kernel reads through to gather scattered K and V.</div></div><div class="gloss__row"><div class="gloss__term">iteration-level scheduling</div><div class="gloss__def">Scheduling once per forward pass rather than once per request, so a sequence can join or leave the batch on any step. Introduced by Orca; the mechanism continuous batching runs on.</div></div><div class="gloss__row"><div class="gloss__term">admission control</div><div class="gloss__def">The scheduler decision of whether a waiting sequence can start this iteration, gated by both free blocks and a configured concurrency cap (max_num_seqs).</div></div><div class="gloss__row"><div class="gloss__term">preemption</div><div class="gloss__def">Evicting a running sequence when the block pool has none free for it, by swap or by recomputation, rather than failing the request.</div></div><div class="gloss__row"><div class="gloss__term">swap</div><div class="gloss__def">Preemption that copies a sequence’s KV blocks to host memory and back, preserving the cache at the cost of a PCIe round trip.</div></div><div class="gloss__row"><div class="gloss__term">recomputation</div><div class="gloss__def">Preemption that drops a sequence’s KV blocks and reruns prefill over its tokens-so-far when it is re-admitted, at the cost of redone compute.</div></div><div class="gloss__row"><div class="gloss__term">copy-on-write (KV cache)</div><div class="gloss__def">Sharing a physical block between sequences via a reference count, and copying it only at the moment one sequence’s write would make it diverge from another’s.</div></div><div class="gloss__row"><div class="gloss__term">automatic prefix caching</div><div class="gloss__def">Resolving a new request’s prefix to existing physical blocks via a hash chained over each block’s tokens and its predecessor’s hash, without the request explicitly declaring a shared prefix.</div></div><div class="gloss__row"><div class="gloss__term">reference count</div><div class="gloss__def">The count of sequences whose block table points at a given physical block, used to decide whether releasing a sequence actually frees the block.</div></div><div class="gloss__row"><div class="gloss__term">driver process</div><div class="gloss__def">In a multi-GPU vLLM deployment, the single process holding the scheduler and authoritative block tables, which broadcasts each iteration’s decisions to the worker processes.</div></div><div class="gloss__row"><div class="gloss__term">worker process</div><div class="gloss__def">One per GPU in a multi-GPU deployment; holds a shard of the model and executes the batch the driver assigned, exchanging activations with other workers via NCCL under tensor parallelism.</div></div><div class="gloss__row"><div class="gloss__term">chunked prefill</div><div class="gloss__def">Capping how many prefill tokens the scheduler admits in one iteration and carrying the remainder to later iterations, so a long prompt interleaves with ongoing decode instead of blocking it.</div></div>
+        </div>
+      </section>
+
+      <nav class="pagenav">
+        <a href="model-architectures.html" data-nav="prev"><span>◀ PREVIOUS LEVEL</span>11 MODEL ARCHITECTURES</a>
+        <span></span>
+      </nav>
+
+    </main>
+  </div>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <p class="foot__h">LEVELS</p>
+        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">&nbsp;</p>
+        <ul><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li><li><a href="../modules/model-architectures.html">11 · MODEL ARCHITECTURES</a></li><li><a href="../modules/how-vllm-works.html">12 · HOW VLLM WORKS</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">REFERENCE</p>
+        <ul>
+          <li><a href="../reference/timeline.html">Timeline</a></li>
+          <li><a href="../reference/hardware.html">GPU spec table</a></li>
+          <li><a href="../reference/engines.html">Serving engines</a></li>
+          <li><a href="../reference/frontier.html">Open problems</a></li>
+          <li><a href="../reference/glossary.html">Glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="foot__h">SOURCE</p>
+        <ul>
+          <li><a href="https://github.com/tushar-amrit-6/inference">GitHub repository</a></li>
+          <li><a href="../reference/how-to-use.html">How to work through this</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
+    do the arithmetic yourself.</p>
+  </div>
+</footer>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

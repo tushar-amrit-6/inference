@@ -734,4 +734,79 @@ export default {
       ].join('');
     },
   },
+
+  /* ---------------------------------------------------------------- 12 --- */
+  12: {
+    w: 58, h: 28,
+    title: 'The block table and the scheduler loop',
+    desc: 'One sequence’s logical blocks point into a shared physical pool of eight; block 2 ' +
+      'is referenced by two sequences and marked shared. On the right, the scheduler moves ' +
+      'sequences between waiting, running and swapped once per iteration, preempting a running ' +
+      'sequence into swapped, or dropping and recomputing it, whenever no free block is left for ' +
+      'one that needs to grow.',
+    caption: 'Admission only ever needs one free block, not a sequence’s eventual length — ' +
+      'that asymmetry is what makes evicting and re-admitting a sequence every single iteration ' +
+      'affordable.',
+    draw: (g, id) => {
+      const L = [
+        ['L0', 1.5, 8.8, 15.2],
+        ['L1', 8.8, 17.8, 15.2],
+        ['L2', 16.1, 23.8, 15.2],
+      ];
+      const POOL = [
+        ['P0', 1.5, FAINT, true], ['P1', 4.5, FAINT, true], ['P2', 7.5, PINKY, false],
+        ['P3', 10.5, FAINT, true], ['P4', 13.5, FAINT, true], ['P5', 16.5, A, false],
+        ['P6', 19.5, FAINT, true], ['P7', 22.5, A, false],
+      ];
+      return [
+        g.heading(1.5, 1.6, 'LEVEL 12 · THE BLOCK TABLE AND THE SCHEDULER LOOP'),
+        g.line(1.5, 2.4, 56.5, 2.4, { stroke: FAINT, width: 1 }),
+
+        /* --- left: block table into the physical pool ------------------ */
+        g.heading(1.5, 4.2, 'SEQ A — LOGICAL BLOCKS INTO THE POOL'),
+        g.box(1.5, 6.0, 6.5, 3, 'L0', { sub: 'logical', accent: DIM }),
+        g.box(8.8, 6.0, 6.5, 3, 'L1', { sub: 'logical', accent: DIM }),
+        g.box(16.1, 6.0, 6.5, 3, 'L2', { sub: 'logical', accent: DIM }),
+        ...L.map(([, lx, px2]) => g.arrow(lx + 3.25, 9.0, px2, 15.2, { id, stroke: DIM })),
+
+        g.chip(8.8, 12.0, '×2 — SEQ B TOO', { accent: PINKY, anchor: 'middle' }),
+
+        ...POOL.map(([lbl, x, accent, free]) =>
+          g.box(x, 15.2, 2.6, 3, lbl, free ? { accent, fill: 'none' } : { accent })),
+
+        g.note(1.5, 19.7, ['5 of 8 blocks free — claimed only when a', 'sequence actually fills the one it has.'],
+          { fill: FAINT }),
+        g.note(1.5, 21.9, ['P2 forks the instant Seq A or B writes to it —', 'copy-on-write, not copy-on-read.'],
+          { fill: DIM }),
+
+        /* --- right: the scheduler loop ---------------------------------- */
+        g.heading(28.5, 4.2, 'THE SCHEDULER — ONE STEP, ONE FORWARD PASS'),
+        g.box(28.5, 6.5, 8, 3.2, 'WAITING', { sub: '2 seqs', accent: DIM }),
+        g.arrow(36.5, 8.1, 38.3, 8.1, { id, label: 'admit' }),
+        g.box(38.5, 6.5, 8, 3.2, 'RUNNING', { sub: '3 seqs', accent: A }),
+        g.arrow(46.5, 8.1, 48.3, 8.1, { id, label: 'done' }),
+        g.box(48.5, 6.5, 8, 3.2, 'DONE', { sub: 'blocks freed', accent: FAINT }),
+
+        g.arrow(41, 9.9, 41, 13.0, { id, stroke: BLINKY, label: 'preempt' }),
+        g.arrow(46, 13.0, 46, 9.9, { id, stroke: A, label: 'resume' }),
+        g.box(38.5, 13.2, 8, 3.2, 'SWAPPED', { sub: '1 seq', accent: CLYDE }),
+
+        g.note(38.5, 17.3, ['or: drop entirely and recompute', 'from scratch on readmission'], { fill: FAINT }),
+        g.note(48.5, 12.6, ['blocks return', 'to the free list'], { fill: FAINT }),
+
+        g.note(28.5, 20.6, [
+          'A sequence joins or leaves RUNNING on any step —',
+          'nothing waits for a fixed-size batch to drain.',
+        ], { fill: DIM }),
+
+        g.line(1.5, 23.6, 56.5, 23.6, { stroke: FAINT, width: 1 }),
+        g.text(1.5, 25, 'admit if free_blocks ≥ blocks_needed(next_waiting), else preempt and retry',
+          { font: 'label', fill: A }),
+        g.note(1.5, 26.3, [
+          'One scheduler, one block pool, one step at a time —',
+          'this is Module 5 and Module 6, meeting inside a single system.',
+        ], { fill: DIM }),
+      ].join('');
+    },
+  },
 };

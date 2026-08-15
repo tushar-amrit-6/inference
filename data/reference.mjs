@@ -292,6 +292,53 @@ model/hardware pairs, because it optimizes for generality across a very large mo
 **Pick it when:** you are serving many concurrent users, you want broad model support, and you
 want to deploy today without a compilation step.
 
+## How vLLM works
+
+**Everything above is downstream of one data structure: the block table.** The KV cache is
+carved into fixed-size blocks — 16 tokens each, in the original design — drawn from a single pool
+shared by every sequence resident on the GPU. Each sequence gets a block table, a small array
+mapping its logical block indices (0, 1, 2, …) to physical block indices anywhere in that pool,
+the same indirection an OS uses for virtual-memory pages. A sequence claims a new physical block
+only when its current one fills, so allocation tracks actual usage rather than a worst-case
+reservation. The paged-attention kernel reads through this indirection directly — given a block
+table and a slot mapping, it gathers the right K/V vectors from scattered memory instead of
+assuming one contiguous buffer per sequence.
+
+**The scheduler runs once per token, not once per request.** Continuous batching — the technique
+Orca introduced as iteration-level scheduling — makes the forward pass, not the sequence, the
+unit of scheduling. Every step, the scheduler looks at its running, waiting and swapped queues
+and decides who is in this iteration's batch: running sequences advance by one token, waiting
+sequences are admitted if blocks are free, and chunked prefill slices a long prompt into pieces
+so it interleaves with other sequences' decode steps instead of blocking them for the length of a
+full prefill pass. A sequence can enter or leave the batch on any step — nothing waits on a
+fixed-size batch's slowest member, which is the entire point of scheduling at the iteration level
+instead of the request level.
+
+**Preemption is what happens when the pool runs dry.** If every physical block is spoken for and
+a running sequence needs one more, the scheduler evicts the lowest-priority sequence rather than
+failing the request, by one of two means: swap its blocks out to host memory and back in later,
+or recompute — drop the blocks and rerun prefill over its tokens-so-far once it is rescheduled.
+Recompute tends to win for short sequences, where redoing the prefill is cheap; swap wins once a
+sequence is long enough that its cache is expensive to regenerate but comparatively cheap to move
+over PCIe.
+
+**Copy-on-write turns a shared prefix into shared physical blocks.** Two sequences that share
+tokens — parallel samples from one prompt, or two unrelated requests behind the same system
+prompt — can point their block tables at identical physical blocks instead of duplicating them,
+tracked by a reference count per block. A write forks only the block being written: the instant
+one sequence's continuation diverges from the other's, that single block is copied and the two
+block tables split there, not before. Automatic prefix caching generalizes this to requests that
+never asked to share anything — each block is hashed on its own tokens chained with its prefix's
+hash, so a new request reproducing a previously seen prefix resolves to existing physical blocks
+on lookup instead of allocating and recomputing them.
+
+**Multi-GPU is a driver plus workers.** Under tensor or pipeline parallelism, one driver process
+owns the scheduler and the authoritative block tables; it broadcasts each step's batch to one
+worker process per GPU, and workers exchange activations through NCCL collectives at the points
+the parallelism strategy requires them. The block manager stays single-writer on the driver —
+workers execute against the block tables they are handed rather than negotiating allocation among
+themselves.
+
 ## SGLang — the workload is not one request at a time
 
 **The bet:** real traffic is structured and repetitive. Requests share system prompts, few-shot
@@ -488,7 +535,7 @@ work gets done.
      HOW TO USE
      ====================================================================== */
   howToLede:
-    'Twelve levels, roughly three months at a few hours a week. Levels 00 to 03 are the foundation — do not rush them.',
+    'Thirteen levels, roughly three months at a few hours a week. Levels 00 to 03 are the foundation — do not rush them.',
 
   howTo: `## The one idea that organizes everything
 
@@ -549,6 +596,7 @@ about it.
 | **05–07** | Systems and kernels. Faster going, because you now have the framework. |
 | **08–10** | The frontier. More reading, less arithmetic. |
 | **11** | The architecture zoo. Read it any time after 06 — it is the level that makes the others compose. |
+| **12** | Inside one engine. Read it after 05, 06 and 09 — it is where their scheduling, memory and distributed-execution material meets in a single running system. |
 
 At a few hours a week this is roughly three months. There is no benefit to going faster; the
 checkpoints are honest gates and the material compounds.
@@ -564,7 +612,7 @@ checkpoints are honest gates and the material compounds.
 
 Marking a level cleared stores it in your browser's local storage. Nothing is sent anywhere,
 there is no account, and clearing your browser data resets it. The score is cosmetic: 2,200
-points a level, 26,400 for all twelve.
+points a level, 28,600 for all thirteen.
 
 Arrow keys move between levels.
 
