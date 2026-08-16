@@ -129,7 +129,7 @@ function footer(up, modules) {
         </ul>
       </div>
     </div>
-    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    <p class="foot__note">Built as a self-paced set of chapters. Every number here is meant to be
     re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
     do the arithmetic yourself.</p>
   </div>
@@ -336,7 +336,7 @@ function indexPage(modules) {
     <section class="hero">
       <div class="hero__grid">
         <div>
-          <p class="eyebrow hero__kicker">A COURSE IN FOURTEEN LEVELS</p>
+          <p class="eyebrow hero__kicker">FOURTEEN CHAPTERS</p>
           <h1 class="hero__title">LLM<br>INFERENCE</h1>
           <p class="hero__thesis">Pac-Man is <b>memory-bound</b>. One pellet per move, however fast he runs.</p>
           <p class="hero__body">So is your GPU. Generating a single token means reading
@@ -345,7 +345,7 @@ function indexPage(modules) {
           <strong>0.4% of the machine's arithmetic capability</strong>; the other 99.6% of the time
           it is sitting still, waiting on the memory bus.</p>
           <p class="hero__body">Batching, quantization, GQA, PagedAttention, FlashAttention,
-          speculative decoding — every technique in this course is an answer to one question:
+          speculative decoding — every technique in these chapters is an answer to one question:
           <strong>how do we do more useful work per byte moved from memory?</strong> Hold that in
           view and the field stops looking like a pile of tricks.</p>
           <div class="hero__cta">
@@ -462,7 +462,7 @@ ${footer('', modules)}
   return layout({
     title: `${SITE.title} — ${SITE.subtitle}`,
     description:
-      'A self-paced course on how LLM inference works and why it is hard. Fourteen levels, from the transformer forward pass to distributed serving, the architecture zoo, inside vLLM itself, and down to the silicon, organized around one idea: decoding is memory-bound.',
+      'A self-paced set of chapters on how LLM inference works and why it is hard. Fourteen levels, from the transformer forward pass to distributed serving, the architecture zoo, inside vLLM itself, and down to the silicon, organized around one idea: decoding is memory-bound.',
     body,
   });
 }

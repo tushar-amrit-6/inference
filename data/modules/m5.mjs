@@ -231,7 +231,7 @@ was wasting anyway.
 
 That reframes chunked prefill entirely. It is not a scheduling compromise that trades TTFT for
 TPOT. It is a way to run prefill in the compute the decode step was leaving on the floor — the
-purest possible expression of this course's thesis. Both workloads finish faster than they would
+purest possible expression of these chapters' thesis. Both workloads finish faster than they would
 if you ran them separately.
 
 Sarathi-Serve, which introduced this technique as "stall-free batching", reported substantial
@@ -486,7 +486,7 @@ prefill work is riding along in compute capacity the decode step was already was
 
 So chunked prefill is not a compromise between TTFT and TPOT. It is a way to reclaim idle
 arithmetic, and it makes both workloads faster than running them separately would. It is the
-clearest example in the whole course of what "more useful work per byte moved" means in
+clearest example in these chapters of what "more useful work per byte moved" means in
 practice.`,
   },
 

@@ -63,7 +63,7 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
 <p>Prefill/decode disaggregation is clearly right in principle and awkward in practice. You must move the KV cache between pools, and for a long prompt that is gigabytes over an interconnect. Open: how to place and schedule across heterogeneous pools, how to size the two pools as traffic shifts, and whether the transfer can be overlapped well enough to disappear.</p>
 <h3>7. Hardware and the widening wall</h3>
 <p>Compute has grown far faster than bandwidth for a decade, and the ridge point has drifted from 153 on an A100 to 295 on an H100. Each generation makes decode relatively worse.</p>
-<p>FP4 and FP8 help by shrinking bytes. Larger HBM stacks help capacity. But the structural fix would be a memory-centric architecture — much more bandwidth per FLOP, or compute placed nearer the memory. Several companies are betting on variations of this. Whether any of it displaces GPUs at scale is genuinely uncertain, and it is the question that would most change everything else in this course.</p>
+<p>FP4 and FP8 help by shrinking bytes. Larger HBM stacks help capacity. But the structural fix would be a memory-centric architecture — much more bandwidth per FLOP, or compute placed nearer the memory. Several companies are betting on variations of this. Whether any of it displaces GPUs at scale is genuinely uncertain, and it is the question that would most change everything else in these chapters.</p>
 <h3>8. The economics</h3>
 <p>Inference is now the dominant cost of operating a model, and the field has no shared vocabulary for cost-quality trade-offs. What is the right price for a token that took 20,000 thinking tokens to produce? How should a provider expose the latency/throughput dial to customers who do not know they want it? These are not technical questions, but they increasingly determine which technical work gets done.</p>
 <hr>
@@ -99,7 +99,7 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         </ul>
       </div>
     </div>
-    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    <p class="foot__note">Built as a self-paced set of chapters. Every number here is meant to be
     re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
     do the arithmetic yourself.</p>
   </div>

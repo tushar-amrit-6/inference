@@ -66,7 +66,7 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
 
       <section class="section ghost ghost--pinky" id="big-idea">
         <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--pinky)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>PINKY · THE BIG IDEA</p>
-        <div class="prose"><p>Every roofline in this course so far has been drawn for one machine — an H100 — and every conclusion has been about the <em>shape</em> of the roofline rather than the chip underneath it. This level swaps the chip out and asks which of those conclusions survive.</p>
+        <div class="prose"><p>Every roofline in these chapters so far has been drawn for one machine — an H100 — and every conclusion has been about the <em>shape</em> of the roofline rather than the chip underneath it. This level swaps the chip out and asks which of those conclusions survive.</p>
 <p>The two designs could hardly have started further apart. The GPU is a graphics processor that grew into a general-purpose parallel machine: thousands of hardware threads, a scheduler that picks which of them runs each cycle, a cache hierarchy that guesses what you will need next, and matrix units bolted on later as an accelerator inside an accelerator. The TPU was designed backwards from one operation. Google built the first one because a projection said that if speech recognition took off, they would need to double their datacenter footprint — so the chip is a matrix multiplier with the smallest amount of other machinery that will keep it fed. No caches in the GPU sense. No dynamic instruction scheduling. One enormous grid of multiply-accumulate cells with data flowing through it.</p>
 <p>And yet: <strong>both are attached to HBM, and their bandwidths differ by less than a factor of two.</strong> That is the fact this whole level turns on. Generating one token at batch 1 means reading every weight once, so decode time is <code>weight_bytes / bandwidth</code> on both machines, and every architectural difference below — the systolic array, the warp scheduler, the scratchpad, the compiler — sits on the side of the ledger that decode never reads. The differences are real and they are large, but they show up in <em>prefill</em>, in <em>large-batch decode</em>, in <em>energy per token</em>, and in <em>what happens when you need 64 chips instead of 8</em> — never in the single-stream latency number people usually quote when comparing them.</p>
 <p>By the end you should be able to look at any accelerator datasheet — including ones that do not exist yet — and work out in about five minutes what it will and will not do for inference: what its ridge point is, what batch size its arithmetic geometry demands, how far its fast interconnect reaches, and which of those three will bite you first.</p></div>
@@ -229,7 +229,7 @@ TP-64  over InfiniBand 50 GB/s -&gt;  3.30 ms   against a ~5 ms step: catastroph
       <section class="section ghost ghost--inky" id="math-lab">
         <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--inky)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>INKY · MATH BY HAND</p>
         <h2 class="section__title">Math by hand</h2>
-        <div class="prose"><p>Everything below reuses figures from elsewhere in the course — Llama-3-8B's 8.03e9 parameters, Llama-3-70B's 70.6e9 parameters with <code>d_model</code> 8192 and 80 layers, the H100's 3.35 TB/s and 989 TFLOP/s, and Module 9's ring all-reduce formula — plus the TPU datasheet figures from the table in the first concept. The point of most of these is that you can derive a chip's internals from two published numbers and a guess about its geometry.</p>
+        <div class="prose"><p>Everything below reuses figures from elsewhere in these chapters — Llama-3-8B's 8.03e9 parameters, Llama-3-70B's 70.6e9 parameters with <code>d_model</code> 8192 and 80 layers, the H100's 3.35 TB/s and 989 TFLOP/s, and Module 9's ring all-reduce formula — plus the TPU datasheet figures from the table in the first concept. The point of most of these is that you can derive a chip's internals from two published numbers and a guess about its geometry.</p>
 <pre><code>peak_flops   = n_mxu x dim x dim x 2 x clock      # a systolic array, from geometry
 ridge        = dense_flops / bandwidth
 array_eff(m) = m / (m + dim)                      # pipeline fill, per weight tile
@@ -308,8 +308,8 @@ TP-64, InfiniBand 50 GB/s: 3.30 ms    ~63%                     fatal</code></pre
 
 The point is not to simulate silicon. It is to show that the two designs
 differ in exactly one place that matters for inference -- how a matmul's
-shape maps onto the arithmetic units -- and that in the decode regime this
-whole course is about, that difference is invisible, because both machines
+shape maps onto the arithmetic units -- and that in the decode regime these
+chapters are about, that difference is invisible, because both machines
 are waiting on HBM either way.
 
 Peak FLOPs and bandwidth are datasheet figures (verify them). Everything
@@ -319,7 +319,7 @@ efficiency models are the two shape-quantization effects each design has.
 
 from math import ceil
 
-# ---- the model: Llama-3-8B, the same one used everywhere in this course ----
+# ---- the model: Llama-3-8B, the same one used in every chapter here ----
 N_PARAMS = 8.03e9
 DTYPE_B = 2
 W_BYTES = N_PARAMS * DTYPE_B          # 16.06 GB read once per forward pass
@@ -467,7 +467,7 @@ if __name__ == &quot;__main__&quot;:
 <p>They diverge as batch grows, and not in the direction the peak-FLOPs column suggests. The v5p turns compute-bound at batch 128 while the H100 is still riding its memory ceiling at 256 — because the array's fill penalty is a <em>tax on effective peak</em>, and a lower effective peak means an earlier corner. Part 4 makes that explicit: the H100 turns at batch 257 against an ideal ridge of 295, the v5p at batch 39 against an ideal ridge of 166. Turning early is not a virtue here; it means the ceiling you hit is lower than the one on the datasheet.</p>
 <p>Treat the v5p rows as a pessimistic bound rather than a prediction — TODO 3 is where you find out how much of that gap double-buffering closes, and the honest answer is &quot;most of it, for large matmuls.&quot; If your numbers differ, check that <code>efficiency</code> divides by <code>ceil(m/tile)*tile</code> for the SIMT machine and by <code>(m + dim)</code> for the systolic one; swapping those two models is the one mistake that still produces plausible-looking output.</p></div>
         <div class="prose"><h3>Stretch</h3><p>Add a fourth machine that does not exist: same 3.35 TB/s of bandwidth as an H100, but ten times the peak FLOPs. Re-run every part. Watch the ridge point go to 2,950 and the decode rows not move at all — that is the memory wall in one experiment, and it is why &quot;10× the FLOPs&quot; in a launch keynote should be read as a claim about training.</p>
-<p>Then do the reverse and the more useful one: hold peak fixed and double bandwidth, the H100→H200 change. Notice which parts of the output move. The gap between those two experiments is the whole argument of this course, expressed as a diff.</p>
+<p>Then do the reverse and the more useful one: hold peak fixed and double bandwidth, the H100→H200 change. Notice which parts of the output move. The gap between those two experiments is the whole argument of these chapters, expressed as a diff.</p>
 <p>Finally, implement TODO 1 and extend it: shard Llama-3-70B across 8 chips of each machine, with the per-layer all-reduce priced at NVLink bandwidth for the GPU and ICI bandwidth for the TPU, and then across 64. The 8-chip answers will be close. The 64-chip answers will not be, and the reason will be the fabric rather than the chip — which is the one place in this level where the two designs produce genuinely different serving architectures.</p></div>
       </section>
 
@@ -617,7 +617,7 @@ can explain why almost none of it matters at batch 1.</p>
         </ul>
       </div>
     </div>
-    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    <p class="foot__note">Built as a self-paced set of chapters. Every number here is meant to be
     re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
     do the arithmetic yourself.</p>
   </div>

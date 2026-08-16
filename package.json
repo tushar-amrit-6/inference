@@ -1,8 +1,8 @@
 {
-  "name": "llm-inference-course",
+  "name": "llm-inference-chapters",
   "private": true,
   "type": "module",
-  "description": "A self-paced course on LLM inference, built as a static site.",
+  "description": "A self-paced set of chapters on LLM inference, built as a static site.",
   "scripts": {
     "build": "node build/build.mjs",
     "check:figures": "node build/check-figures.mjs",

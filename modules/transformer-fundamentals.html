@@ -66,9 +66,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
 
       <section class="section ghost ghost--pinky" id="big-idea">
         <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--pinky)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>PINKY · THE BIG IDEA</p>
-        <div class="prose"><p>Everything in this course is downstream of one question: <strong>what has to happen in memory for a model to produce one token?</strong> You cannot answer that until you can trace a tensor through a transformer layer and say its shape at every arrow.</p>
+        <div class="prose"><p>Everything in these chapters is downstream of one question: <strong>what has to happen in memory for a model to produce one token?</strong> You cannot answer that until you can trace a tensor through a transformer layer and say its shape at every arrow.</p>
 <p>So Module 0 is not a transformers tutorial with an inference flavour. It is a shape-counting exercise. By the end you should be able to look at a config file — <code>n_layers</code>, <code>d_model</code>, <code>n_heads</code>, <code>n_kv_heads</code>, <code>vocab_size</code> — and derive, on paper, how many parameters the model has, how many bytes that is on disk, and which of those bytes must be re-read for every single token generated.</p>
-<p>The last part is the punchline. A transformer's weights are used <em>once</em> per forward pass. There is no reuse. When you generate one token you stream all 16 GB of a Llama-3-8B off the memory bus to do about 16 GFLOPs of arithmetic with them. Hold that ratio in your head — 16 GB moved, 16 GFLOP done — because the rest of the course is a sustained assault on it.</p></div>
+<p>The last part is the punchline. A transformer's weights are used <em>once</em> per forward pass. There is no reuse. When you generate one token you stream all 16 GB of a Llama-3-8B off the memory bus to do about 16 GFLOPs of arithmetic with them. Hold that ratio in your head — 16 GB moved, 16 GFLOP done — because everything that follows is a sustained assault on it.</p></div>
       </section>
 
       <section class="section ghost ghost--pellet" id="concepts">
@@ -136,7 +136,7 @@ out     = weights @ V                [S, d_h]   weighted average of value vector
   </div>
   <div class="prose"><p>The causal mask sets <code>scores[i][j] = -inf</code> for all <code>j &gt; i</code>, so <code>softmax</code> gives those entries exactly zero weight. Implementations add a matrix of <code>0</code> and <code>-inf</code> (or <code>-1e9</code>) rather than slicing, because a dense add is faster on a GPU than irregular indexing.</p>
 <p>The training reason for this is the obvious one: it lets you compute the loss for all <code>S</code> positions in a single forward pass without any position cheating by looking at its own answer. That is <strong>teacher forcing</strong>, and it is why training is so much more hardware-efficient than generation.</p>
-<p>The inference reason is the one people skip, and it is the load-bearing fact of this entire course. Causality means the representation of token <code>i</code> <strong>cannot be influenced by anything that comes after it</strong>. So when you append token 501 to the sequence:</p>
+<p>The inference reason is the one people skip, and it is the load-bearing fact of everything that follows. Causality means the representation of token <code>i</code> <strong>cannot be influenced by anything that comes after it</strong>. So when you append token 501 to the sequence:</p>
 <ul><li>the K and V vectors for positions 0–500 are bit-for-bit identical to what they were before;</li><li>the <em>only</em> new work is computing K, V, and Q for position 501;</li><li>everything else can be read from storage.</li></ul>
 <p>Without causality this would be false. In a bidirectional encoder like BERT, adding a token at the end changes the representation of every earlier token, so there is nothing to cache. That is the real reason decoder-only models won for generation: not that they are more expressive, but that the causal constraint turns an O(n²) recomputation into an O(n) append.</p>
 <p>Worth being precise about what is <em>not</em> cached. Q is not cached, because the query for a position is used once, at the step where that position is the newest token, and then never again. Attention outputs are not cached either. Only K and V — hence &quot;KV cache&quot; and not &quot;QKV cache.&quot;</p></div>
@@ -204,7 +204,7 @@ mlp:        W_gate 4096 x 14336 = 58,720,256
 <pre><code>LayerNorm:  y = g * (x - mean(x)) / sqrt(var(x) + eps) + b
 RMSNorm:    y = g * x / sqrt(mean(x^2) + eps)</code></pre>
 <p>RMSNorm drops the mean subtraction and the bias. It works about as well and is measurably cheaper — one pass over the vector instead of two, and one fewer parameter tensor.</p>
-<p>Why an inference course cares: normalization layers are <strong>memory-bound with essentially zero arithmetic intensity</strong>. An RMSNorm over a <code>[1, 4096]</code> decode vector reads 4096 values, does a handful of FLOPs each, and writes 4096 values back. If you launch it as its own kernel you pay a full round trip to HBM for nothing. This is the canonical case for <strong>kernel fusion</strong> — folding the norm into the matmul that follows it so the data never leaves on-chip memory. Modules 4 and 7 return to this. A transformer at decode time is a long chain of these tiny bandwidth-bound operations glued between big matmuls, and the glue is not free.</p></div>
+<p>Why a chapter on inference cares: normalization layers are <strong>memory-bound with essentially zero arithmetic intensity</strong>. An RMSNorm over a <code>[1, 4096]</code> decode vector reads 4096 values, does a handful of FLOPs each, and writes 4096 values back. If you launch it as its own kernel you pay a full round trip to HBM for nothing. This is the canonical case for <strong>kernel fusion</strong> — folding the norm into the matmul that follows it so the data never leaves on-chip memory. Modules 4 and 7 return to this. A transformer at decode time is a long chain of these tiny bandwidth-bound operations glued between big matmuls, and the glue is not free.</p></div>
   
   <p class="keypoint"><b>REMEMBER</b>Modern models normalize the input to each block, never the residual stream itself, which keeps a clean gradient path from output to input.</p>
 </article>
@@ -302,7 +302,7 @@ x 32      = 6,979,321,856</code></pre>
         <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--clyde)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>CLYDE · CODE LAB</p>
         <h2 class="section__title">Code lab</h2>
         <div class="prose"><p>Implement single-head causal attention in pure NumPy and print the shape at every step. No PyTorch, no <code>nn.MultiheadAttention</code>. The point is that after doing this you will never again be unsure what <code>[B, H, S, D]</code> means.</p>
-<p>Then verify the two facts that the rest of the course rests on: that the mask makes the output at position <code>i</code> independent of everything after <code>i</code>, and that appending a token leaves the earlier K and V untouched.</p></div>
+<p>Then verify the two facts that the rest of these chapters rest on: that the mask makes the output at position <code>i</code> independent of everything after <code>i</code>, and that appending a token leaves the earlier K and V untouched.</p></div>
         <div class="prose" style="max-width:none"><pre><code class="lang-python">import numpy as np
 
 np.random.seed(0)
@@ -402,7 +402,7 @@ print(&quot;  -&gt; so recomputing them every step is pure waste. See Module 2.&
             <h3 class="paper__title"><a href="https://www.youtube.com/watch?v=kCc8FmEb1nY" target="_blank" rel="noopener">Let's build GPT: from scratch, in code, spelled out</a></h3>
             <p class="paper__by">Andrej Karpathy, 2023</p>
             <p class="paper__why">Two hours, and you leave with a working transformer you typed yourself. There is no substitute for this.</p>
-            <div class="paper__frame"><p>Type it, do not watch it. Pause at every tensor operation and predict the output shape before he says it. The companion repo is <strong>nanoGPT</strong>, which is the cleanest readable GPT implementation in existence and worth keeping open for the rest of this course.</p></div>
+            <div class="paper__frame"><p>Type it, do not watch it. Pause at every tensor operation and predict the output shape before he says it. The companion repo is <strong>nanoGPT</strong>, which is the cleanest readable GPT implementation in existence and worth keeping open for the rest of these chapters.</p></div>
           </article>
 <article class="paper">
             <h3 class="paper__title"><a href="https://arxiv.org/abs/2104.09864" target="_blank" rel="noopener">RoFormer: Enhanced Transformer with Rotary Position Embedding</a></h3>
@@ -519,7 +519,7 @@ mask is what makes a KV cache correct, rather than just a speed hack.</p>
         </ul>
       </div>
     </div>
-    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    <p class="foot__note">Built as a self-paced set of chapters. Every number here is meant to be
     re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
     do the arithmetic yourself.</p>
   </div>

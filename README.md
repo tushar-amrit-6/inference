@@ -1,7 +1,7 @@
 # LLM Inference — from scratch, one token at a time
 
-A self-paced course on how LLM inference works and why it is hard, built as a static site with a
-Pac-Man arcade theme.
+A self-paced set of chapters on how LLM inference works and why it is hard, built as a static
+site with a Pac-Man arcade theme.
 
 Fourteen levels, from the transformer forward pass to distributed serving, the architecture zoo,
 inside vLLM itself, and down to the silicon the whole thing runs on, organised around one idea:
@@ -85,7 +85,7 @@ That loads each page in a real browser, measures the actual `getBBox` of every l
 on any overlap or anything drawn outside the canvas.
 
 ```
-data/modules/m*.mjs    course content, one file per level
+data/modules/m*.mjs    chapter content, one file per level
 data/reference.mjs     timeline, hardware table, engines, frontier, how-to
 data/diagrams.mjs      the per-level summary figures
 build/build.mjs        the generator
@@ -95,7 +95,7 @@ build/diagram.mjs      grid-paper drawing primitives, authored in grid cells
 build/check-figures.mjs  measures rendered label boxes and fails on collisions
 assets/css/arcade.css  the design system
 assets/js/app.js       progress tracking, scroll spy, keyboard nav
-start.md               the original course outline this was built from
+start.md               the original outline this was built from
 ```
 
 The maze on the landing page is authored as a 21×19 tile grid in `build/maze.mjs`, the same way the

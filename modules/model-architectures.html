@@ -115,7 +115,7 @@ cache     8192 x 131072 = 1.07 GB
     <h3 class="concept__title">Decoder-only, and the two shapes it beat</h3>
   </div>
   <div class="prose"><p>Three shapes came out of the original transformer, and only one of them is what you serve today.</p>
-<p><strong>Encoder-only</strong> — BERT and its descendants. Bidirectional attention over a fixed input, no generation. Still the right tool for classification, retrieval embeddings and reranking, and still deployed everywhere in the retrieval half of a RAG system. It has no decode loop, so none of this course applies to it.</p>
+<p><strong>Encoder-only</strong> — BERT and its descendants. Bidirectional attention over a fixed input, no generation. Still the right tool for classification, retrieval embeddings and reranking, and still deployed everywhere in the retrieval half of a RAG system. It has no decode loop, so none of these chapters apply to it.</p>
 <p><strong>Encoder-decoder</strong> — T5, BART, Whisper. The encoder reads the input bidirectionally once. The decoder generates, and each decoder layer has two attention blocks: self-attention over what it has generated so far, and <strong>cross-attention</strong> over the encoder's output.</p>
 <p>The inference-relevant fact about that shape is one people usually get backwards. The cross-attention K and V are projections of the encoder output, so they are computed <strong>once per request and never grow</strong>. Only the decoder's self-attention cache grows, and it grows with the <em>output</em> length rather than the input length. For a task with a long input and a short output — summarization, translation, transcription — an encoder-decoder has a smaller and flatter cache profile than a decoder-only model doing the same job. Whisper is the surviving example most people have running: its encoder consumes a fixed 30-second window of mel spectrogram, so its cross-attention cache is a constant.</p>
 <p>So encoder-decoder is not the expensive shape. It is the <strong>inflexible</strong> one: two parameter sets to hold, an input that must be fully encoded before any output appears, and no way to append to the encoded region without recomputing it.</p>
@@ -703,7 +703,7 @@ it is paying with.</p>
         </ul>
       </div>
     </div>
-    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    <p class="foot__note">Built as a self-paced set of chapters. Every number here is meant to be
     re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
     do the arithmetic yourself.</p>
   </div>

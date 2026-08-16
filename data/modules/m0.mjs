@@ -6,7 +6,7 @@ export default {
   hours: '8–12 hours',
   prereqs: ['Python and NumPy', 'Matrix multiplication', 'What a softmax is'],
 
-  bigIdea: `Everything in this course is downstream of one question: **what has to happen in
+  bigIdea: `Everything in these chapters is downstream of one question: **what has to happen in
 memory for a model to produce one token?** You cannot answer that until you can trace a tensor
 through a transformer layer and say its shape at every arrow.
 
@@ -19,7 +19,7 @@ token generated.
 The last part is the punchline. A transformer's weights are used *once* per forward pass. There
 is no reuse. When you generate one token you stream all 16 GB of a Llama-3-8B off the memory bus
 to do about 16 GFLOPs of arithmetic with them. Hold that ratio in your head — 16 GB moved,
-16 GFLOP done — because the rest of the course is a sustained assault on it.`,
+16 GFLOP done — because everything that follows is a sustained assault on it.`,
 
   concepts: [
     {
@@ -125,8 +125,8 @@ positions in a single forward pass without any position cheating by looking at i
 That is **teacher forcing**, and it is why training is so much more hardware-efficient than
 generation.
 
-The inference reason is the one people skip, and it is the load-bearing fact of this entire
-course. Causality means the representation of token \`i\` **cannot be influenced by anything that
+The inference reason is the one people skip, and it is the load-bearing fact of everything that
+follows. Causality means the representation of token \`i\` **cannot be influenced by anything that
 comes after it**. So when you append token 501 to the sequence:
 
 - the K and V vectors for positions 0–500 are bit-for-bit identical to what they were before;
@@ -259,7 +259,7 @@ RMSNorm:    y = g * x / sqrt(mean(x^2) + eps)
 RMSNorm drops the mean subtraction and the bias. It works about as well and is measurably
 cheaper — one pass over the vector instead of two, and one fewer parameter tensor.
 
-Why an inference course cares: normalization layers are **memory-bound with essentially zero
+Why a chapter on inference cares: normalization layers are **memory-bound with essentially zero
 arithmetic intensity**. An RMSNorm over a \`[1, 4096]\` decode vector reads 4096 values, does a
 handful of FLOPs each, and writes 4096 values back. If you launch it as its own kernel you pay a
 full round trip to HBM for nothing. This is the canonical case for **kernel fusion** — folding
@@ -454,7 +454,7 @@ reasoning systematic.`,
 step. No PyTorch, no \`nn.MultiheadAttention\`. The point is that after doing this you will never
 again be unsure what \`[B, H, S, D]\` means.
 
-Then verify the two facts that the rest of the course rests on: that the mask makes the output at
+Then verify the two facts that the rest of these chapters rest on: that the mask makes the output at
 position \`i\` independent of everything after \`i\`, and that appending a token leaves the earlier
 K and V untouched.`,
     code: `import numpy as np
@@ -574,7 +574,7 @@ cross-attention — a modern LLM is only the decoder stack, minus its cross-atte
       why: 'Two hours, and you leave with a working transformer you typed yourself. There is no substitute for this.',
       frame: `Type it, do not watch it. Pause at every tensor operation and predict the output
 shape before he says it. The companion repo is **nanoGPT**, which is the cleanest readable GPT
-implementation in existence and worth keeping open for the rest of this course.`,
+implementation in existence and worth keeping open for the rest of these chapters.`,
     },
     {
       title: 'RoFormer: Enhanced Transformer with Rotary Position Embedding',

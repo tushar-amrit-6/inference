@@ -23,7 +23,7 @@ So distributed inference is a trade between two effects that both scale with GPU
 bandwidth (good, linear) versus more communication (bad, and dependent on topology). Getting it
 right means knowing which parallelism strategy puts the traffic where the fast links are.
 
-The module ends with the idea that follows most directly from everything in this course:
+The module ends with the idea that follows most directly from everything in these chapters:
 **prefill and decode are different workloads, so stop running them on the same machines.**`,
 
   concepts: [
@@ -301,7 +301,7 @@ actually taking, which is the arithmetic the math lab makes you do.`,
       body: `An MoE layer replaces the single MLP with \`E\` expert MLPs and a router that sends each
 token to the top \`k\` of them, typically \`k = 2\` out of 8 to 256 experts.
 
-The inference consequence follows straight from this course's thesis. **You only read the weights
+The inference consequence follows straight from these chapters' thesis. **You only read the weights
 of the experts you activate.** A model with 8 experts and top-2 routing has roughly 4× the
 parameters of its dense equivalent but moves about the same bytes per token.
 
@@ -357,7 +357,7 @@ is harder than dense serving even though the arithmetic is friendlier.`,
     {
       name: 'Prefill/decode disaggregation',
       keyPoint: 'Two workloads with opposite bottlenecks and opposite ideal configurations should not share hardware; the cost is transferring the KV cache between pools.',
-      body: `This is the conclusion the whole course has been building toward.
+      body: `This is the conclusion these chapters have been building toward.
 
 Prefill is compute-bound, latency-critical at the request level, and benefits from high TP degree
 and large FLOP capacity. Decode is memory-bound, latency-critical per token, benefits from
@@ -408,7 +408,7 @@ than per-node, a significant additional benefit.
 
 **When it is not worth it:** short prompts (little to transfer, but also little interference),
 low load (no contention to eliminate), or a slow interconnect between pools. Like everything in
-this course, it is a trade you should compute rather than assume.`,
+these chapters, it is a trade you should compute rather than assume.`,
       ascii: '',
     },
     {

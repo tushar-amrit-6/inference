@@ -139,7 +139,7 @@ attainable = min(P_peak, I * BW)</code></pre>
 <p>Read the table for structure, not for individual entries.</p>
 <p><strong>The H200 has a lower ridge point than the H100.</strong> Same silicon compute, 43% more bandwidth. A lower ridge is <em>better for decode</em>: you need less intensity — a smaller batch — to saturate the machine. The H200 is a straightforwardly better decode part than the H100 while being an identical prefill part. This is what it looks like when a vendor targets the memory wall directly.</p>
 <p><strong>The L40S has a ridge point of 419.</strong> GDDR6 instead of HBM, and a lot of compute. You would need batch 419 to saturate it, which the 48 GB of memory will not let you reach for any large model. It is a fine prefill and fine-tuning card and a poor decode card, and the ridge point tells you that in one number.</p>
-<p><strong>Every ridge point is in the 150–420 range.</strong> Modern accelerators have added FLOPs far faster than bandwidth for a decade, so the ridge keeps drifting right and decode keeps getting relatively worse. This trend is why this course exists.</p></div>
+<p><strong>Every ridge point is in the 150–420 range.</strong> Modern accelerators have added FLOPs far faster than bandwidth for a decade, so the ridge keeps drifting right and decode keeps getting relatively worse. This trend is why these chapters exist.</p></div>
   <pre class="ascii" aria-label="diagram">  attainable
   FLOP/s
     |                       ┌──────────────────  P_peak (989 TF)
@@ -236,7 +236,7 @@ max batch = 60 / 0.54 = 111</code></pre>
       <section class="section ghost ghost--inky" id="math-lab">
         <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--inky)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>INKY · MATH BY HAND</p>
         <h2 class="section__title">Math by hand</h2>
-        <div class="prose"><p>The signature calculation of this course. Do it on paper.</p>
+        <div class="prose"><p>The signature calculation of these chapters. Do it on paper.</p>
 <p><strong>Part 1 — derive the floor.</strong> A 7B model, fp16, batch 1, short context (ignore the KV cache). Compute the theoretical minimum TPOT and maximum tokens/second on:</p>
 <pre><code>a) A100 80GB SXM   2.04 TB/s
 b) H100 SXM        3.35 TB/s
@@ -634,7 +634,7 @@ running anything.</p>
         </ul>
       </div>
     </div>
-    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    <p class="foot__note">Built as a self-paced set of chapters. Every number here is meant to be
     re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
     do the arithmetic yourself.</p>
   </div>

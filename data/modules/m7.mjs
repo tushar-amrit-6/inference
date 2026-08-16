@@ -183,7 +183,7 @@ This is what made long-context training practical at all.
 **The trade is recomputation.** During the backward pass you need the attention probabilities,
 which you did not store. FlashAttention recomputes them from Q, K, V on the fly. That is *more*
 FLOPs than the naive version — and it is still faster, because the FLOPs were never the
-bottleneck. It is the clearest possible demonstration of this course's thesis: trading arithmetic
+bottleneck. It is the clearest possible demonstration of these chapters' thesis: trading arithmetic
 for bandwidth is a winning trade, even at a large arithmetic premium.
 
 **FlashAttention-2** (2023) reworked the same algorithm around GPU scheduling rather than the

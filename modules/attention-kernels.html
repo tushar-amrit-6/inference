@@ -164,7 +164,7 @@ write O                                     # the only large HBM write</code></p
 <p>The <code>[N, N]</code> score matrix is never assembled. Only <code>[block, block]</code> tiles exist, in shared memory, and they are discarded as soon as they are consumed.</p>
 <p>The traffic analysis: HBM accesses drop from <code>O(N² + Nd)</code> to <code>O(N²d²/M)</code>, where <code>M</code> is the SRAM size. With <code>d = 128</code> and <code>M ≈ 100 KB</code>, the factor <code>d²/M</code> is well under 1, so the reduction is substantial — the paper reports 9× fewer HBM accesses on GPT-2 and 2–4× end-to-end speedups.</p>
 <p>Memory goes from <strong>quadratic to linear</strong> in sequence length, because you only ever hold blocks. This is what made long-context training practical at all.</p>
-<p><strong>The trade is recomputation.</strong> During the backward pass you need the attention probabilities, which you did not store. FlashAttention recomputes them from Q, K, V on the fly. That is <em>more</em> FLOPs than the naive version — and it is still faster, because the FLOPs were never the bottleneck. It is the clearest possible demonstration of this course's thesis: trading arithmetic for bandwidth is a winning trade, even at a large arithmetic premium.</p>
+<p><strong>The trade is recomputation.</strong> During the backward pass you need the attention probabilities, which you did not store. FlashAttention recomputes them from Q, K, V on the fly. That is <em>more</em> FLOPs than the naive version — and it is still faster, because the FLOPs were never the bottleneck. It is the clearest possible demonstration of these chapters' thesis: trading arithmetic for bandwidth is a winning trade, even at a large arithmetic premium.</p>
 <p><strong>FlashAttention-2</strong> (2023) reworked the same algorithm around GPU scheduling rather than the memory hierarchy: reduce non-matmul FLOPs (rescaling operations are much slower per FLOP than tensor-core matmuls on modern GPUs), swap the loop order so the query block is outer, and parallelize over sequence length as well as batch and heads. Roughly another 2×, reaching 50–73% of theoretical peak matmul throughput.</p>
 <p><strong>FlashAttention-3</strong> (2024) targets Hopper specifically: warp specialization (separate warps produce and consume data), asynchronous TMA copies overlapped with computation, interleaving the matmul and softmax so the non-tensor-core softmax work hides behind tensor-core work, and FP8 support. The trend across all three is instructive — the first was an algorithmic insight, the next two were about exploiting specific hardware asynchrony. Extracting the last factor of two now requires knowing the machine intimately.</p></div>
   
@@ -667,7 +667,7 @@ than prefill.</p>
         </ul>
       </div>
     </div>
-    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    <p class="foot__note">Built as a self-paced set of chapters. Every number here is meant to be
     re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
     do the arithmetic yourself.</p>
   </div>

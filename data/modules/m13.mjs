@@ -6,7 +6,7 @@ export default {
   hours: '6–8 hours',
   prereqs: ['Module 4', 'Module 7', 'Module 9'],
 
-  bigIdea: `Every roofline in this course so far has been drawn for one machine — an H100 — and
+  bigIdea: `Every roofline in these chapters so far has been drawn for one machine — an H100 — and
 every conclusion has been about the *shape* of the roofline rather than the chip underneath it.
 This level swaps the chip out and asks which of those conclusions survive.
 
@@ -359,7 +359,7 @@ same insight from opposite ends.`,
   ],
 
   mathLab: {
-    prompt: `Everything below reuses figures from elsewhere in the course — Llama-3-8B's 8.03e9
+    prompt: `Everything below reuses figures from elsewhere in these chapters — Llama-3-8B's 8.03e9
 parameters, Llama-3-70B's 70.6e9 parameters with \`d_model\` 8192 and 80 layers, the H100's
 3.35 TB/s and 989 TFLOP/s, and Module 9's ring all-reduce formula — plus the TPU datasheet figures
 from the table in the first concept. The point of most of these is that you can derive a chip's
@@ -560,8 +560,8 @@ ridge points and step times out.`,
 
 The point is not to simulate silicon. It is to show that the two designs
 differ in exactly one place that matters for inference -- how a matmul's
-shape maps onto the arithmetic units -- and that in the decode regime this
-whole course is about, that difference is invisible, because both machines
+shape maps onto the arithmetic units -- and that in the decode regime these
+chapters are about, that difference is invisible, because both machines
 are waiting on HBM either way.
 
 Peak FLOPs and bandwidth are datasheet figures (verify them). Everything
@@ -571,7 +571,7 @@ efficiency models are the two shape-quantization effects each design has.
 
 from math import ceil
 
-# ---- the model: Llama-3-8B, the same one used everywhere in this course ----
+# ---- the model: Llama-3-8B, the same one used in every chapter here ----
 N_PARAMS = 8.03e9
 DTYPE_B = 2
 W_BYTES = N_PARAMS * DTYPE_B          # 16.06 GB read once per forward pass
@@ -753,7 +753,7 @@ launch keynote should be read as a claim about training.
 
 Then do the reverse and the more useful one: hold peak fixed and double bandwidth, the H100→H200
 change. Notice which parts of the output move. The gap between those two experiments is the whole
-argument of this course, expressed as a diff.
+argument of these chapters, expressed as a diff.
 
 Finally, implement TODO 1 and extend it: shard Llama-3-70B across 8 chips of each machine, with the
 per-layer all-reduce priced at NVLink bandwidth for the GPU and ICI bandwidth for the TPU, and then

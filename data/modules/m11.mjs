@@ -98,8 +98,8 @@ serve today.
 
 **Encoder-only** — BERT and its descendants. Bidirectional attention over a fixed input, no
 generation. Still the right tool for classification, retrieval embeddings and reranking, and still
-deployed everywhere in the retrieval half of a RAG system. It has no decode loop, so none of this
-course applies to it.
+deployed everywhere in the retrieval half of a RAG system. It has no decode loop, so none of these
+chapters apply to it.
 
 **Encoder-decoder** — T5, BART, Whisper. The encoder reads the input bidirectionally once. The
 decoder generates, and each decoder layer has two attention blocks: self-attention over what it has

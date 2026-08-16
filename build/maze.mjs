@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Maze renderer — builds the course map as static SVG at build time.
+   Maze renderer — builds the chapter map as static SVG at build time.
 
    The map is a tile grid, the way the real game is (Pac-Man is a 28x36 grid
    of 8px tiles). Ours is 21x19 with bigger tiles so the module discs have
@@ -226,7 +226,7 @@ export function renderMaze(modules) {
 
   return (
     `<svg class="maze" viewBox="0 0 ${W} ${H}" role="group" ` +
-    `aria-label="Course map: ${modules.length} modules laid out as a Pac-Man maze" ` +
+    `aria-label="Chapter map: ${modules.length} modules laid out as a Pac-Man maze" ` +
     `xmlns="http://www.w3.org/2000/svg">${out.join('')}</svg>`
   );
 }

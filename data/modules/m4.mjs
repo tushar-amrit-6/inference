@@ -181,7 +181,7 @@ that in one number.
 
 **Every ridge point is in the 150–420 range.** Modern accelerators have added FLOPs far faster
 than bandwidth for a decade, so the ridge keeps drifting right and decode keeps getting relatively
-worse. This trend is why this course exists.`,
+worse. This trend is why these chapters exist.`,
       ascii: `  attainable
   FLOP/s
     |                       ┌──────────────────  P_peak (989 TF)
@@ -353,7 +353,7 @@ purchase, and precisely the point of this module.`,
   ],
 
   mathLab: {
-    prompt: `The signature calculation of this course. Do it on paper.
+    prompt: `The signature calculation of these chapters. Do it on paper.
 
 **Part 1 — derive the floor.**
 A 7B model, fp16, batch 1, short context (ignore the KV cache). Compute the theoretical minimum

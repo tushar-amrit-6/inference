@@ -552,7 +552,7 @@ FP4 and FP8 help by shrinking bytes. Larger HBM stacks help capacity. But the st
 would be a memory-centric architecture — much more bandwidth per FLOP, or compute placed nearer
 the memory. Several companies are betting on variations of this. Whether any of it displaces
 GPUs at scale is genuinely uncertain, and it is the question that would most change everything
-else in this course.
+else in these chapters.
 
 ## 8. The economics
 
@@ -581,7 +581,7 @@ Generating a token requires reading **every** model weight from memory. On moder
 moving those bytes takes far longer than the arithmetic performed on them. So decoding a single
 sequence leaves the GPU almost entirely idle.
 
-Nearly every technique in this course is an answer to one question: **how do we do more useful
+Nearly every technique in these chapters is an answer to one question: **how do we do more useful
 work per byte moved from memory?** Batching, quantization, GQA, speculative decoding,
 PagedAttention — different attacks on the same problem. Keep this in view and the field stops
 looking like a pile of tricks.
@@ -630,7 +630,7 @@ about it.
 | levels | why |
 |---|---|
 | **00–03** | The foundation. Take your time. Everything later assumes you can trace a forward pass and compute a KV cache without notes. |
-| **04** | The analytical core. If you only truly master one level, make it this one — the rest of the course is applied roofline reasoning. |
+| **04** | The analytical core. If you only truly master one level, make it this one — everything after it is applied roofline reasoning. |
 | **05–07** | Systems and kernels. Faster going, because you now have the framework. |
 | **08–10** | The frontier. More reading, less arithmetic. |
 | **11** | The architecture zoo. Read it any time after 06 — it is the level that makes the others compose. |

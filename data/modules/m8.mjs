@@ -20,7 +20,7 @@ arithmetic instead of one. Intensity goes from 1 to 5. Still nowhere near the ri
 arithmetic is genuinely free.
 
 That is speculative decoding: **draft cheaply, verify in parallel, and spend idle FLOPs to shorten
-the sequential chain.** It is the only technique in this course that reduces the *number* of
+the sequential chain.** It is the only technique in these chapters that reduces the *number* of
 forward passes rather than the cost of each one.
 
 The part that makes it remarkable rather than merely clever is that the output distribution is

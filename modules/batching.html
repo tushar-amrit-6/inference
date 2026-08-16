@@ -191,7 +191,7 @@ one prefill of 8,000 tokens    ~130 ms  (compute-bound: 2 x 8.03e9 x 8000 FLOP)<
 <p>The choice of budget is a real trade-off:</p>
 <table><thead><tr><th>budget</th><th>TTFT</th><th>TPOT stability</th><th>GPU efficiency</th></tr></thead><tbody><tr><td>small (256)</td><td>worse — more iterations to finish a prefill</td><td>excellent</td><td>poor — too few tokens to saturate</td></tr><tr><td>medium (2048)</td><td>good</td><td>good</td><td>good</td></tr><tr><td>large (8192)</td><td>best</td><td>poor — long iterations</td><td>best</td></tr></tbody></table>
 <p>There is also a subtle benefit that is easy to miss and is arguably the main one. A pure decode iteration at batch 32 has arithmetic intensity 32 — deep in memory-bound territory, GPU mostly idle. Adding 2,016 prefill tokens to that same iteration raises the intensity to roughly 2,048. <strong>The prefill work is nearly free</strong>, because it uses the arithmetic capacity that the decode step was wasting anyway.</p>
-<p>That reframes chunked prefill entirely. It is not a scheduling compromise that trades TTFT for TPOT. It is a way to run prefill in the compute the decode step was leaving on the floor — the purest possible expression of this course's thesis. Both workloads finish faster than they would if you ran them separately.</p>
+<p>That reframes chunked prefill entirely. It is not a scheduling compromise that trades TTFT for TPOT. It is a way to run prefill in the compute the decode step was leaving on the floor — the purest possible expression of these chapters' thesis. Both workloads finish faster than they would if you ran them separately.</p>
 <p>Sarathi-Serve, which introduced this technique as &quot;stall-free batching&quot;, reported substantial improvements in serving capacity under latency SLOs for exactly this reason.</p></div>
   
   <p class="keypoint"><b>REMEMBER</b>Cap the tokens processed per iteration, then fill that budget with decode tokens first and prefill chunks second.</p>
@@ -310,7 +310,7 @@ mixed, 32 decode + 2016 prefill = 2048 tokens:
   bytes = 23.64e9   (the same weights! prefill adds negligible bytes)
   I = 1,392 FLOP/byte         -&gt; 4.7x PAST the ridge, compute-bound</code></pre>
 <p>This is the result worth sitting with. The mixed iteration moves <strong>the same bytes</strong> as the pure decode iteration — the weights are read once either way — but does <strong>64× the arithmetic</strong>. The prefill work is riding along in compute capacity the decode step was already wasting.</p>
-<p>So chunked prefill is not a compromise between TTFT and TPOT. It is a way to reclaim idle arithmetic, and it makes both workloads faster than running them separately would. It is the clearest example in the whole course of what &quot;more useful work per byte moved&quot; means in practice.</p></div>
+<p>So chunked prefill is not a compromise between TTFT and TPOT. It is a way to reclaim idle arithmetic, and it makes both workloads faster than running them separately would. It is the clearest example in these chapters of what &quot;more useful work per byte moved&quot; means in practice.</p></div>
         </details>
       </section>
 
@@ -650,7 +650,7 @@ and decode interfere, and why mixing them in one iteration turns out to be nearl
         </ul>
       </div>
     </div>
-    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    <p class="foot__note">Built as a self-paced set of chapters. Every number here is meant to be
     re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
     do the arithmetic yourself.</p>
   </div>

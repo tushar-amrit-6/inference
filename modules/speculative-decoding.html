@@ -69,7 +69,7 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="prose"><p>Every module so far has attacked the <em>bytes</em> side of the ratio. This one attacks the other side: the wasted arithmetic.</p>
 <p>Here is the setup. At batch 1, a decode step moves 15 GB and does 16 GFLOP — arithmetic intensity of about 1 against an H100's ridge point of 295. <strong>You are using roughly 0.4% of the machine's arithmetic.</strong> The tensor cores sit idle for the entire step.</p>
 <p>Now notice something about that idle capacity. Verifying whether a <em>guessed</em> token is correct costs no extra memory traffic — the weights are already being streamed. If you guess five tokens and check all five in one forward pass, you move the same 15 GB and do five positions' worth of arithmetic instead of one. Intensity goes from 1 to 5. Still nowhere near the ridge, so the extra arithmetic is genuinely free.</p>
-<p>That is speculative decoding: <strong>draft cheaply, verify in parallel, and spend idle FLOPs to shorten the sequential chain.</strong> It is the only technique in this course that reduces the <em>number</em> of forward passes rather than the cost of each one.</p>
+<p>That is speculative decoding: <strong>draft cheaply, verify in parallel, and spend idle FLOPs to shorten the sequential chain.</strong> It is the only technique in these chapters that reduces the <em>number</em> of forward passes rather than the cost of each one.</p>
 <p>The part that makes it remarkable rather than merely clever is that the output distribution is preserved <strong>exactly</strong>. Not approximately, not usually — provably, by a modified rejection sampling scheme. You are not trading quality for speed. You are getting the same samples faster, and the proof fits on half a page.</p></div>
       </section>
 
@@ -689,7 +689,7 @@ pay for a given model pair, acceptance rate and batch size.</p>
         </ul>
       </div>
     </div>
-    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    <p class="foot__note">Built as a self-paced set of chapters. Every number here is meant to be
     re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
     do the arithmetic yourself.</p>
   </div>

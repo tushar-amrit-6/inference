@@ -70,7 +70,7 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
 <p>NVLink between H100s moves about 900 GB/s. HBM moves 3,350 GB/s. PCIe Gen5 moves about 64 GB/s. Splitting a model means that some of the data movement in every forward pass happens across a link that is 3.7× slower than memory at best, and 52× slower at worst. Every technique in this module is about controlling how much traffic crosses that link.</p>
 <p>There is a compensation, and it is the reason multi-GPU inference works at all: <strong>splitting a model across <code>N</code> GPUs also multiplies your aggregate memory bandwidth by <code>N</code>.</strong> Four H100s give you 13.4 TB/s of HBM. Since decode is bandwidth-bound, four GPUs can decode a model roughly four times faster than one could — if the communication does not eat the gain.</p>
 <p>So distributed inference is a trade between two effects that both scale with GPU count: more bandwidth (good, linear) versus more communication (bad, and dependent on topology). Getting it right means knowing which parallelism strategy puts the traffic where the fast links are.</p>
-<p>The module ends with the idea that follows most directly from everything in this course: <strong>prefill and decode are different workloads, so stop running them on the same machines.</strong></p></div>
+<p>The module ends with the idea that follows most directly from everything in these chapters: <strong>prefill and decode are different workloads, so stop running them on the same machines.</strong></p></div>
       </section>
 
       <section class="section ghost ghost--pellet" id="concepts">
@@ -209,7 +209,7 @@ maximize throughput/$   -&gt;  minimum TP that fits the model, then replicate</c
     <h3 class="concept__title">Mixture of experts: a bandwidth win and a capacity problem</h3>
   </div>
   <div class="prose"><p>An MoE layer replaces the single MLP with <code>E</code> expert MLPs and a router that sends each token to the top <code>k</code> of them, typically <code>k = 2</code> out of 8 to 256 experts.</p>
-<p>The inference consequence follows straight from this course's thesis. <strong>You only read the weights of the experts you activate.</strong> A model with 8 experts and top-2 routing has roughly 4× the parameters of its dense equivalent but moves about the same bytes per token.</p>
+<p>The inference consequence follows straight from these chapters' thesis. <strong>You only read the weights of the experts you activate.</strong> A model with 8 experts and top-2 routing has roughly 4× the parameters of its dense equivalent but moves about the same bytes per token.</p>
 <p>For decode, which is memory-bound, this is close to free quality. Mixtral-8x7B has ~47B total parameters but activates ~13B per token: it decodes at roughly the speed of a 13B model while being substantially better than one. <strong>MoE is the most direct possible exploitation of the fact that bytes moved, not parameters held, is what costs you.</strong></p>
 <p>The problems are all about capacity and routing.</p>
 <p><strong>Every expert must be resident.</strong> You do not know in advance which experts a token will need, so all of them must be in memory somewhere. Mixtral-8x7B needs 94 GB at fp16 even though only 26 GB is read per token. <strong>MoE trades memory capacity for memory bandwidth</strong>, which is a good trade when capacity is what you have.</p>
@@ -238,7 +238,7 @@ maximize throughput/$   -&gt;  minimum TP that fits the model, then replicate</c
     <span class="concept__n">06</span>
     <h3 class="concept__title">Prefill/decode disaggregation</h3>
   </div>
-  <div class="prose"><p>This is the conclusion the whole course has been building toward.</p>
+  <div class="prose"><p>This is the conclusion these chapters have been building toward.</p>
 <p>Prefill is compute-bound, latency-critical at the request level, and benefits from high TP degree and large FLOP capacity. Decode is memory-bound, latency-critical per token, benefits from bandwidth and cache capacity, and wants large batches. Module 5 showed that co-locating them means one interferes with the other, and chunked prefill only mitigates it.</p>
 <p><strong>Disaggregation</strong> puts them on separate machine pools:</p>
 <pre><code>  request
@@ -259,7 +259,7 @@ maximize throughput/$   -&gt;  minimum TP that fits the model, then replicate</c
 <p><strong>The cost is the KV transfer.</strong> After prefill you must move the prompt's entire KV cache to the decode pool. For Llama-3-70B with a 4k prompt that is <code>320 KiB × 4096 = 1.25 GiB</code>. Over InfiniBand at ~50 GB/s that is 25 ms; over NVLink where available, ~1.4 ms.</p>
 <p>Whether disaggregation wins depends on comparing that transfer against the interference it removes. DistServe's argument, and it is convincing, is that for most realistic workloads the transfer is cheaper — especially because it can be <strong>overlapped layer by layer</strong>: start sending layer 0's KV as soon as it is computed, rather than waiting for the whole prefill to finish. Done well, most of the transfer hides behind the remaining prefill compute.</p>
 <p>Splitwise reached similar conclusions independently, and Mooncake built a production system around a disaggregated KV store shared across the cluster — which also makes prefix caching global rather than per-node, a significant additional benefit.</p>
-<p><strong>When it is not worth it:</strong> short prompts (little to transfer, but also little interference), low load (no contention to eliminate), or a slow interconnect between pools. Like everything in this course, it is a trade you should compute rather than assume.</p></div>
+<p><strong>When it is not worth it:</strong> short prompts (little to transfer, but also little interference), low load (no contention to eliminate), or a slow interconnect between pools. Like everything in these chapters, it is a trade you should compute rather than assume.</p></div>
   
   <p class="keypoint"><b>REMEMBER</b>Two workloads with opposite bottlenecks and opposite ideal configurations should not share hardware; the cost is transferring the KV cache between pools.</p>
 </article>
@@ -762,7 +762,7 @@ it does to throughput.</p>
         </ul>
       </div>
     </div>
-    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    <p class="foot__note">Built as a self-paced set of chapters. Every number here is meant to be
     re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
     do the arithmetic yourself.</p>
   </div>

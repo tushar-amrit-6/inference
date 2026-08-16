@@ -247,7 +247,7 @@ describes a growing share of traffic, and the adaptation is very much in progres
     {
       name: 'The open problems',
       keyPoint: 'Long context, evaluation, adaptive speculation, agentic cache policy and the widening memory wall are the areas where no approach has clearly won.',
-      body: `Where the machinery in this course runs out.
+      body: `Where the machinery in these chapters runs out.
 
 **1. Long context is still fundamentally unaffordable.** The arithmetic does not improve with
 cleverness: Llama-3-70B at 128k context needs 40 GiB of cache per sequence, which is three
@@ -285,7 +285,8 @@ ridge point went from 153 on an A100 to 295 on an H100. Every generation makes d
 worse. FP4 and FP8 help by shrinking bytes and larger HBM helps capacity, but the structural fix
 would be a memory-centric architecture with far more bandwidth per FLOP, or compute placed nearer
 memory. Several companies are betting on variants of this. Whether any displaces GPUs at scale is
-genuinely uncertain, and it is the question that would most change everything else in this course.
+genuinely uncertain, and it is the question that would most change everything else in these
+chapters.
 
 **7. The economics have no shared vocabulary.** Inference is now the dominant cost of operating a
 model, and the field has no common language for cost-quality trade-offs. What is the right price
@@ -293,9 +294,9 @@ for a token that took 20,000 thinking tokens to produce? How do you expose the l
 dial to customers who do not know they want it? Not technical questions, but they increasingly
 determine which technical work gets done.
 
-*A note on currency: this course was written from the author's knowledge and not verified against
-live sources at build time. Points 3, 4 and 6 move fastest. Before relying on any specific claim,
-search for recent work — and if something here has been solved since, that is a good sign.*`,
+*A note on currency: these chapters were written from the author's knowledge and not verified
+against live sources at build time. Points 3, 4 and 6 move fastest. Before relying on any specific
+claim, search for recent work — and if something here has been solved since, that is a good sign.*`,
       ascii: '',
     },
     {
@@ -305,16 +306,16 @@ search for recent work — and if something here has been solved since, that is 
 something real.
 
 **Reproduce a published benchmark and account for the gap.** This is the highest-value exercise in
-the course, and it is the one in the original outline for good reason. Pick a published number —
+these chapters, and it is the one in the original outline for good reason. Pick a published number —
 a vLLM blog post, an engine comparison, a model card's throughput claim. Reproduce it. You will
 not match it. Then find out why.
 
-The discrepancies are where the understanding is, and the list of causes is a summary of this
-whole course: different hardware SKU, different achieved bandwidth, different length distribution,
-closed-loop versus open-loop load, mean versus percentile, different batch size, warmup included,
-different precision, speculative decoding silently enabled, chunked prefill settings, or a
-prefix-cache hit rate you did not have. Working through that list on a real discrepancy will
-teach you more than re-reading any of these modules.
+The discrepancies are where the understanding is, and the list of causes is a summary of these
+chapters in one list: different hardware SKU, different achieved bandwidth, different length
+distribution, closed-loop versus open-loop load, mean versus percentile, different batch size,
+warmup included, different precision, speculative decoding silently enabled, chunked prefill
+settings, or a prefix-cache hit rate you did not have. Working through that list on a real
+discrepancy will teach you more than re-reading any of these modules.
 
 **Then, in rough order of value:**
 
@@ -326,13 +327,13 @@ is responsible. This is a genuinely useful skill and few people have it.
 of Modules 2, 5 and 6 in practice. Read \`v1/core/\` and follow one request through admission,
 scheduling and eviction.
 
-**Pick one module and go deeper than this course did.** Each of these has a substantial literature
-behind it: KV compression, speculative decoding variants, MoE serving, long-context attention,
-structured decoding. Depth in one is worth more than breadth across all.
+**Pick one module and go deeper than these chapters did.** Each of these has a substantial
+literature behind it: KV compression, speculative decoding variants, MoE serving, long-context
+attention, structured decoding. Depth in one is worth more than breadth across all.
 
-**Build the small thing.** A KV cache calculator you actually use. A roofline planner. A
-batching simulator. The labs in this course are starting points — the versions you extend for your
-own hardware and models are the ones you will keep.
+**Build the small thing.** A KV cache calculator you actually use. A roofline planner. A batching
+simulator. The labs in these chapters are starting points — the versions you extend for your own
+hardware and models are the ones you will keep.
 
 **Stay current deliberately.** This field moves fast enough that specific numbers age within
 months. What does not age is the framework: bytes moved per unit of useful work, and which side of
@@ -962,14 +963,12 @@ they have different causes.`,
 chunked prefill, CUDA graphs, quantization and speculation. Features no longer distinguish them.
 What differs is the operating point each was designed for — and most disagreements about which is
 best are two people in different regimes talking past each other.`,
-    },
-    {
-      wrong: 'Assuming a technique that helped someone else will help you.',
-      right: `Almost every optimization in this course is regime-dependent. Weight quantization is
-transformative at batch 1 and nearly useless at batch 64 with long context. Speculation is a 3×
-win at low concurrency and a net loss at high. Chunked prefill matters for chat and barely matters
-for reasoning workloads. Always ask what term of the cost model a technique attacks, and whether
-that term dominates *your* deployment.`,
+    }, { wrong: 'Assuming a technique that helped someone else will help you.', right: `Almost every
+optimization in these chapters is regime-dependent. Weight quantization is transformative at batch 1
+and nearly useless at batch 64 with long context. Speculation is a 3× win at low concurrency and a
+net loss at high. Chunked prefill matters for chat and barely matters for reasoning workloads.
+Always ask what term of the cost model a technique attacks, and whether that term dominates *your*
+deployment.`,
     },
   ],
 

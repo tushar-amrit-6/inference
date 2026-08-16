@@ -127,7 +127,7 @@ cost of redoing work the GPU had already done once.
 The intuition most people reach for is "recompute is cheap for short sequences, swap wins once a
 sequence is long enough that its cache is expensive to redo." The math lab in this level does the
 arithmetic and that intuition turns out to be *incomplete*: under the same linear-in-length
-approximation this course uses for prefill FLOPs everywhere else, both costs scale with sequence
+approximation these chapters use for prefill FLOPs everywhere else, both costs scale with sequence
 length, which means their **ratio is constant** — for Llama-3-8B on an H100 with a real PCIe link,
 swap comes out cheaper than recompute at every length, not just long ones. What actually produces a
 length-dependent crossover is something the simple bytes-and-FLOPs model leaves out entirely: a
@@ -251,7 +251,7 @@ design where each worker allocated its own could not.`,
   ],
 
   mathLab: {
-    prompt: `All of this reuses figures already established elsewhere in the course rather than
+    prompt: `All of this reuses figures already established elsewhere in these chapters rather than
 inventing new ones — Llama-3-8B's 8.03e9 active parameters and its 131,072 B (128 KiB) per-token
 cache, the ~50 GB/s achieved PCIe bandwidth from Module 5's swap example, and the 16-token block
 size from Module 6. One new number: back out the achieved H100 compute throughput implied by
@@ -405,15 +405,15 @@ latency win dressed up as a memory feature.
 
 That the PCIe link is otherwise idle, that host memory is actually provisioned and pinned for
 however many sequences you might want to swap out simultaneously, and that the *linear* prefill
-FLOPs approximation used everywhere in this course holds — it undercounts recompute's true cost at
-very long context, where attention's quadratic term stops being negligible, which if anything makes
-recompute look *relatively better* here than it actually is and would push the true crossover even
-shorter. None of those hold under real multi-tenant load: PCIe bandwidth is shared with weight
-loading, tensor-parallel activation transfers and other sequences' swaps at the same moment;
-pinned host memory has its own capacity ceiling; and a deployment under enough memory pressure to
-be preempting sequences at all is precisely the deployment where "otherwise idle" is least true.
-The honest conclusion is not "swap is always better" — it is that a length-based threshold is the
-wrong lever to reach for first, and contention for shared resources is a bigger factor than the
+FLOPs approximation used everywhere in these chapters holds — it undercounts recompute's true cost
+at very long context, where attention's quadratic term stops being negligible, which if anything
+makes recompute look *relatively better* here than it actually is and would push the true crossover
+even shorter. None of those hold under real multi-tenant load: PCIe bandwidth is shared with weight
+loading, tensor-parallel activation transfers and other sequences' swaps at the same moment; pinned
+host memory has its own capacity ceiling; and a deployment under enough memory pressure to be
+preempting sequences at all is precisely the deployment where "otherwise idle" is least true. The
+honest conclusion is not "swap is always better" — it is that a length-based threshold is the wrong
+lever to reach for first, and contention for shared resources is a bigger factor than the
 bytes-and-FLOPs comparison this question modeled.`,
   },
 
@@ -741,7 +741,7 @@ pieces.`,
       },
       {
         q: 'Work through the swap-versus-recompute arithmetic for Llama-3-8B on an H100 with a real PCIe link. Which one actually wins, and does it depend on sequence length?',
-        a: `Under the linear approximation this course uses for prefill FLOPs everywhere else,
+        a: `Under the linear approximation these chapters use for prefill FLOPs everywhere else,
 recompute costs about 23.1 microseconds per token and swap costs about 5.2 microseconds per token
 — a ratio of 4.41, and because both scale linearly in sequence length, that ratio is the same at
 10 tokens and at 100,000. Swap wins at every length under this model, which contradicts the
