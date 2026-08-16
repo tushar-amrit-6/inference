@@ -963,7 +963,15 @@ every rank still holds one KV head, but each head now exists on two ranks. Aggre
 is 2× what the formula predicts, your maximum batch size falls accordingly, and nothing in the logs
 mentions it — you scaled out for bandwidth and paid for it in the term that caps concurrency. It is
 the clearest case of a "boring" config field (\`n_kv_heads\`) setting a hard limit on how a model
-can be deployed, and it is decided at training time.`,
+can be deployed, and it is decided at training time.
+
+The limit is on head-sharding specifically, and Module 9's decode context parallelism is the way
+out: shard the same cache by token position and the divisor keeps working past the head count.
+Worth noting where that leaves MLA, which looks like the opposite case. Because MLA compresses K
+and V into one latent vector there is no head axis at all, so tensor parallelism replicates the
+whole cache on every rank at every degree — DeepSeek-V3's 68.6 KiB per token is 68.6 KiB on all
+sixteen. The architecture that caches least per token is also the one that gets least help from
+sharding it by head, which is why position-sharding arrived with it.`,
       },
     ],
   },

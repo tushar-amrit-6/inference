@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GLOSSARY — LLM INFERENCE</title>
-<meta name="description" content="136 terms from across all fourteen levels, each linked back to where it is explained.">
+<meta name="description" content="138 terms from across all fourteen levels, each linked back to where it is explained.">
 <meta name="color-scheme" content="dark light">
 <script>/* set the stored theme before first paint, so there is no flash of the wrong one */
 (function(){try{var t=localStorage.getItem('llm-inference:theme');
 if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <meta property="og:title" content="GLOSSARY — LLM INFERENCE">
-<meta property="og:description" content="136 terms from across all fourteen levels, each linked back to where it is explained.">
+<meta property="og:description" content="138 terms from across all fourteen levels, each linked back to where it is explained.">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -37,7 +37,7 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
     <div class="mod-head">
       <p class="mod-head__level">REFERENCE</p>
       <h1 class="mod-head__title">GLOSSARY</h1>
-      <p class="mod-head__tag">136 terms from across all fourteen levels, each linked back to where it is explained.</p>
+      <p class="mod-head__tag">138 terms from across all fourteen levels, each linked back to where it is explained.</p>
     </div>
     <section class="section">
     <div class="gloss">
@@ -126,6 +126,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="gloss__term">decode<br><a href="../modules/autoregressive-loop.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 01</a></div>
         <div class="gloss__def">The per-token forward passes that follow prefill, one position at a time. Memory-bound; sets TPOT.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">decode context parallelism (DCP)<br><a href="../modules/distributed-inference.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 09</a></div>
+        <div class="gloss__def">Sharding the KV cache by token position across ranks so per-GPU cache keeps shrinking past the KV-head count. One extra collective per layer: AllGather the query, attend locally, combine the partials by their log-sum-exp.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">degeneration<br><a href="../modules/decoding-and-sampling.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 03</a></div>
         <div class="gloss__def">The repetitive-loop failure mode of likelihood-maximizing decoders. Named and diagnosed by Holtzman et al.</div>
       </div><div class="gloss__row">
@@ -212,6 +215,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
       </div><div class="gloss__row">
         <div class="gloss__term">local-global interleaving<br><a href="../modules/model-architectures.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 11</a></div>
         <div class="gloss__def">A stack of mostly windowed layers with occasional full-attention layers. Gemma 2 used 1:1 at 4096; Gemma 3 uses 5:1 at 1024.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">log-sum-exp (LSE) combination<br><a href="../modules/distributed-inference.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 09</a></div>
+        <div class="gloss__def">Merging attention outputs computed over disjoint slices of the sequence by reweighting them with each slice’s softmax normalizer. FlashAttention’s online softmax, applied across devices instead of across tiles.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">logits<br><a href="../modules/transformer-fundamentals.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 00</a></div>
         <div class="gloss__def">The unnormalized [.., vocab_size] scores produced by the LM head, before any softmax or sampling.</div>

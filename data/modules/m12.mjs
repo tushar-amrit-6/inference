@@ -237,7 +237,15 @@ many GPUs are executing the result.
 What this buys you is that nothing in this level's first five concepts needed to know a second GPU
 existed. What it costs is a broadcast every iteration and a driver process that is now a
 sequential bottleneck other systems can choose to remove — which is precisely DistServe's argument
-in this level's papers, and the reason it is here as the closing citation rather than a footnote.`,
+in this level's papers, and the reason it is here as the closing citation rather than a footnote.
+
+The single-writer property is also what lets the *layout* of the cache change without any of this
+being rewritten. Decode context parallelism — Module 9's answer to the KV-head ceiling, in which
+each rank holds the blocks for a slice of a sequence's token positions rather than a slice of its
+heads — changes which physical blocks a given worker is responsible for and adds a collective
+inside attention. It does not change who allocates them, when they are freed, or what the
+scheduler decides. A driver that owns every block table can re-shard the cache across ranks; a
+design where each worker allocated its own could not.`,
       ascii: '',
     },
   ],

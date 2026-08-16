@@ -3,7 +3,7 @@ export default {
   slug: 'distributed-inference',
   title: 'DISTRIBUTED INFERENCE',
   tagline: 'When the model does not fit, the interconnect becomes the memory bus — and it is much slower.',
-  hours: '7–9 hours',
+  hours: '8–10 hours',
   prereqs: ['Module 2', 'Module 4', 'Module 5'],
 
   bigIdea: `A 70B model at fp16 is 141 GB of weights. No single GPU holds that. So you split it,
@@ -81,7 +81,9 @@ single most important practical fact in this module: **TP belongs inside a node,
 without replicating its cache. With 8 KV heads you can run TP-8 cleanly, one KV head per GPU. At
 TP-16 you must duplicate KV heads, so per-GPU cache stops shrinking as you add GPUs — you pay for
 hardware that adds bandwidth and compute but no cache capacity. **The KV head count silently caps
-useful TP degree.**`,
+useful TP degree** — or rather, it caps the degree to which *this* way of splitting the cache keeps
+paying. Splitting it along a different axis lifts the cap, which is what the decode
+context-parallelism concept below is about.`,
       ascii: `  MLP under TP-2: column-split then row-split, one all-reduce
 
          X (replicated on both GPUs)
@@ -147,7 +149,8 @@ PP across nodes    (InfiniBand/Ethernet, low-volume activation passing)
 
 An 8-GPU node running TP-8, with PP across nodes. Sequence or context parallelism (splitting the
 sequence dimension, as in Ring Attention) is a third axis used for very long context, where even
-one sequence's activations and KV cache exceed a single GPU.`,
+one sequence's activations and KV cache exceed a single GPU — and, in the decode-specific form two
+concepts down, as the answer to the KV-head ceiling.`,
       ascii: '',
     },
     {
@@ -178,7 +181,9 @@ fitting the model, you are decoding it faster, because you added memory bandwidt
 
 **KV cache per GPU stops shrinking at TP-8.** Llama-3-70B has 8 KV heads. At TP-16 two GPUs share
 each KV head and must both hold its cache, so per-GPU KV stays at 40 KiB/token. You doubled the
-hardware and got no additional cache capacity — only bandwidth. That is the GQA ceiling biting.
+hardware and got no additional cache capacity — only bandwidth. That is the GQA ceiling biting, and
+that flat 40 KiB row is what the next concept exists to fix: layering DCP-2 on top of TP-16 shards
+the same cache by position and takes it to 20 KiB.
 
 **Communication grows with TP degree.** The all-reduce volume scales as \`(N−1)/N\`, approaching a
 constant, but the *number of participants* grows and ring all-reduce latency grows with hop count.
@@ -198,13 +203,97 @@ tokens per second than one TP-8 deployment — but each request will be slower.
 That is the real decision:
 
 \`\`\`
-minimize latency        ->  maximize TP (up to the KV head count / node boundary)
+minimize latency        ->  maximize TP (up to the node boundary)
+maximize cache capacity ->  TP to the KV head count, then DCP for the rest
 maximize throughput/$   ->  minimum TP that fits the model, then replicate
 \`\`\`
 
 Most production deployments choose the smallest TP that fits the model with acceptable latency,
 then scale out with replicas.`,
       ascii: '',
+    },
+    {
+      name: 'Decode context parallelism: shard the cache by position, not by head',
+      keyPoint: 'DCP splits the KV cache along the sequence dimension, so per-GPU cache keeps shrinking past the KV-head count — paid for with one extra collective per layer, which is affordable at decode precisely because the query is one token wide.',
+      body: `The ceiling in the last two concepts is not a law of nature. It is a consequence of
+*which axis* the cache gets sharded on, and the cache has more than one axis.
+
+Tensor parallelism shards it by **head**, because that is the axis TP is already splitting for the
+attention matmuls — it comes free with the strategy. But heads are a small, fixed number set by the
+model architect, so the divisor runs out. **Decode context parallelism (DCP) shards the same cache
+by token position instead**, and positions do not run out: for a 200k-token request across four
+ranks, rank 0 holds the cache for tokens 0–50k, rank 1 holds 50k–100k, and so on. Per-GPU cache
+keeps falling as you add GPUs, which is exactly the property TP loses at \`n_kv_heads\`.
+
+**The mechanism, one decode step.** Each rank holds a slice of the positions but needs to attend
+over all of them, so:
+
+\`\`\`
+AllGather Q  ->  attend locally  ->  AllGather + ReduceScatter
+\`\`\`
+
+Every rank gathers the full query, computes attention between it and *its own* KV slice, and
+produces a partial output plus the log-sum-exp of its slice's scores. Those partials are then
+combined — weighted by their LSE values — and the result is redistributed by head so the rest of
+the layer proceeds in its usual TP layout. **The LSE combination is exactly Module 7's online
+softmax**, applied across devices instead of across tiles in shared memory: the same
+mathematics that lets FlashAttention never materialize the score matrix lets DCP never gather the
+K and V.
+
+**Why "decode" specifically.** The operand you move is the query, and at decode the query is one
+token per sequence — about 0.5 MB at batch 32 for a \`d_model\` of 8192, the same order as the
+all-reduce you are already paying twice a layer. The data you *avoid* moving is the KV cache,
+which is gigabytes. You are moving the small operand to the big data, and the ratio between them is
+what makes it worth an extra collective. At prefill the query is \`seq\` times larger and that ratio
+inverts, which is why Ring Attention — the context-parallel scheme in this module's papers —
+makes the opposite choice and passes K/V blocks around a ring instead. Same axis, different
+regime, opposite answer about what should move.
+
+**The constraint, and why it differs by architecture.** In vLLM's implementation a GQA model caps
+DCP at \`tp_size // num_kv_heads\`, with even divisibility. Read that as: DCP picks up exactly the
+TP degree that ran out of heads to split. Llama-3-70B at TP-8 has eight heads for eight ranks and
+no use for DCP; at TP-16 it gets DCP-2, and per-GPU cache halves again from 40 to 20 KiB per token,
+roughly doubling how many sequences fit.
+
+An MLA model is a different story, and a more urgent one. MLA compresses K and V into a *single*
+latent vector per token, so there is no head axis to split at all — every TP rank holds the entire
+cache, at every TP degree. DeepSeek-V3's 68.6 KiB per token from Module 11 is 68.6 KiB on rank 0
+and 68.6 KiB on rank 15 alike. That is why the MLA constraint is only \`tp_size >= dcp_size\`:
+sharding by position is not an optimization there, it is the sole available lever, and it is the
+reason the technique showed up when MLA models did.
+
+**What it does not do.** DCP moves no weights, so it does nothing for the model-fitting problem
+that PP and TP solve. It does not directly reduce single-stream latency either — what it buys is
+cache capacity, which becomes batch size, which becomes throughput, which is the chain Module 6
+established. And it adds a collective per layer to the attention path, so it belongs on the same
+fast link as TP for the same reason TP does.
+
+**The reported payoff, with the usual caveat.** vLLM's benchmark on an 8×B200 node serving Kimi
+K2.6 (an MLA model, NVFP4) against agentic traces with roughly 67k-token median inputs: baseline
+TP plateaus at 1,863 tok/s/GPU at concurrency 64, where it hits 100% KV-cache utilization and
+cannot admit another sequence; with DCP it reaches 6,091 tok/s/GPU at concurrency 512 while still
+sitting at 82% KV usage. Treat the mechanism and the constraint formulas as durable and that 3.3×
+as what it is — one model, one node, one trace shape, measured by the people who wrote the
+feature. The number your workload gets is a function of how much of your memory the cache was
+actually taking, which is the arithmetic the math lab makes you do.`,
+      ascii: `  ONE CACHE, TWO AXES TO SHARD IT ON
+
+  BY HEAD (tensor parallelism)        BY POSITION (decode context parallelism)
+
+  rank 0   kv head 0  ████            rank 0   tokens      0- 50k  ████
+  rank 1   kv head 1  ████            rank 1   tokens  50k-100k    ████
+    ...                                 ...
+  rank 7   kv head 7  ████            rank 7   tokens 350k-400k    ████
+  rank 8   kv head 0  ████ REPLICA    rank 8   tokens 400k-450k    ████
+           ^ only 8 heads exist,               ^ positions do not run out
+             so the divisor stops
+
+  one decode step, per layer:
+
+     AllGather Q  ──►  attend to the local slice  ──►  AllGather + ReduceScatter
+     one token wide     gigabytes, never moves        combine partials by LSE
+     (~0.5 MB @ b=32)                                  (Module 7's online softmax,
+                                                        across devices this time)`,
     },
     {
       name: 'Mixture of experts: a bandwidth win and a capacity problem',
@@ -395,6 +484,10 @@ For TP ∈ {2, 4, 8, 16} at fp16:
   b) KV cache per token per GPU at 8k context. Careful past TP-8.
   c) Aggregate bandwidth and the TPOT floor.
   d) At which TP does the KV cache per GPU stop improving, and why?
+  e) Now add decode context parallelism. vLLM caps DCP for a GQA model at
+     \`tp_size // num_kv_heads\`. What is the maximum DCP degree at TP-8, TP-16 and TP-32, and what
+     does KV per token per GPU become in each case? At TP-16 with 20 GB of weights and workspace
+     per GPU, how many 8k-context sequences fit in an 80 GB card with and without DCP?
 
 **Part 3 — communication cost.**
 Decode, batch 32, \`seq = 1\`, \`d_model = 8192\`, fp16. Ring all-reduce moves
@@ -469,6 +562,27 @@ across devices without replicating its cache. At TP-8 each GPU owns exactly one 
 hold its cache, so per-GPU KV stays at 40 KiB. You doubled the hardware and gained bandwidth and
 compute but **no additional cache capacity** — which means no additional batch size, which means
 no additional throughput from that axis.
+
+e) DCP picks up precisely where the head divisor gave out:
+
+\`\`\`
+TP-8:   8 // 8 = 1   ->  no DCP available    kv/token/GPU = 40 KiB
+TP-16: 16 // 8 = 2   ->  DCP-2               kv/token/GPU = 40 / 2 = 20 KiB
+TP-32: 32 // 8 = 4   ->  DCP-4               kv/token/GPU = 40 / 4 = 10 KiB
+\`\`\`
+
+At TP-16, weights are 8.8 GB per GPU; with 20 GB of weights-plus-workspace budgeted and ~76 GB
+usable, about 56 GB is left for cache:
+
+\`\`\`
+without DCP:  56 GB / (40 KiB x 8192)  =  56e9 / 327.7e6  =  170 sequences
+with DCP-2:   56 GB / (20 KiB x 8192)  =  56e9 / 163.8e6  =  341 sequences
+\`\`\`
+
+Twice the concurrent sequences on the same sixteen GPUs, from re-sharding a cache that was already
+there. Note what this does *not* change: the TPOT floor, the weight bytes, and the number of
+all-reduces the MLP still needs. DCP buys capacity, and capacity becomes throughput only if you
+actually raise the batch size to use it.
 
 **Part 3**
 
@@ -614,10 +728,18 @@ class Model:
     def weight_bytes(self, dtype=2):
         return self.n_params * dtype
 
-    def kv_per_token(self, dtype=2, tp=1):
-        """Per GPU. A KV head cannot be split, so the divisor saturates at n_kv_heads."""
+    def kv_per_token(self, dtype=2, tp=1, dcp=1):
+        """Per GPU. A KV head cannot be split, so the head divisor saturates at
+        n_kv_heads -- that is the GQA ceiling. Decode context parallelism adds a
+        second divisor that does not saturate, because it shards the same cache
+        by token position instead of by head."""
         heads_per_gpu = max(1, self.n_kv_heads // min(tp, self.n_kv_heads))
-        return 2 * self.n_layers * heads_per_gpu * self.head_dim * dtype
+        return 2 * self.n_layers * heads_per_gpu * self.head_dim * dtype / dcp
+
+    def max_dcp(self, tp):
+        """vLLM's constraint for GQA models: DCP picks up exactly the TP degree
+        that ran out of KV heads to split."""
+        return max(1, tp // self.n_kv_heads)
 
 
 H100 = GPU("H100 SXM", 80, 3350, 989)
@@ -634,7 +756,7 @@ def allreduce_bytes(batch, seq, d_model, tp, dtype=2):
     return 2 * (tp - 1) / tp * batch * seq * d_model * dtype
 
 
-def plan(model, gpu, tp, pp=1, batch=32, seq=8192,
+def plan(model, gpu, tp, pp=1, dcp=1, batch=32, seq=8192,
          w_dtype=2, kv_dtype=2, workspace_gb=10, efficiency=0.75):
     n_gpus = tp * pp
     same_node = n_gpus <= gpu.per_node
@@ -642,7 +764,7 @@ def plan(model, gpu, tp, pp=1, batch=32, seq=8192,
 
     # --- memory ---
     w_per_gpu = model.weight_bytes(w_dtype) / n_gpus
-    kv_per_gpu = model.kv_per_token(kv_dtype, tp) * seq * batch / pp
+    kv_per_gpu = model.kv_per_token(kv_dtype, tp, dcp) * seq * batch / pp
     used = w_per_gpu + kv_per_gpu + workspace_gb * GB
     fits = used < gpu.memory_gb * GB * 0.95
 
@@ -655,13 +777,22 @@ def plan(model, gpu, tp, pp=1, batch=32, seq=8192,
     comm_b = allreduce_bytes(batch, 1, model.d_model, tp) * 2 * layers_here
     comm_ms = comm_b / (link * GB) * 1000 if tp > 1 else 0.0
 
+    # DCP: an extra collective per layer -- AllGather Q, then combine the
+    # per-shard partials by their log-sum-exp. Modelled here as one all-reduce
+    # over the DCP group, which is the right order of magnitude at decode.
+    dcp_b = allreduce_bytes(batch, 1, model.d_model, dcp) * layers_here if dcp > 1 else 0
+    comm_ms += dcp_b / (link * GB) * 1000
+
     # PP: one activation hand-off per stage boundary
     pp_b = batch * 1 * model.d_model * 2 * (pp - 1) if pp > 1 else 0
     pp_ms = pp_b / (link * GB) * 1000
 
     tpot = mem_ms + comm_ms + pp_ms
+    free = gpu.memory_gb * GB * 0.95 - w_per_gpu - workspace_gb * GB
+    kv_tok = model.kv_per_token(kv_dtype, tp, dcp)
     return {
-        "n_gpus": n_gpus, "tp": tp, "pp": pp, "fits": fits, "same_node": same_node,
+        "n_gpus": n_gpus, "tp": tp, "pp": pp, "dcp": dcp, "fits": fits,
+        "kv_tok": kv_tok, "seats": max(0, free) / (kv_tok * seq), "same_node": same_node,
         "w_gb": w_per_gpu / GB, "kv_gb": kv_per_gpu / GB, "used_gb": used / GB,
         "mem_ms": mem_ms, "comm_ms": comm_ms + pp_ms, "tpot_ms": tpot,
         "comm_pct": 100 * (comm_ms + pp_ms) / tpot if tpot else 0,
@@ -698,6 +829,35 @@ for tp in (1, 2, 4, 8, 16):
           f"{r['mem_ms']:>8.1f} {r['comm_ms']:>8.2f} {r['tpot_ms']:>7.1f} "
           f"{r['comm_pct']:>6.1f}% {r['throughput']:>8.0f} {r['tput_per_gpu']:>7.0f}{flag}")
 print("  note: kv/tok stops improving past TP-8 -- only 8 KV heads to split")
+
+print("\\n=== Part 2b: decode context parallelism lifts the KV-head ceiling ===\\n")
+print(f"  {'TP':>3} {'DCP':>4} {'GPUs':>5} {'kv/tok/GPU':>11} {'seqs @ 8k':>10} "
+      f"{'TPOT':>8} {'comm%':>7}")
+for tp, dcp in ((8, 1), (16, 1), (16, 2), (32, 1), (32, 4)):
+    if dcp > L70B.max_dcp(tp):
+        continue
+    r = plan(L70B, H100, tp=tp, dcp=dcp)
+    print(f"  {tp:>3} {dcp:>4} {r['n_gpus']:>5} {r['kv_tok']/1024:>10.0f}K "
+          f"{r['seats']:>10.0f} {r['tpot_ms']:>7.1f}ms {r['comm_pct']:>6.1f}%")
+print(f"  max DCP for {L70B.name} ({L70B.n_kv_heads} KV heads): "
+      f"TP-8 -> {L70B.max_dcp(8)}, TP-16 -> {L70B.max_dcp(16)}, TP-32 -> {L70B.max_dcp(32)}")
+print("  note: DCP shards the SAME cache by position, so the divisor keeps going.")
+print("  note: TP-16 and TP-32 leave the 8-GPU node, so their comm% is an")
+print("        internode figure -- DCP's extra collective wants a fast link too.")
+
+# MLA caches one latent vector per token per layer and cannot split it by head
+# at all, so TP replicates it on every rank. DeepSeek-V3: 61 layers, a 576-wide
+# latent (512 compressed + 64 rope), fp16 -- the 68.6 KiB/token from Module 11.
+MLA_KV_PER_TOKEN = 61 * 576 * 2
+
+print("\\n=== why the DCP rule differs for MLA: there is nothing to split ===\\n")
+print(f"  {'TP':>3} {'GQA kv/tok/GPU':>15} {'MLA kv/tok/GPU':>15}   max DCP: GQA / MLA")
+for tp in (1, 2, 4, 8, 16):
+    print(f"  {tp:>3} {L70B.kv_per_token(2, tp)/1024:>14.0f}K "
+          f"{MLA_KV_PER_TOKEN/1024:>14.1f}K        "
+          f"{L70B.max_dcp(tp):>3} / {tp:>3}")
+print("  GQA: the head divisor works until it runs out of heads, then DCP takes over.")
+print("  MLA: the head divisor never worked at all, so DCP is the only lever there is.")
 
 print("\\n=== the PCIe trap: same config, slow link ===")
 PCIE = GPU("H100 (PCIe-only)", 80, 3350, 989, per_node=8, nvlink_gbs=64.0)
@@ -756,6 +916,22 @@ The TP table reproduces the math lab: TPOT falling roughly linearly from TP-2 to
 staying at a few percent over NVLink, and — the key line — \`kv/tok\` stopping at 40 KiB past TP-8
 because there are only 8 KV heads to distribute. Note also that \`tok/s per GPU\` **falls** as TP
 rises: you buy latency with efficiency.
+
+Part 2b is the new lever. At TP-8 the DCP column is empty, because eight KV heads across eight
+ranks leaves nothing for DCP to pick up — the constraint \`tp // n_kv_heads\` evaluates to 1. At
+TP-16 it engages: \`kv/tok/GPU\` halves from 40 KiB to 20 KiB and the seat count roughly doubles
+from 170 to 341 sequences, on the same sixteen GPUs. At TP-32 with DCP-4 it is 10 KiB and 734
+seats. Read the \`comm%\` column with the node boundary in mind — TP-16 and TP-32 have already
+left the 8-GPU node, so those percentages are internode figures inflated by the same 50 GB/s link
+this module keeps warning about. DCP's extra collective is subject to exactly that warning: it
+wants a fast link for the same reason TP does.
+
+The MLA table underneath is the sharper version of the argument. The GQA column falls 320 → 160 →
+80 → 40 KiB and then stops; the MLA column sits at 68.6 KiB at *every* TP degree, because a single
+latent vector per token has no head axis to split and TP simply replicates it on every rank. For a
+GQA model DCP is an extra lever available past TP-8; for an MLA model it is the only lever there
+has ever been, which is why the technique arrived alongside MLA-based models rather than before
+them.
 
 The PCIe comparison is the one to internalize. Expect penalties in the range of **1.2× at TP-2 to
 1.5–1.8× at TP-8** on these bandwidth-only estimates — and reality is worse, because small-message
@@ -823,6 +999,21 @@ Read alongside Sarathi-Serve from Module 5: same problem, opposite conclusion.`,
       frame: 'Read Section 2 for the architecture and routing. The number to extract is the ratio of total to active parameters, and what that means for the memory-capacity versus memory-bandwidth trade. The load-balancing discussion is brief; supplement with the DeepSeek-V3 report for a more detailed treatment of expert parallelism at scale.',
     },
     {
+      title: 'Efficient Decode Context Parallelism with vLLM for Long Context Workloads',
+      by: 'vLLM team, August 2026',
+      url: 'https://vllm.ai/blog/2026-08-07-decode-context-parallelism',
+      why: 'The engineering write-up of DCP: sharding the KV cache by position so per-GPU cache keeps shrinking past the KV-head count.',
+      frame: `An engineering blog post rather than a paper, so read it for two things and treat the
+rest as vendor benchmarking. First, the collective pattern — AllGather Q, attend locally, combine
+partials by log-sum-exp — and how little it is, given what it avoids moving. Second, the divisibility
+constraints, which encode the whole architectural argument in two lines: \`tp // num_kv_heads\` for
+GQA, \`tp >= dcp\` for MLA. The 3.3× throughput headline is one model on one 8×B200 node against
+one trace shape; re-derive what your own deployment would get from the capacity arithmetic in this
+module's math lab instead of importing it. Read against Ring Attention below, which shards the same
+axis and reaches the opposite conclusion about what should move, because it is solving the prefill
+case.`,
+    },
+    {
       title: 'Ring Attention with Blockwise Transformers for Near-Infinite Context',
       by: 'Liu, Zaharia & Abbeel, 2023',
       url: 'https://arxiv.org/abs/2310.01889',
@@ -865,7 +1056,27 @@ replicating its cache on both. At TP-8 each GPU owns exactly one KV head, so per
 both must store its cache, so per-GPU KV stays flat at 40 KiB/token for Llama-3-70B. You added
 hardware that brings bandwidth and compute but no additional cache capacity, and since cache
 capacity is what caps batch size, that axis of scaling has stopped paying. It is a real constraint
-on large-model deployment and one reason KV head counts are chosen with parallelism in mind.`,
+on large-model deployment and one reason KV head counts are chosen with parallelism in mind.
+
+What the cap actually says, precisely, is that *this* way of splitting the cache stops paying —
+splitting by head. Decode context parallelism splits the same cache by token position instead, and
+positions do not run out: at TP-16 a DCP degree of 2 (\`16 // 8\`) takes per-GPU cache from 40 KiB
+back down to 20 KiB per token. So the honest form of the claim is that eight KV heads cap the
+useful degree of *head-sharded* parallelism at 8, and anything beyond that has to shard a
+different axis.`,
+      },
+      {
+        q: 'Decode context parallelism gathers the query on every rank each step. Why is that affordable at decode but not at prefill?',
+        a: `Because at decode the query is one token per sequence. At batch 32 with
+\`d_model = 8192\` in fp16 that is about 0.5 MB — the same order as the all-reduce the layer
+already does twice — while the KV cache it is being matched against is gigabytes and stays exactly
+where it is. You are moving the small operand to the big data, and the whole trade is that ratio.
+At prefill the query is \`seq\` times larger: for a 2,048-token prompt it is not 0.5 MB but roughly
+a gigabyte's worth of traffic per layer, and the ratio inverts — now the queries are the bulk and
+the sensible thing is to move K and V instead, which is precisely what Ring Attention does by
+passing K/V blocks around a ring and overlapping the transfer with blockwise computation. Same
+sharding axis, opposite decision about what travels, decided entirely by which operand is bigger
+in that phase. This is also why the technique is named for decode rather than for context.`,
       },
       {
         q: 'Why is MoE good for inference bandwidth but awkward for memory capacity?',
@@ -918,8 +1129,10 @@ to cross node boundaries.`,
       right: `Throughput per GPU generally falls as TP degree rises, because communication
 overhead is paid on every layer and scaling is sub-linear. Two TP-4 replicas usually beat one
 TP-8 deployment on total tokens per second, while being slower per request. And past the KV head
-count, extra GPUs add bandwidth but no cache capacity, so they buy no additional batch size at
-all.`,
+count, extra GPUs add bandwidth but no cache capacity *under head-sharded TP alone*, so they buy no
+additional batch size unless you also shard the cache by position with DCP — which is a
+configuration flag you have to actually set, not something that happens because you bought more
+GPUs.`,
     },
     {
       wrong: 'Estimating communication cost from bandwidth alone.',
@@ -939,6 +1152,8 @@ expert's GPU sets the pace for every other. Cheaper per token, harder to deploy.
   ],
 
   glossary: [
+    { term: 'decode context parallelism (DCP)', def: 'Sharding the KV cache by token position across ranks so per-GPU cache keeps shrinking past the KV-head count. One extra collective per layer: AllGather the query, attend locally, combine the partials by their log-sum-exp.' },
+    { term: 'log-sum-exp (LSE) combination', def: 'Merging attention outputs computed over disjoint slices of the sequence by reweighting them with each slice’s softmax normalizer. FlashAttention’s online softmax, applied across devices instead of across tiles.' },
     { term: 'tensor parallelism (TP)', def: 'Splitting weight matrices within a layer across GPUs. Two all-reduces per transformer layer. Needs NVLink.' },
     { term: 'pipeline parallelism (PP)', def: 'Assigning different layers to different GPUs. One activation hand-off per stage boundary. Tolerates slow links.' },
     { term: 'expert parallelism (EP)', def: 'Distributing MoE experts across GPUs. Requires all-to-all routing and suffers from load imbalance.' },

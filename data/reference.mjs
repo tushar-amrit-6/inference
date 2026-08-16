@@ -162,6 +162,13 @@ circulation rather than when a venue accepted it.`,
       what: 'Long chain-of-thought models that spend thousands of tokens thinking before answering.',
       why: 'Shifts the decode-to-prefill ratio dramatically toward decode — the memory-bound half. A workload that was 60% prefill by FLOPs can become almost entirely decode by wall-clock.',
     },
+    {
+      date: '2026-08',
+      name: 'Decode context parallelism',
+      url: 'https://vllm.ai/blog/2026-08-07-decode-context-parallelism',
+      what: 'Shard the KV cache across ranks by token position rather than by attention head, gathering the one-token-wide query each step and combining the per-shard partials by their log-sum-exp.',
+      why: 'Removes the KV-head ceiling on how far the cache can be split — the constraint that made extra GPUs add bandwidth but no concurrency past TP-8, and that bound latent-attention models at every degree. A capacity technique in a period when long-context agentic traffic made capacity the binding constraint.',
+    },
   ],
 
   /* ======================================================================

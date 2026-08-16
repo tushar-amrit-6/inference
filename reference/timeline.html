@@ -148,6 +148,11 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <h2 class="tl__name"><a href="https://arxiv.org/abs/2501.12948" target="_blank" rel="noopener">Reasoning models change the workload shape</a></h2>
         <p class="tl__what">Long chain-of-thought models that spend thousands of tokens thinking before answering.</p>
         <p class="tl__why">Shifts the decode-to-prefill ratio dramatically toward decode — the memory-bound half. A workload that was 60% prefill by FLOPs can become almost entirely decode by wall-clock.</p>
+      </li><li class="tl__item">
+        <p class="tl__date">2026-08</p>
+        <h2 class="tl__name"><a href="https://vllm.ai/blog/2026-08-07-decode-context-parallelism" target="_blank" rel="noopener">Decode context parallelism</a></h2>
+        <p class="tl__what">Shard the KV cache across ranks by token position rather than by attention head, gathering the one-token-wide query each step and combining the per-shard partials by their log-sum-exp.</p>
+        <p class="tl__why">Removes the KV-head ceiling on how far the cache can be split — the constraint that made extra GPUs add bandwidth but no concurrency past TP-8, and that bound latent-attention models at every degree. A capacity technique in a period when long-context agentic traffic made capacity the binding constraint.</p>
       </li>
     </ol>
   </section>
