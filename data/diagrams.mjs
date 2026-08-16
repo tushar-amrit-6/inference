@@ -809,4 +809,54 @@ export default {
       ].join('');
     },
   },
+
+  /* ---------------------------------------------------------------- 13 --- */
+  13: {
+    w: 58, h: 28,
+    title: 'Two floor plans, one memory wall',
+    desc: 'A GPU column and a TPU column side by side. The GPU stacks 132 streaming ' +
+      'multiprocessors over 228 kilobytes of shared memory per SM, a 50 megabyte hardware-managed ' +
+      'L2, and 80 gigabytes of HBM at 3.35 terabytes per second. The TPU stacks eight 128 by 128 ' +
+      'systolic arrays over a vector unit, 128 mebibytes of compiler-managed VMEM with no cache, ' +
+      'and 95 gigabytes of HBM at 2.77 terabytes per second. Below, three regimes: at batch one ' +
+      'both are bound by HBM and the gap is exactly the bandwidth ratio; at large batch the array ' +
+      'fill decides; at scale the interconnect decides.',
+    caption: 'Everything above the HBM row is where the two designs disagree. Decoding one token ' +
+      'reads only the HBM row — which is why single-stream benchmarks of these two chips are ' +
+      'bandwidth measurements wearing a compute measurement’s clothes.',
+    draw: (g, id) => [
+      g.heading(1.5, 1.6, 'LEVEL 13 · TWO FLOOR PLANS, ONE MEMORY WALL'),
+      g.line(1.5, 2.4, 56.5, 2.4, { stroke: FAINT, width: 1 }),
+      g.note(1.5, 3.7, ['both attached to the same generation of HBM, within 1.2x on bandwidth'],
+        { fill: FAINT }),
+
+      g.line(29, 4.8, 29, 19.6, { stroke: FAINT, width: 1 }),
+
+      /* --- left column: the GPU -------------------------------------- */
+      g.heading(1.5, 5.4, 'GPU · H100 · SIMT, RUNTIME'),
+      g.box(1.5, 6.2, 26, 3, '132 × SM', { sub: '4 warp schedulers, 4 tensor cores each', accent: PINKY }),
+      g.box(1.5, 10.0, 26, 2.6, 'SHARED MEM / L1 · 228 KB per SM', { sub: 'you place every byte', accent: DIM }),
+      g.box(1.5, 13.2, 26, 2.6, 'L2 CACHE · 50 MB', { sub: 'the hardware decides what stays', accent: FAINT }),
+      g.box(1.5, 16.4, 26, 3, 'HBM3 · 80 GB · 3.35 TB/s', { sub: 'ridge 295 — saturates at batch 295', accent: A, fill: TINT }),
+
+      /* --- right column: the TPU ------------------------------------- */
+      g.heading(30.5, 5.4, 'TPU · v5p · SYSTOLIC, AHEAD-OF-TIME'),
+      g.box(30.5, 6.2, 26, 3, '8 × MXU · 128×128', { sub: 'weight-stationary, fill = 128 cycles', accent: CLYDE }),
+      g.box(30.5, 10.0, 26, 2.6, 'VPU (8,128) + SCALAR · VLIW', { sub: 'softmax, norms, in-order issue', accent: DIM }),
+      g.box(30.5, 13.2, 26, 2.6, 'VMEM · ~128 MiB · NO CACHE', { sub: 'XLA places every byte', accent: FAINT }),
+      g.box(30.5, 16.4, 26, 3, 'HBM · 95 GB · 2.77 TB/s', { sub: 'ridge 166 — saturates at batch 166', accent: A, fill: TINT }),
+
+      /* --- the three regimes ----------------------------------------- */
+      g.line(1.5, 20.2, 56.5, 20.2, { stroke: FAINT, width: 1 }),
+      g.heading(1.5, 21.0, 'WHERE IT SHOWS UP — AND WHERE IT DOES NOT'),
+
+      g.box(1.5, 21.8, 17, 2.8, 'DECODE, BATCH 1', { sub: 'both bound by HBM', accent: A }),
+      g.box(20.5, 21.8, 17, 2.8, 'LARGE BATCH', { sub: 'array fill decides', accent: CLYDE }),
+      g.box(39.5, 21.8, 17, 2.8, 'AT SCALE', { sub: 'the fabric decides', accent: PINKY }),
+
+      g.note(1.5, 25.5, ['4.79 ms vs 5.81 ms — and', 'that IS the bandwidth ratio'], { fill: DIM }),
+      g.note(20.5, 25.5, ['50% of peak at 128 tokens,', '80% at 512 — geometry, not HBM'], { fill: DIM }),
+      g.note(39.5, 25.5, ['TP-64: 0.28 ms on a torus,', '3.30 ms across InfiniBand'], { fill: DIM }),
+    ].join(''),
+  },
 };

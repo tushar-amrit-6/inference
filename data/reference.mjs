@@ -210,6 +210,37 @@ sparsity number, which is double and does not apply to production LLMs.
 > should be checked against a current datasheet — they are given here as working estimates, not
 > authoritative values. Bandwidth figures are the most stable and the most important.
 
+## Google TPUs
+
+Different chip, same wall. A TPU's compute core is a 128x128 systolic array rather than a set of
+SIMT cores with tensor units, but it is attached to the same generation of HBM — so the ridge
+point means exactly what it means above, and decode is bounded by bandwidth on both. Level 13
+works through the internals; these are the numbers it uses.
+
+| TPU | memory | bandwidth | dense bf16 | pod | ridge point |
+|---|---|---|---|---|---|
+| v4 | 32 GB HBM2 | 1.2 TB/s | 275 TFLOP/s | 4096, 3D torus + OCS | 229 |
+| v5e | 16 GB HBM2e | 0.82 TB/s | 197 TFLOP/s | 256, 2D torus | 241 |
+| v5p | 95 GB HBM2e | 2.77 TB/s | 459 TFLOP/s | 8960, 3D torus | **166** |
+| v6e | 32 GB HBM | ~1.64 TB/s | ~918 TFLOP/s | 256 | ~560 |
+
+The v5p is the best-balanced part in either table: it reaches its own arithmetic ceiling at a
+batch of 166, where an H100 needs 295. That is a statement about balance, not speed — the H100's
+ceiling is 2.2x higher. The v6e is the opposite lesson and the same one the A100-to-H100 jump
+teaches: compute grew 4.7x over the v5e while bandwidth doubled, so the ridge point more than
+doubled with it.
+
+Interconnect is where the two families differ most. A GPU's fast fabric is an island — ~900 GB/s
+to every peer inside an NVLink domain of 8 (72 on an NVL72 rack), then a cliff to ~50 GB/s per GPU
+on InfiniBand. A TPU's ICI links run chip-to-chip in a torus at roughly 100 GB/s per link, six
+links per chip on a 3D-torus part, and that figure does not change whether the pod holds 64 chips
+or 8,960. No cliff, but a diameter: opposite corners of a large torus are many hops apart.
+
+> **Same caveat, more so.** TPU specifications are published less completely than GPU ones and
+> some figures here (particularly v6e) are working estimates. The derivations in Level 13 are the
+> defence: if a number is wrong, the geometry check — peak FLOPs against MXU count, array size and
+> a plausible clock — will usually say so.
+
 ## The trend that explains the whole field
 
 | | A100 (2020) | H100 (2022) | H200 (2023) | B200 (2024) |
@@ -535,7 +566,7 @@ work gets done.
      HOW TO USE
      ====================================================================== */
   howToLede:
-    'Thirteen levels, roughly three months at a few hours a week. Levels 00 to 03 are the foundation — do not rush them.',
+    'Fourteen levels, roughly three months at a few hours a week. Levels 00 to 03 are the foundation — do not rush them.',
 
   howTo: `## The one idea that organizes everything
 
@@ -597,6 +628,7 @@ about it.
 | **08–10** | The frontier. More reading, less arithmetic. |
 | **11** | The architecture zoo. Read it any time after 06 — it is the level that makes the others compose. |
 | **12** | Inside one engine. Read it after 05, 06 and 09 — it is where their scheduling, memory and distributed-execution material meets in a single running system. |
+| **13** | The silicon underneath. Read it after 04 — it is the roofline applied to the machine itself, and it explains why the GPU/TPU comparisons you will be asked to make are usually bandwidth comparisons in disguise. |
 
 At a few hours a week this is roughly three months. There is no benefit to going faster; the
 checkpoints are honest gates and the material compounds.
@@ -612,7 +644,7 @@ checkpoints are honest gates and the material compounds.
 
 Marking a level cleared stores it in your browser's local storage. Nothing is sent anywhere,
 there is no account, and clearing your browser data resets it. The score is cosmetic: 2,200
-points a level, 28,600 for all thirteen.
+points a level, 30,800 for all fourteen.
 
 Arrow keys move between levels.
 

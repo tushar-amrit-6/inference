@@ -35,7 +35,7 @@
   var cy = function (r) { return PAD + r * TILE + TILE / 2; };
 
   function open(r, c) {
-    return r >= 0 && r < ROWS && c >= 0 && c < COLS && /[.o0-9ABC]/.test(MAP[r].charAt(c));
+    return r >= 0 && r < ROWS && c >= 0 && c < COLS && /[.o0-9A-D]/.test(MAP[r].charAt(c));
   }
 
   var DIRS = {

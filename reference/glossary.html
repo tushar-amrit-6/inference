@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GLOSSARY — LLM INFERENCE</title>
-<meta name="description" content="120 terms from across all thirteen levels, each linked back to where it is explained.">
+<meta name="description" content="136 terms from across all fourteen levels, each linked back to where it is explained.">
 <meta name="color-scheme" content="dark light">
 <script>/* set the stored theme before first paint, so there is no flash of the wrong one */
 (function(){try{var t=localStorage.getItem('llm-inference:theme');
 if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <meta property="og:title" content="GLOSSARY — LLM INFERENCE">
-<meta property="og:description" content="120 terms from across all thirteen levels, each linked back to where it is explained.">
+<meta property="og:description" content="136 terms from across all fourteen levels, each linked back to where it is explained.">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,7 +24,7 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
   <a class="scorebar__home" href="../index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="currentColor" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
   
   <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
-  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/13</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/14</span></span>
   <span class="scorebar__spacer"></span>
   <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
   <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch theme">
@@ -37,7 +37,7 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
     <div class="mod-head">
       <p class="mod-head__level">REFERENCE</p>
       <h1 class="mod-head__title">GLOSSARY</h1>
-      <p class="mod-head__tag">120 terms from across all thirteen levels, each linked back to where it is explained.</p>
+      <p class="mod-head__tag">136 terms from across all fourteen levels, each linked back to where it is explained.</p>
     </div>
     <section class="section">
     <div class="gloss">
@@ -180,6 +180,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="gloss__term">hidden state<br><a href="../modules/transformer-fundamentals.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 00</a></div>
         <div class="gloss__def">One d_model-length slice of the residual stream, at one position and one layer.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">ICI (Inter-Chip Interconnect)<br><a href="../modules/gpus-and-tpus.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 13</a></div>
+        <div class="gloss__def">The direct chip-to-chip links forming a TPU pod's 2D or 3D torus. Around 100 GB/s per link on a v5p, and the same bandwidth whether the pod has 64 chips or thousands.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">image tokens<br><a href="../modules/model-architectures.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 11</a></div>
         <div class="gloss__def">The positions a vision encoder and projector contribute to the language model sequence. 576 for LLaVA-1.5, thousands under tiling schemes.</div>
       </div><div class="gloss__row">
@@ -228,17 +231,26 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="gloss__term">MQA<br><a href="../modules/kv-cache.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 02</a></div>
         <div class="gloss__def">Multi-query attention: a single KV head shared by all query heads. Maximum cache savings, largest quality cost.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">MXU<br><a href="../modules/gpus-and-tpus.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 13</a></div>
+        <div class="gloss__def">A TPU's Matrix Multiply Unit: a 128×128 weight-stationary systolic array. A v5p TensorCore has four; a chip has two TensorCores.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">n-gram lookup<br><a href="../modules/speculative-decoding.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 08</a></div>
         <div class="gloss__def">Drafting by searching the context for the current suffix and proposing what followed it. Free, and excellent on repetitive text.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">NVLink<br><a href="../modules/distributed-inference.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 09</a></div>
         <div class="gloss__def">High-bandwidth GPU-to-GPU interconnect, ~900 GB/s on H100. Roughly 14x faster than PCIe Gen5.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">occupancy<br><a href="../modules/gpus-and-tpus.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 13</a></div>
+        <div class="gloss__def">How many warps are resident on an SM relative to the maximum. It is the GPU's mechanism for hiding memory latency: with nothing else resident, a stall is an idle cycle.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">online softmax<br><a href="../modules/attention-kernels.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 07</a></div>
         <div class="gloss__def">Computing softmax incrementally with a running max and sum, rescaling earlier partials when a larger value appears. Exact, not approximate.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">open-loop load<br><a href="../modules/systems-and-frontier.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 10</a></div>
         <div class="gloss__def">Arrivals follow an external schedule (usually Poisson) regardless of server state. The only way to observe overload.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">optical circuit switch (OCS)<br><a href="../modules/gpus-and-tpus.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 13</a></div>
+        <div class="gloss__def">The reconfigurable optical fabric connecting TPU v4 cubes, allowing a job's topology to be chosen at schedule time and failed cubes to be routed around.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">PagedAttention<br><a href="../modules/memory-optimization.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 06</a></div>
         <div class="gloss__def">Fixed-size block allocation for the KV cache with per-sequence block tables, borrowed from OS virtual memory. Cuts fragmentation waste from 60-80% to under 4%.</div>
@@ -248,6 +260,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
       </div><div class="gloss__row">
         <div class="gloss__term">pipeline bubble<br><a href="../modules/distributed-inference.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 09</a></div>
         <div class="gloss__def">Idle stage time while the pipeline fills and drains. Fraction is (N-1)/(M+N-1) for M microbatches and N stages.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">pipeline fill (array)<br><a href="../modules/gpus-and-tpus.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 13</a></div>
+        <div class="gloss__def">The cycles before a systolic array's first result emerges, while the wavefront crosses it. Costs a matmul of m rows roughly m/(m+128) of peak on a 128-wide array.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">pipeline parallelism (PP)<br><a href="../modules/distributed-inference.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 09</a></div>
         <div class="gloss__def">Assigning different layers to different GPUs. One activation hand-off per stage boundary. Tolerates slow links.</div>
@@ -321,11 +336,17 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="gloss__term">SGLang<br><a href="../modules/systems-and-frontier.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 10</a></div>
         <div class="gloss__def">Serving engine organized around structured, prefix-sharing workloads: RadixAttention plus a frontend programming language.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">shape bucketing<br><a href="../modules/gpus-and-tpus.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 13</a></div>
+        <div class="gloss__def">Quantizing dynamic dimensions (batch, context length) to a small set of values and padding up, so a serving loop needs only a few cached compiled programs instead of one per distinct shape.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">shared expert<br><a href="../modules/model-architectures.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 11</a></div>
         <div class="gloss__def">An expert every token reads, alongside its routed ones. Absorbs the common knowledge that would otherwise be duplicated into every expert.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">shared memory / SRAM<br><a href="../modules/attention-kernels.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 07</a></div>
         <div class="gloss__def">On-chip memory, ~228 KB per SM on Hopper, with roughly 6x the bandwidth of HBM. The tier FlashAttention keeps its tiles in.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">SIMT<br><a href="../modules/gpus-and-tpus.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 13</a></div>
+        <div class="gloss__def">Single instruction, multiple threads — the GPU execution model where a warp of 32 threads issues one instruction together, with divergent branches serialized under lane masks.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">sliding-window attention<br><a href="../modules/model-architectures.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 11</a></div>
         <div class="gloss__def">Attending only to the last w positions, which makes the cache constant in context rather than linear. Bounds the cache, not the receptive field.</div>
@@ -348,17 +369,26 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="gloss__term">static batching<br><a href="../modules/batching.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 05</a></div>
         <div class="gloss__def">Fixed batch that runs to completion. Utilization collapses when sequence lengths vary, and gets worse as batch grows.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">streaming multiprocessor (SM)<br><a href="../modules/gpus-and-tpus.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 13</a></div>
+        <div class="gloss__def">The GPU's independent execution unit: warp schedulers, registers, shared memory and tensor cores. An H100 SXM has 132 of them.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">swap<br><a href="../modules/how-vllm-works.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 12</a></div>
         <div class="gloss__def">Preemption that copies a sequence’s KV blocks to host memory and back, preserving the cache at the cost of a PCIe round trip.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">SwiGLU<br><a href="../modules/transformer-fundamentals.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 00</a></div>
         <div class="gloss__def">The gated feed-forward block used by Llama-family models: down(silu(gate(x)) * up(x)). Three weight matrices instead of two.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">systolic array<br><a href="../modules/gpus-and-tpus.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 13</a></div>
+        <div class="gloss__def">A mesh of multiply-accumulate cells wired to their neighbours, through which operands flow and partial sums accumulate. One memory read feeds many multiplications, which is where its energy advantage comes from.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">teacher forcing<br><a href="../modules/transformer-fundamentals.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 00</a></div>
         <div class="gloss__def">Training on the known target sequence so all positions are computed in one parallel pass. The reason training is far more hardware-efficient than generation.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">temperature<br><a href="../modules/decoding-and-sampling.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 03</a></div>
         <div class="gloss__def">Divisor applied to logits before softmax. Below 1 sharpens, above 1 flattens.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">tensor core<br><a href="../modules/gpus-and-tpus.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 13</a></div>
+        <div class="gloss__def">The matrix-multiply unit inside an SM, where essentially all of a GPU's FLOPs live. Not a systolic array in the TPU sense, despite the name.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">tensor parallelism (TP)<br><a href="../modules/distributed-inference.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 09</a></div>
         <div class="gloss__def">Splitting weight matrices within a layer across GPUs. Two all-reduces per transformer layer. Needs NVLink.</div>
@@ -368,6 +398,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
       </div><div class="gloss__row">
         <div class="gloss__term">tied embeddings<br><a href="../modules/model-architectures.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 11</a></div>
         <div class="gloss__def">Reusing the input embedding matrix as the LM head. Saves vocab x d_model parameters — rounding error at 70B, a quarter of a 0.6B model.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">TMA (Tensor Memory Accelerator)<br><a href="../modules/gpus-and-tpus.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 13</a></div>
+        <div class="gloss__def">Hopper's asynchronous DMA engine for moving tiles between global and shared memory without spending warps on address arithmetic.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">token budget<br><a href="../modules/batching.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 05</a></div>
         <div class="gloss__def">The cap on tokens processed per scheduler iteration. Decode tokens are admitted first, prefill chunks fill the rest.</div>
@@ -393,14 +426,29 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="gloss__term">vLLM<br><a href="../modules/systems-and-frontier.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 10</a></div>
         <div class="gloss__def">Serving engine organized around memory management: PagedAttention, continuous batching, broad model support.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">VMEM<br><a href="../modules/gpus-and-tpus.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 13</a></div>
+        <div class="gloss__def">A TPU's on-chip scratchpad, roughly 128 MiB on recent generations, entirely managed by the compiler. There is no cache behind it.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">VPU<br><a href="../modules/gpus-and-tpus.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 13</a></div>
+        <div class="gloss__def">The TPU's vector unit, an (8, 128) lane array that handles the elementwise work — softmax, normalization, activations, residual adds — that the MXU cannot.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">warp<br><a href="../modules/gpus-and-tpus.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 13</a></div>
+        <div class="gloss__def">The 32-thread group a GPU schedules as a unit. Hopper adds the warpgroup — four warps issuing one wgmma matrix instruction together.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">warp specialization<br><a href="../modules/attention-kernels.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 07</a></div>
         <div class="gloss__def">Assigning different warps within a block to different roles (producer/consumer) so data movement overlaps computation. Central to FlashAttention-3.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">weight-stationary<br><a href="../modules/gpus-and-tpus.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 13</a></div>
+        <div class="gloss__def">A dataflow in which a tile of weights is loaded into the array and held while activations stream through, rather than both operands moving.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">worker process<br><a href="../modules/how-vllm-works.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 12</a></div>
         <div class="gloss__def">One per GPU in a multi-GPU deployment; holds a shard of the model and executes the batch the driver assigned, exchanging activations with other workers via NCCL under tensor parallelism.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">workspace<br><a href="../modules/kv-cache.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 02</a></div>
         <div class="gloss__def">GPU memory reserved for activations, temporary buffers, and communication. Typically 10-20 GB, and easy to forget when budgeting.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">XLA<br><a href="../modules/gpus-and-tpus.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 13</a></div>
+        <div class="gloss__def">The compiler that turns a JAX or TensorFlow graph into a statically scheduled TPU program. It specializes on tensor shapes, which is why shape variety costs compilations.</div>
       </div>
     </div>
   </section>
@@ -411,11 +459,11 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
     <div class="foot__grid">
       <div>
         <p class="foot__h">LEVELS</p>
-        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li></ul>
+        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li></ul>
       </div>
       <div>
         <p class="foot__h">&nbsp;</p>
-        <ul><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li><li><a href="../modules/model-architectures.html">11 · MODEL ARCHITECTURES</a></li><li><a href="../modules/how-vllm-works.html">12 · HOW VLLM WORKS</a></li></ul>
+        <ul><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li><li><a href="../modules/model-architectures.html">11 · MODEL ARCHITECTURES</a></li><li><a href="../modules/how-vllm-works.html">12 · HOW VLLM WORKS</a></li><li><a href="../modules/gpus-and-tpus.html">13 · GPUS AND TPUS</a></li></ul>
       </div>
       <div>
         <p class="foot__h">REFERENCE</p>

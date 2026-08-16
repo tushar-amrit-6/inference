@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>13 · GPUS AND TPUS — LLM INFERENCE</title>
+<meta name="description" content="Two chips built on opposite philosophies, bolted to the same kind of memory. What a systolic array buys, what a warp scheduler buys, and why decode barely notices either.">
+<meta name="color-scheme" content="dark light">
+<script>/* set the stored theme before first paint, so there is no flash of the wrong one */
+(function(){try{var t=localStorage.getItem('llm-inference:theme');
+if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<meta property="og:title" content="13 · GPUS AND TPUS — LLM INFERENCE">
+<meta property="og:description" content="Two chips built on opposite philosophies, bolted to the same kind of memory. What a systolic array buys, what a warp scheduler buys, and why decode barely notices either.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/arcade.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20fill%3D%22%23000%22%2F%3E%3Cpath%20d%3D%22M16%2C16%20L29%2C9%20A15%2C15%200%201%200%2029%2C23%20Z%22%20fill%3D%22%23FFE800%22%2F%3E%3C%2Fsvg%3E">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="scorebar">
+  <a class="scorebar__home" href="../index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="currentColor" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
+  <span class="scorebar__item"><span class="scorebar__label">LEVEL</span><span class="scorebar__value scorebar__value--pac">13</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/14</span></span>
+  <span class="scorebar__spacer"></span>
+  <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
+  <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch theme">
+    <svg class="icon-moon" width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M6.2 1.4A6.6 6.6 0 1 0 14.6 9.8 5.2 5.2 0 0 1 6.2 1.4z"/></svg>
+    <svg class="icon-sun" width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="8" r="3.2"/><path d="M8 .8v2.1M8 13.1v2.1M.8 8h2.1M13.1 8h2.1M2.9 2.9l1.5 1.5M11.6 11.6l1.5 1.5M13.1 2.9l-1.5 1.5M4.4 11.6l-1.5 1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+  </button>
+</header>
+<div class="wrap">
+  <div class="shell">
+    <nav class="rail" aria-label="Module contents">
+  <p class="rail__head">ON THIS LEVEL</p>
+  <ul class="rail__list">
+    <li><a class="rail__link" href="#big-idea" data-kind="dot"><span class="rail__dot"></span><span>The big idea</span></a></li><li><a class="rail__link" href="#concept-0" data-kind="dot"><span class="rail__dot"></span><span>Same wall, two floor plans</span></a></li><li><a class="rail__link" href="#concept-1" data-kind="dot"><span class="rail__dot"></span><span>Inside a GPU: oversubscription as a design principle</span></a></li><li><a class="rail__link" href="#concept-2" data-kind="dot"><span class="rail__dot"></span><span>Inside a TPU: a matmul built out of wires</span></a></li><li><a class="rail__link" href="#concept-3" data-kind="dot"><span class="rail__dot"></span><span>Cache or scratchpad: who decides what stays on chip</span></a></li><li><a class="rail__link" href="#concept-4" data-kind="dot"><span class="rail__dot"></span><span>Who schedules, and when: runtime hardware versus an ahead-of-time compiler</span></a></li><li><a class="rail__link" href="#concept-5" data-kind="dot"><span class="rail__dot"></span><span>The fabric: an island with a cliff, or a torus with a diameter</span></a></li><li><a class="rail__link" href="#math-lab" data-kind="dot"><span class="rail__dot"></span><span>Math by hand</span></a></li><li><a class="rail__link" href="#code-lab" data-kind="dot"><span class="rail__dot"></span><span>Code lab</span></a></li><li><a class="rail__link" href="#papers" data-kind="dot"><span class="rail__dot"></span><span>Papers</span></a></li><li><a class="rail__link" href="#pitfalls" data-kind="dot"><span class="rail__dot"></span><span>Pitfalls</span></a></li><li><a class="rail__link" href="#checkpoint" data-kind="power"><span class="rail__dot"></span><span>Checkpoint</span></a></li><li><a class="rail__link" href="#glossary" data-kind="dot"><span class="rail__dot"></span><span>Glossary</span></a></li>
+  </ul>
+  <div class="rail__nav">
+    <a class="rail__step" href="how-vllm-works.html">◀ 12 HOW VLLM WORKS</a>
+    <a class="rail__step" href="../index.html">▲ ALL LEVELS</a>
+    
+  </div>
+</nav>
+    <main id="main">
+
+      <div class="mod-head">
+        <p class="mod-head__level">LEVEL 13</p>
+        <h1 class="mod-head__title">GPUS AND TPUS</h1>
+        <p class="mod-head__tag">Two chips built on opposite philosophies, bolted to the same kind of memory. What a systolic array buys, what a warp scheduler buys, and why decode barely notices either.</p>
+        <div class="mod-head__meta">
+          <span>⏱ 6–8 hours</span>
+          <span>● 6 concepts</span>
+          <span>📄 5 papers</span>
+          <span>▸ needs: Module 4, Module 7, Module 9</span>
+        </div>
+      </div>
+
+      <section class="section" id="at-a-glance">
+        <p class="eyebrow" style="margin-bottom:var(--s5)">AT A GLANCE · THE WHOLE LEVEL ON ONE PAGE</p>
+        <figure class="fig"><div class="fig__scroll"><svg class="fig__svg" viewBox="0 0 1044 504" width="1044" height="504" role="img" aria-labelledby="fig13-t fig13-d" xmlns="http://www.w3.org/2000/svg"><title id="fig13-t">Two floor plans, one memory wall</title><desc id="fig13-d">A GPU column and a TPU column side by side. The GPU stacks 132 streaming multiprocessors over 228 kilobytes of shared memory per SM, a 50 megabyte hardware-managed L2, and 80 gigabytes of HBM at 3.35 terabytes per second. The TPU stacks eight 128 by 128 systolic arrays over a vector unit, 128 mebibytes of compiler-managed VMEM with no cache, and 95 gigabytes of HBM at 2.77 terabytes per second. Below, three regimes: at batch one both are bound by HBM and the gap is exactly the bandwidth ratio; at large batch the array fill decides; at scale the interconnect decides.</desc><defs><pattern id="fig13-grid" width="18" height="18" patternUnits="userSpaceOnUse"><path d="M 18 0 L 0 0 0 18" fill="none" stroke="var(--grid-line)" stroke-width="1"/></pattern><marker id="fig13-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--ink-dim)"/></marker><marker id="fig13-ah-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/></marker></defs><rect width="1044" height="504" fill="var(--grid-bg)"/><rect width="1044" height="504" fill="url(#fig13-grid)"/><text x="27" y="28.8" font-family="var(--display)" font-size="10.5" fill="var(--accent)" text-anchor="start" dominant-baseline="middle">LEVEL 13 · TWO FLOOR PLANS, ONE MEMORY WALL</text><line x1="27" y1="43.2" x2="1017" y2="43.2" stroke="var(--ink-faint)" stroke-width="1"/><text x="27" y="66.6" font-family="var(--body)" font-size="15.5" font-style="italic" fill="var(--ink-faint)" text-anchor="start" dominant-baseline="middle">both attached to the same generation of HBM, within 1.2x on bandwidth</text><line x1="522" y1="86.4" x2="522" y2="352.8" stroke="var(--ink-faint)" stroke-width="1"/><text x="27" y="97.2" font-family="var(--display)" font-size="10.5" fill="var(--accent)" text-anchor="start" dominant-baseline="middle">GPU · H100 · SIMT, RUNTIME</text><g><rect x="27" y="111.6" width="468" height="54" rx="4" fill="var(--phosphor)" stroke="var(--pinky)" stroke-width="1.6"/><text x="261" y="130.5" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">132 × SM</text><text x="261" y="148.5" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="middle" dominant-baseline="middle">4 warp schedulers, 4 tensor cores each</text></g><g><rect x="27" y="180" width="468" height="46.8" rx="4" fill="var(--phosphor)" stroke="var(--ink-dim)" stroke-width="1.6"/><text x="261" y="195.3" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">SHARED MEM / L1 · 228 KB per SM</text><text x="261" y="213.3" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="middle" dominant-baseline="middle">you place every byte</text></g><g><rect x="27" y="237.6" width="468" height="46.8" rx="4" fill="var(--phosphor)" stroke="var(--ink-faint)" stroke-width="1.6"/><text x="261" y="252.9" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">L2 CACHE · 50 MB</text><text x="261" y="270.9" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="middle" dominant-baseline="middle">the hardware decides what stays</text></g><g><rect x="27" y="295.2" width="468" height="54" rx="4" fill="color-mix(in srgb, var(--maze) 14%, transparent)" stroke="var(--accent)" stroke-width="1.6"/><text x="261" y="314.1" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">HBM3 · 80 GB · 3.35 TB/s</text><text x="261" y="332.1" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="middle" dominant-baseline="middle">ridge 295 — saturates at batch 295</text></g><text x="549" y="97.2" font-family="var(--display)" font-size="10.5" fill="var(--accent)" text-anchor="start" dominant-baseline="middle">TPU · v5p · SYSTOLIC, AHEAD-OF-TIME</text><g><rect x="549" y="111.6" width="468" height="54" rx="4" fill="var(--phosphor)" stroke="var(--clyde)" stroke-width="1.6"/><text x="783" y="130.5" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">8 × MXU · 128×128</text><text x="783" y="148.5" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="middle" dominant-baseline="middle">weight-stationary, fill = 128 cycles</text></g><g><rect x="549" y="180" width="468" height="46.8" rx="4" fill="var(--phosphor)" stroke="var(--ink-dim)" stroke-width="1.6"/><text x="783" y="195.3" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">VPU (8,128) + SCALAR · VLIW</text><text x="783" y="213.3" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="middle" dominant-baseline="middle">softmax, norms, in-order issue</text></g><g><rect x="549" y="237.6" width="468" height="46.8" rx="4" fill="var(--phosphor)" stroke="var(--ink-faint)" stroke-width="1.6"/><text x="783" y="252.9" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">VMEM · ~128 MiB · NO CACHE</text><text x="783" y="270.9" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="middle" dominant-baseline="middle">XLA places every byte</text></g><g><rect x="549" y="295.2" width="468" height="54" rx="4" fill="color-mix(in srgb, var(--maze) 14%, transparent)" stroke="var(--accent)" stroke-width="1.6"/><text x="783" y="314.1" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">HBM · 95 GB · 2.77 TB/s</text><text x="783" y="332.1" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="middle" dominant-baseline="middle">ridge 166 — saturates at batch 166</text></g><line x1="27" y1="363.6" x2="1017" y2="363.6" stroke="var(--ink-faint)" stroke-width="1"/><text x="27" y="378" font-family="var(--display)" font-size="10.5" fill="var(--accent)" text-anchor="start" dominant-baseline="middle">WHERE IT SHOWS UP — AND WHERE IT DOES NOT</text><g><rect x="27" y="392.4" width="306" height="50.4" rx="4" fill="var(--phosphor)" stroke="var(--accent)" stroke-width="1.6"/><text x="180" y="409.5" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">DECODE, BATCH 1</text><text x="180" y="427.5" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="middle" dominant-baseline="middle">both bound by HBM</text></g><g><rect x="369" y="392.4" width="306" height="50.4" rx="4" fill="var(--phosphor)" stroke="var(--clyde)" stroke-width="1.6"/><text x="522" y="409.5" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">LARGE BATCH</text><text x="522" y="427.5" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="middle" dominant-baseline="middle">array fill decides</text></g><g><rect x="711" y="392.4" width="306" height="50.4" rx="4" fill="var(--phosphor)" stroke="var(--pinky)" stroke-width="1.6"/><text x="864" y="409.5" font-family="var(--mono)" font-size="16" font-weight="600" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">AT SCALE</text><text x="864" y="427.5" font-family="var(--mono)" font-size="13.5" fill="var(--ink-dim)" text-anchor="middle" dominant-baseline="middle">the fabric decides</text></g><text x="27" y="459" font-family="var(--body)" font-size="15.5" font-style="italic" fill="var(--ink-dim)" text-anchor="start" dominant-baseline="middle">4.79 ms vs 5.81 ms — and</text><text x="27" y="477" font-family="var(--body)" font-size="15.5" font-style="italic" fill="var(--ink-dim)" text-anchor="start" dominant-baseline="middle">that IS the bandwidth ratio</text><text x="369" y="459" font-family="var(--body)" font-size="15.5" font-style="italic" fill="var(--ink-dim)" text-anchor="start" dominant-baseline="middle">50% of peak at 128 tokens,</text><text x="369" y="477" font-family="var(--body)" font-size="15.5" font-style="italic" fill="var(--ink-dim)" text-anchor="start" dominant-baseline="middle">80% at 512 — geometry, not HBM</text><text x="711" y="459" font-family="var(--body)" font-size="15.5" font-style="italic" fill="var(--ink-dim)" text-anchor="start" dominant-baseline="middle">TP-64: 0.28 ms on a torus,</text><text x="711" y="477" font-family="var(--body)" font-size="15.5" font-style="italic" fill="var(--ink-dim)" text-anchor="start" dominant-baseline="middle">3.30 ms across InfiniBand</text></svg></div><figcaption class="fig__cap">Everything above the HBM row is where the two designs disagree. Decoding one token reads only the HBM row — which is why single-stream benchmarks of these two chips are bandwidth measurements wearing a compute measurement’s clothes.</figcaption></figure>
+      </section>
+
+      <section class="section ghost ghost--pinky" id="big-idea">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--pinky)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>PINKY · THE BIG IDEA</p>
+        <div class="prose"><p>Every roofline in this course so far has been drawn for one machine — an H100 — and every conclusion has been about the <em>shape</em> of the roofline rather than the chip underneath it. This level swaps the chip out and asks which of those conclusions survive.</p>
+<p>The two designs could hardly have started further apart. The GPU is a graphics processor that grew into a general-purpose parallel machine: thousands of hardware threads, a scheduler that picks which of them runs each cycle, a cache hierarchy that guesses what you will need next, and matrix units bolted on later as an accelerator inside an accelerator. The TPU was designed backwards from one operation. Google built the first one because a projection said that if speech recognition took off, they would need to double their datacenter footprint — so the chip is a matrix multiplier with the smallest amount of other machinery that will keep it fed. No caches in the GPU sense. No dynamic instruction scheduling. One enormous grid of multiply-accumulate cells with data flowing through it.</p>
+<p>And yet: <strong>both are attached to HBM, and their bandwidths differ by less than a factor of two.</strong> That is the fact this whole level turns on. Generating one token at batch 1 means reading every weight once, so decode time is <code>weight_bytes / bandwidth</code> on both machines, and every architectural difference below — the systolic array, the warp scheduler, the scratchpad, the compiler — sits on the side of the ledger that decode never reads. The differences are real and they are large, but they show up in <em>prefill</em>, in <em>large-batch decode</em>, in <em>energy per token</em>, and in <em>what happens when you need 64 chips instead of 8</em> — never in the single-stream latency number people usually quote when comparing them.</p>
+<p>By the end you should be able to look at any accelerator datasheet — including ones that do not exist yet — and work out in about five minutes what it will and will not do for inference: what its ridge point is, what batch size its arithmetic geometry demands, how far its fast interconnect reaches, and which of those three will bite you first.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="concepts">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>PELLETS · CONCEPTS</p>
+        <article class="concept" id="concept-0">
+  <div class="concept__head">
+    <span class="concept__n">01</span>
+    <h3 class="concept__title">Same wall, two floor plans</h3>
+  </div>
+  <div class="prose"><p>Put the two families in one table and the first thing to notice is how <em>similar</em> the column that matters is.</p>
+<table><thead><tr><th>chip</th><th>HBM</th><th>bandwidth</th><th>dense bf16</th><th>ridge point</th></tr></thead><tbody><tr><td>A100 80GB</td><td>80 GB</td><td>2.04 TB/s</td><td>312 TFLOP/s</td><td>153</td></tr><tr><td>H100 SXM</td><td>80 GB</td><td>3.35 TB/s</td><td>989 TFLOP/s</td><td>295</td></tr><tr><td>H200 SXM</td><td>141 GB</td><td>4.8 TB/s</td><td>989 TFLOP/s</td><td>206</td></tr><tr><td>TPU v4</td><td>32 GB</td><td>1.2 TB/s</td><td>275 TFLOP/s</td><td>229</td></tr><tr><td>TPU v5e</td><td>16 GB</td><td>0.82 TB/s</td><td>197 TFLOP/s</td><td>241</td></tr><tr><td>TPU v5p</td><td>95 GB</td><td>2.77 TB/s</td><td>459 TFLOP/s</td><td>166</td></tr><tr><td>TPU v6e</td><td>32 GB</td><td>1.64 TB/s</td><td>~918 TFLOP/s</td><td>~560</td></tr></tbody></table>
+<p>Nothing in that table is a different <em>kind</em> of number. Both families buy the same HBM stacks from the same two or three suppliers, and no amount of architectural cleverness on the compute side changes what those stacks deliver. So the ratio that Module 4 taught you to compute first — the ridge point, <code>dense FLOP/s ÷ bandwidth</code> — lands in the same band for both, roughly 150 to 300, and its ordering does not track any intuition about which chip is &quot;better.&quot; The v5p has the lowest ridge point in the table and the H100 nearly the highest; that means the v5p needs a smaller batch to saturate its arithmetic, which is a statement about the <em>balance</em> of the part, not its speed. The v6e sits at ~560 for the opposite reason: its compute grew 4.7× over the v5e while its bandwidth only doubled. Same memory wall, same direction of travel, on both sides of the aisle.</p>
+<p>The consequence is worth being blunt about, because it is the conclusion most comparisons get wrong. <strong>At batch 1, decoding on a TPU and decoding on a GPU are the same operation with the same bottleneck, and the faster chip is simply the one with more bandwidth.</strong> Every structural difference in the rest of this level — a systolic array versus tensor cores, a compiler-managed scratchpad versus hardware caches, a torus versus an NVLink island — is invisible to that measurement. They become visible the moment you leave it: at prefill, at large batch, at scale, and on the power bill.</p>
+<p>One clarification before going further, because the vocabulary is genuinely confusing. &quot;TPU&quot; here means Google's Tensor Processing Unit, whose compute core is a systolic array. &quot;Tensor core&quot; means the matrix unit inside an NVIDIA SM, which is <em>not</em> a systolic array in the same sense. The names collide; the designs do not.</p></div>
+  <pre class="ascii" aria-label="diagram">  ONE DECODE STEP, LLAMA-3-8B fp16, BATCH 1
+
+  H100 SXM   weights  16.06 GB / 3.35 TB/s  ████████████████       4.79 ms
+             math    16.06 GFLOP / 989 TF/s  ▏                     0.02 ms
+
+  TPU v5p    weights  16.06 GB / 2.77 TB/s  ███████████████████    5.81 ms
+             math    16.06 GFLOP / 459 TF/s  ▏                     0.03 ms
+
+  The gap between the two machines is 1.21× — exactly their bandwidth ratio.
+  A systolic array, a warp scheduler, a cache, a compiler: none of them
+  contribute anything to these four rows. That is what this level is about.</pre>
+  <p class="keypoint"><b>REMEMBER</b>GPUs and TPUs are both HBM-attached and within ~2× on bandwidth, so at batch 1 they are the same machine; every difference below lives on the compute and network side of the roofline.</p>
+</article>
+<article class="concept" id="concept-1">
+  <div class="concept__head">
+    <span class="concept__n">02</span>
+    <h3 class="concept__title">Inside a GPU: oversubscription as a design principle</h3>
+  </div>
+  <div class="prose"><p>An H100 SXM is 132 <strong>streaming multiprocessors</strong>. Each SM is divided into four processing blocks, and each block has its own warp scheduler, its own register file slice, and its own tensor core. Around them sits 256 KB of registers and up to 228 KB of combined L1/shared memory per SM, backed by a 50 MB L2 shared across the chip and then 80 GB of HBM3.</p>
+<p>The unit of execution is the <strong>warp</strong>: 32 threads that issue the same instruction together. This is SIMT — single instruction, multiple threads — and it is a compromise between the two obvious designs. You write scalar code for one thread, and the hardware runs 32 of them in lockstep; when they disagree at a branch, the hardware executes both sides with some lanes masked off, which is correct but costs you the lanes. So control flow is <em>allowed</em> but <em>priced</em>.</p>
+<p>The interesting design choice is what the GPU does about memory latency, which is roughly 500 cycles to HBM. It does not try to avoid the wait. It oversubscribes: an SM can hold up to 64 warps resident simultaneously, each with its registers already allocated, and every cycle the scheduler picks one that is not blocked and issues from it. <strong>Latency is hidden by having somebody else to run</strong>, and the metric for whether you have enough somebodies is occupancy. This is the deep reason GPUs need thousands of threads to go fast, and the reason a kernel that uses too many registers per thread runs slowly even when it is doing the right arithmetic — fewer registers left over means fewer resident warps means nothing to switch to when one stalls.</p>
+<p>The tensor cores are a later addition, and it shows in how they are reached. They are per-processing block instructions, not a separate chip: a warp (Volta through Ampere) or a <strong>warpgroup</strong> of four warps (Hopper's <code>wgmma</code>) collectively issues a matrix-multiply-accumulate over operands staged in registers and shared memory. Two numbers put them in perspective. First, they are where essentially all the FLOPs are — the H100's non-tensor FP32 throughput is around 67 TFLOP/s against 989 TFLOP/s dense BF16 on the tensor cores, so a kernel that does not use them is leaving roughly 93% of the machine unused. Second, they are fast enough that feeding them is the entire problem, which is why Hopper also added the <strong>Tensor Memory Accelerator</strong> — a DMA engine that copies tiles between global and shared memory asynchronously, so the SM does not spend its warps on address arithmetic — and thread-block clusters, which let neighbouring SMs read each other's shared memory.</p>
+<p>Every one of these features is a way of getting bytes to the matrix units on a machine whose organising principle is <em>generality</em>. That generality is not free, and the next concept is what a chip looks like when it declines to pay for it.</p></div>
+  <pre class="ascii" aria-label="diagram">  ONE SM (× 132 on an H100)
+
+  ┌──────────────────────────────────────────────────────┐
+  │  4 × [ warp scheduler │ regs 64 KB │ TENSOR CORE ]   │
+  │                                                      │
+  │  up to 64 resident warps — the scheduler issues      │
+  │  (2048 threads)            from any warp that is     │
+  │                            not stalled this cycle    │
+  │                                                      │
+  │  SHARED MEMORY / L1 : 228 KB   ← you manage this     │
+  └────────────────────────────┬─────────────────────────┘
+                               │
+                      L2 CACHE 50 MB   ← hardware manages this
+                               │
+                      HBM3 80 GB @ 3.35 TB/s   ~500 cycles away</pre>
+  <p class="keypoint"><b>REMEMBER</b>A GPU hides memory latency by keeping far more threads resident than it can run, and a hardware scheduler picks a ready one every cycle; the matrix units are an accelerator inside that machine, not the machine itself.</p>
+</article>
+<article class="concept" id="concept-2">
+  <div class="concept__head">
+    <span class="concept__n">03</span>
+    <h3 class="concept__title">Inside a TPU: a matmul built out of wires</h3>
+  </div>
+  <div class="prose"><p>A TPU chip contains one or two <strong>TensorCores</strong> (v5e has one, v4 and v5p have two). A TensorCore is four <strong>MXUs</strong>, a vector unit, and a scalar unit, and almost all of the silicon and all of the headline FLOPs are in the MXUs.</p>
+<p>An MXU is a 128×128 grid of multiply-accumulate cells — 16,384 of them — wired only to their immediate neighbours. In the weight-stationary dataflow TPUs use, a 128×128 tile of the weight matrix is loaded into the grid and held there. Activation rows then enter from the left, one per cycle, and partial sums flow downward, each cell adding its own product to the sum arriving from above. After the wavefront has crossed the array, a finished row of outputs emerges from the bottom every cycle.</p>
+<p>The reason to build a matmul this way is not that it is faster per MAC. It is what does <em>not</em> happen. In a conventional design, each multiply-accumulate reads two operands from a register file and writes one back; the register file access costs several times more energy than the arithmetic does. In a systolic array, the operand is handed directly from one cell to its neighbour along a wire that is a few micrometres long. <strong>One value fetched from memory feeds 128 multiplications on its way through the array</strong>, and the intermediate sums are never written anywhere addressable. That is the whole trick, and it is a dataflow trick rather than a circuit one.</p>
+<p>You can check the geometry against the datasheet, which is a good habit and the first thing the math lab asks you to do. A v4 chip has 8 MXUs; each retires 128 × 128 MACs — 2 FLOP apiece — per cycle, so peak equals <code>8 × 16,384 × 2 × clock</code>. Setting that to the published 275 TFLOP/s gives 1.05 GHz, which is exactly the v4's documented clock. The arithmetic closes, which means the mental model is right.</p>
+<p>Two things follow from the geometry, and both matter more for inference than the energy story.</p>
+<p><strong>There is a pipeline to fill.</strong> The first output does not appear until the wavefront has crossed all 128 rows of the array. Streaming <em>m</em> rows through one weight tile therefore costs roughly <code>m + 128</code> cycles to do <em>m</em> rows of useful work, so the array runs at <code>m / (m + 128)</code> of peak: 50% at m = 128, 80% at m = 512, and 0.8% at m = 1. Real MXUs pipeline consecutive tiles to hide some of this, so the true curve is better than the naive one — but the shape is right, and it means <strong>the batch size at which a TPU becomes efficient is set by its array geometry, not only by its ridge point.</strong></p>
+<p><strong>128 becomes a quantum.</strong> Feeding a 128-wide array with a tensor whose dimension is not a multiple of 128 means padding, and padded lanes compute zeros at full cost. This is one of the quieter ways hardware has shaped models: it is not a coincidence that hidden sizes, head dimensions and intermediate widths in modern architectures are almost always multiples of 128.</p>
+<p>The rest of the TensorCore exists because a transformer is not only matmuls. The <strong>VPU</strong> is a (8, 128)-shaped lane array that does the elementwise work — softmax's exponentials, RMSNorm, SwiGLU's gating, the residual adds — and there is a scalar unit that runs the control flow and issues the very wide VLIW instruction bundles the whole core executes in order. Nothing here predicts branches, reorders instructions, or prefetches. What runs, and when, was decided by a compiler before the program started.</p></div>
+  <pre class="ascii" aria-label="diagram">  MXU: 128×128 WEIGHT-STATIONARY SYSTOLIC ARRAY
+
+                               w00     w01     w0n     ← a 128×128 weight tile,
+  row t   ─────────────►       ■ ────► ■ ────► ■       loaded once and held
+  row t+1 ─────────────►       ■       ■       ■
+  row t+2 ─────────────►       ■       ■       ■       activations enter left,
+                               │       │       │       sums fall downward
+                               ▼       ▼       ▼
+                               out0    out1    outn    one finished row per cycle
+
+  ONE activation read feeds 128 multiplies as it crosses ──►
+  ONE weight load feeds every row that streams through   ──▼
+
+  but: the wavefront needs 128 cycles to cross the array before
+       the first result appears  -&gt;  efficiency = m / (m + 128)</pre>
+  <p class="keypoint"><b>REMEMBER</b>The MXU is a 128×128 grid of multiply-accumulate cells with weights held stationary and activations flowing through; a value read once from memory feeds 128 multiplications, which is where the energy advantage comes from.</p>
+</article>
+<article class="concept" id="concept-3">
+  <div class="concept__head">
+    <span class="concept__n">04</span>
+    <h3 class="concept__title">Cache or scratchpad: who decides what stays on chip</h3>
+  </div>
+  <div class="prose"><p>Module 7 built FlashAttention out of one observation: the N×N score matrix never has to exist in HBM if you tile the computation so each tile fits in the fast tier. That reasoning is universal, but the tier it refers to is not the same object on the two machines.</p>
+<p>On a GPU there are two kinds of on-chip memory and they answer to different masters. <strong>Shared memory</strong> — up to 228 KB per SM, about 30 MB chip-wide — is a scratchpad you allocate and fill by hand, and it is what FlashAttention's tiles live in. <strong>L2</strong>, 50 MB, is a cache: the hardware decides what is in it, you influence it only indirectly through access patterns, and you find out whether your kernel used it well by measuring. The split is deliberate. Caches make unpredictable, pointer- chasing, branch-heavy code fast without anyone thinking about it, which is exactly what a general- purpose parallel machine needs.</p>
+<p>A TPU has no L1 or L2 in that sense. It has <strong>VMEM</strong>, a software-managed scratchpad of roughly 128 MiB on recent generations, and every byte that enters or leaves it does so because a compiler emitted an instruction saying so. Nothing is speculative, nothing is evicted behind your back, and there is no such thing as a cache miss — but equally, nothing is rescued at runtime if the schedule was wrong.</p>
+<p>Normalise those to compute and the difference stops looking like a detail. An H100 has about 30 KB of programmer-visible scratchpad per TFLOP/s of arithmetic. A v5p has about 286 KB — roughly <strong>9× more staging area per unit of compute</strong>. That is the single number that best explains why the two programming models feel so different. On a GPU, a kernel author's central problem is that the fast tier is tiny: everything is tiles, and FlashAttention is celebrated precisely because fitting attention into 228 KB took real invention. On a TPU, whole activations for a layer can sit in VMEM across several operations, so the equivalent optimisation is something the compiler does as a matter of course when it fuses a subgraph — not a paper.</p>
+<p>The trade is symmetric, and neither side is free. Hardware caches keep working when the access pattern is data-dependent, which is what a paged KV cache with a per-sequence block table is: a gather through an indirection computed at runtime. A statically scheduled scratchpad has to be told where the bytes are, which means the <em>shape</em> of that gather must be known when the program is compiled — even if the addresses are not. Which is the subject of the next concept, because it is the place where the TPU's design has the most direct consequences for a serving stack.</p></div>
+  <pre class="ascii" aria-label="diagram">  ON-CHIP STAGING, NORMALISED TO COMPUTE
+
+  H100      SMEM 228 KB × 132 SMs = 30 MB  +  L2 50 MB (hardware-managed)
+            ├── you manage ──┘                └── it manages ──┘
+            30 KB of scratchpad per TFLOP/s
+
+  TPU v5p   VMEM ~128 MiB, all compiler-managed, no cache
+            └────────── XLA manages every byte ──────────┘
+            286 KB of scratchpad per TFLOP/s     ~9× more</pre>
+  <p class="keypoint"><b>REMEMBER</b>A GPU gives you 228 KB of shared memory per SM behind a hardware-managed 50 MB L2; a TPU gives the compiler roughly 128 MiB of explicitly managed VMEM and no cache at all — about 9× more on-chip staging per unit of compute.</p>
+</article>
+<article class="concept" id="concept-4">
+  <div class="concept__head">
+    <span class="concept__n">05</span>
+    <h3 class="concept__title">Who schedules, and when: runtime hardware versus an ahead-of-time compiler</h3>
+  </div>
+  <div class="prose"><p>This is the difference that a serving engineer actually feels, and it is downstream of everything above.</p>
+<p>A CUDA kernel launch is a runtime event. You hand the driver a grid of blocks and a stream; the hardware distributes blocks to SMs as they free up, warps stall and resume on their own schedule, and the L2 fills with whatever was touched. Shapes can change between launches at no cost beyond possibly picking a different kernel, control flow can depend on data, and the same binary handles a batch of 1 and a batch of 137 without anyone recompiling anything. Eager-mode PyTorch is viable on GPUs <em>because</em> the hardware absorbs that much dynamism.</p>
+<p>A TPU program is compiled by <strong>XLA</strong> into a static schedule: which VLIW bundle issues on which cycle, which DMA moves which tile into VMEM and when, laid out ahead of time against a machine model. The compiler can do this only because it knows the shape of every tensor, which is why <strong>XLA specializes on shapes</strong>: change a batch size or a sequence length and you get a different program, compiled on first use, and cached under a key that includes those shapes.</p>
+<p>For training this is nearly all upside — shapes are fixed, and a compiler that knows them can fuse aggressively, schedule DMAs perfectly, and lay out the whole step with no runtime overhead at all. For <em>serving</em>, whose defining property is that every request is a different length and the batch changes on every iteration, it is a genuine tax. Everything in Modules 5, 6 and 12 — continuous batching, paged blocks, admission and preemption every single step — is dynamism by construction.</p>
+<p>The answer TPU serving stacks converge on is <strong>bucketing</strong>: quantize the dynamic dimensions to a small set of values (batch 8/16/32/64, context 512/1024/2048/…), pad up to the nearest bucket, and compile one program per bucket. That converts unbounded shape variety into a handful of cached executables, at the cost of computing on padding — which is precisely the waste the systolic array's 128-quantum already taught you to expect, now applied at the level of the serving loop instead of the matmul. The related discipline is keeping the <em>host</em> out of the inner loop: a scheduler that makes a Python-level decision per step, on a machine whose whole advantage is a precomputed schedule, will not go fast.</p>
+<p>It is worth stating clearly what this is <em>not</em>, because the folklore overshoots. Paged attention, continuous batching, and ragged inputs all exist on TPUs — vLLM has a TPU backend, and JAX/Pallas lets you write the gathering kernels by hand when the compiler will not produce them. The cost is not impossibility. It is that a dynamic-shape workload on a static-shape machine pays in compilation time, in padded compute, and in engineering effort that on a GPU you would not have spent — and conversely, the GPU pays for its dynamism continuously, in silicon area spent on schedulers and caches and in an achieved fraction of peak that is rarely as high as a well-compiled TPU program's.</p></div>
+  <pre class="ascii" aria-label="diagram">  SAME REQUEST STREAM, TWO EXECUTION MODELS
+
+  GPU     batch=1   batch=7   batch=23  batch=31   ← any shape, same binary
+          └──────── one kernel, hardware schedules blocks ────────┘
+
+  TPU     batch=1  ─┐
+          batch=7  ─┼─► bucket 8   ──► program A   (compiled once, cached)
+          batch=23 ─┤
+          batch=31 ─┴─► bucket 32  ──► program B   (compiled once, cached)
+                          ▲
+                          └── 23 and 31 are padded up to 32, and the
+                              padding is computed at full cost</pre>
+  <p class="keypoint"><b>REMEMBER</b>A GPU decides at runtime what runs where; a TPU program is scheduled by XLA before it starts, which is why static shapes, bucketing and recompilation are first-class concerns on TPU serving stacks and not on GPU ones.</p>
+</article>
+<article class="concept" id="concept-5">
+  <div class="concept__head">
+    <span class="concept__n">06</span>
+    <h3 class="concept__title">The fabric: an island with a cliff, or a torus with a diameter</h3>
+  </div>
+  <div class="prose"><p>Module 9 established that tensor parallelism belongs inside a node, because it does two all-reduces per layer and NVLink is 18× faster than InfiniBand. That advice is correct — and it is advice about a <em>topology</em>, not about parallelism in general. Change the topology and the advice changes.</p>
+<p>A GPU system is built as <strong>islands</strong>. Inside an NVLink domain — 8 GPUs on an H100 node, 72 on a Blackwell NVL72 rack — every GPU talks to every other at around 900 GB/s through NVSwitch, which is about a quarter of HBM bandwidth and fast enough that TP's all-reduces nearly disappear. Cross the island boundary and you are on InfiniBand or Ethernet at roughly 50 GB/s per GPU: an 18× cliff, in one hop. The entire parallelism playbook in Module 9 — TP inside the node, PP and DP across nodes — is a map of where that cliff is.</p>
+<p>A TPU pod has no cliff, because it has no switches in the middle. Each chip has <strong>ICI</strong> links wired directly to its neighbours in a 2D (v5e) or 3D (v4, v5p) torus — six links at roughly 100 GB/s each on a v5p — and that is the bandwidth between neighbouring chips whether the pod holds 64 of them or 8,960. What you get instead of a cliff is a <strong>diameter</strong>: two chips on opposite corners of a 3D torus are many hops apart, so collectives are structured to move along torus axes, and the mapping of a model onto the mesh is something you specify rather than something you hope for. TPU v4 adds optical circuit switches between 4×4×4 cubes, which makes the pod's topology reconfigurable per job and lets a failed cube be routed around instead of taking the pod down.</p>
+<p>Run Module 9's own arithmetic across both shapes and the difference is stark. For Llama-3-70B decoding at batch 32, tensor parallelism moves about 147 MB per token at TP-8 and 165 MB at TP-64, by the ring all-reduce formula from that level:</p>
+<pre><code>TP-8   over NVLink   900 GB/s  -&gt;  0.16 ms   against a ~5 ms step: free
+TP-64  over ICI      600 GB/s  -&gt;  0.28 ms   against a ~5 ms step: still free
+TP-64  over InfiniBand 50 GB/s -&gt;  3.30 ms   against a ~5 ms step: catastrophic</code></pre>
+<p>TP-64 is a perfectly reasonable configuration on a torus and an unusable one on a GPU cluster without a large NVLink domain — not because the TPU's links are faster (they are not; NVLink is faster than ICI per link) but because <strong>the TPU's fast tier does not end at 8 chips.</strong> That is the single most useful thing to know about the fabric difference, and it is why the two ecosystems have different instincts about how much of a model to shard and how far.</p>
+<p>The same reasoning explains NVL72. Extending the NVLink domain from 8 GPUs to 72 does not make any link faster; it moves the cliff. Which is a way of saying the two designs are converging on the same insight from opposite ends.</p></div>
+  <pre class="ascii" aria-label="diagram">  BANDWIDTH vs DISTANCE
+
+  GPU     900 GB/s ████████████████  (within 8, or 72 on NVL72)
+           50 GB/s █                 (everything beyond)  ← the cliff
+
+  TPU     ~100 GB/s per link, 6 links per chip
+          ███ ███ ███ ███ ███ ███ ███ ███ ...  out to thousands of chips
+          no cliff — but chip (0,0,0) to chip (7,7,7) is 12 hops away</pre>
+  <p class="keypoint"><b>REMEMBER</b>NVLink gives a handful of GPUs enormous bandwidth and then falls off a cliff to the network; ICI gives every TPU in a pod the same moderate bandwidth to its neighbours, with no cliff but a hop count that grows with distance.</p>
+</article>
+      </section>
+
+      <section class="section ghost ghost--inky" id="math-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--inky)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>INKY · MATH BY HAND</p>
+        <h2 class="section__title">Math by hand</h2>
+        <div class="prose"><p>Everything below reuses figures from elsewhere in the course — Llama-3-8B's 8.03e9 parameters, Llama-3-70B's 70.6e9 parameters with <code>d_model</code> 8192 and 80 layers, the H100's 3.35 TB/s and 989 TFLOP/s, and Module 9's ring all-reduce formula — plus the TPU datasheet figures from the table in the first concept. The point of most of these is that you can derive a chip's internals from two published numbers and a guess about its geometry.</p>
+<pre><code>peak_flops   = n_mxu x dim x dim x 2 x clock      # a systolic array, from geometry
+ridge        = dense_flops / bandwidth
+array_eff(m) = m / (m + dim)                      # pipeline fill, per weight tile
+allreduce_B  = 2 x batch x seq x d_model x 2 x (N-1)/N     # Module 9, per GPU</code></pre>
+<ol><li>A TPU v4 chip has 2 TensorCores of 4 MXUs each, and each MXU is 128×128. Given the published 275 TFLOP/s of dense bf16, what clock does that imply? Do the same for v5e (1 TensorCore, 4 MXUs, 197 TFLOP/s) and v5p (2 TensorCores, 459 TFLOP/s). Then try v6e, which publishes ~918 TFLOP/s — assume the same 8 × 128×128 geometry and say what the answer tells you.</li><li>Compute the ridge point for the H100, v4, v5e and v5p. Which part is best balanced for decode, and what does &quot;best balanced&quot; actually mean here?</li><li>Llama-3-70B in fp16 is 141.2 GB of weights. For an H100 (80 GB), a v5e (16 GB) and a v5p (95 GB): how many chips before the model fits at all, and what is the per-token decode floor at that minimum count? Then compute the floor at 8 chips of each.</li><li>Using <code>array_eff(m) = m / (m + 128)</code>: what fraction of peak does an MXU reach at m = 1, 8, 128, 512 and 2048 tokens? What m do you need for 90%? Compare that number to the v5p's ridge point from question 2 and say which constraint binds first.</li><li>An H100 has 228 KB of shared memory per SM across 132 SMs; a v5p has roughly 128 MiB of VMEM. Normalise both to bytes of programmer-visible on-chip staging per TFLOP/s of dense bf16. What is the ratio, and what does it predict about how each machine's attention kernels are written?</li><li>Your server averages 257 tokens per step. On a machine whose GEMM tiles the batch dimension in units of 128, how much arithmetic do you actually pay for? Separately: GPT-2's vocabulary is 50,257 — how much does padding it to a multiple of 128 add, and why is the measured speedup from doing so far larger than that percentage?</li><li>Llama-3-70B, decode, batch 32, <code>d_model</code> 8192, 80 layers, fp16. Using Module 9's formula, compute the total all-reduce bytes per token at TP-8 and TP-64, then the time over NVLink (900 GB/s), over aggregate ICI (600 GB/s), and over InfiniBand (50 GB/s). Compare each against the ~5.3 ms decode step from question 3. What does this say about where TP-64 is reasonable?</li><li>Which of the numbers above would change if the workload were prefill instead of decode, and which would not?</li></ol></div>
+        <details class="spoiler">
+          <summary>SHOW THE WORKED SOLUTION</summary>
+          <div class="spoiler__body prose"><p><strong>1. Backing the clock out of the geometry</strong></p>
+<p>Each MXU retires <code>128 × 128 = 16,384</code> MACs per cycle, and a MAC is 2 FLOP:</p>
+<pre><code>v4:   275e12 / (8 x 16384 x 2)  =  1.049 GHz
+v5e:  197e12 / (4 x 16384 x 2)  =  1.503 GHz
+v5p:  459e12 / (8 x 16384 x 2)  =  1.751 GHz</code></pre>
+<p>The v4 answer is the interesting one: its documented clock is 1,050 MHz, so the model closes to three digits. That is a real check, not a coincidence — it confirms the MXU count and array size.</p>
+<pre><code>v6e:  918e12 / (8 x 16384 x 2)  =  3.502 GHz</code></pre>
+<p>3.5 GHz is not a plausible clock for a datacenter accelerator, so the assumption must be wrong: the v6e cannot have the same 8 × 128×128 geometry. Either it has more MXUs or larger ones. This is the most useful thing back-of-envelope arithmetic does — not confirming what you believed, but telling you precisely which belief is broken.</p>
+<p><strong>2. Ridge points</strong></p>
+<pre><code>H100:  989e12 / 3.35e12  =  295
+v4:    275e12 / 1.20e12  =  229
+v5e:   197e12 / 0.819e12 =  241
+v5p:   459e12 / 2.765e12 =  166</code></pre>
+<p>The v5p is the best-balanced part in this set: it needs an arithmetic intensity of 166 to saturate, where the H100 needs 295. Since decode intensity equals batch size, that is a statement that the v5p reaches its own ceiling at a batch of 166 while the H100 needs 295 to reach its. It says nothing about which ceiling is higher — the H100's is 2.2× the v5p's. A low ridge point means &quot;easy to saturate,&quot; not &quot;fast.&quot;</p>
+<p><strong>3. How many chips before it runs, and how fast then</strong></p>
+<pre><code>weights = 70.6e9 x 2 = 141.2 GB
+
+H100 (80 GB):  ceil(141.2/80) = 2 chips   -&gt;  70.6 GB per chip / 3.35 TB/s  = 21.07 ms  (47 tok/s)
+v5e  (16 GB):  ceil(141.2/16) = 9 chips   -&gt;  15.7 GB per chip / 0.819 TB/s = 19.16 ms  (52 tok/s)
+v5p  (95 GB):  ceil(141.2/95) = 2 chips   -&gt;  70.6 GB per chip / 2.765 TB/s = 25.53 ms  (39 tok/s)
+
+at 8 chips:
+H100:  17.65 GB / 3.35 TB/s  =  5.27 ms   (190 tok/s)
+v5e:   17.65 GB / 0.819 TB/s = 21.55 ms   ( 46 tok/s)
+v5p:   17.65 GB / 2.765 TB/s =  6.38 ms   (157 tok/s)</code></pre>
+<p>Two things to notice. First, the minimum-fit configuration is nobody's answer — you shard past the capacity requirement because sharding buys aggregate bandwidth, which is the actual currency of decode. Second, the v5e needs 9 chips before it can run at all and is still slower on 8 than an H100 is on 8: it is a small, cheap, throughput-oriented part, and a 70B model in fp16 is simply not what it is for. That is a statement about part selection, not about TPUs.</p>
+<p><strong>4. Array fill</strong></p>
+<pre><code>m =    1:  1/129    =   0.8%
+m =    8:  8/136    =   5.9%
+m =  128:  128/256  =  50.0%
+m =  512:  512/640  =  80.0%
+m = 2048:  2048/2176 = 94.1%
+
+90%:  m/(m+128) = 0.9  -&gt;  m = 9 x 128 = 1,152 tokens</code></pre>
+<p>Set that against the v5p's ridge point of 166. To be <em>memory-bound-free</em> you need a batch of 166; to run the array near its peak you need a batch of 1,152. Under this (deliberately pessimistic, un-pipelined) model the geometry binds long after the roofline does — so on a systolic machine the question &quot;what batch do I need?&quot; has two answers and you must take the larger. Real MXUs overlap the fill of one weight tile with the drain of the previous one, which pulls the second number down substantially; the code lab leaves that as an exercise precisely because how much it helps is the whole argument about how much the fill really costs.</p>
+<p><strong>5. Scratchpad per unit of compute</strong></p>
+<pre><code>H100:  228 KB x 132       =  30.8 MB  -&gt;  30.8e6 / 989   =  31.1 KB per TFLOP/s
+v5p:   128 MiB            = 134.2 MB  -&gt; 134.2e6 / 459   = 292.4 KB per TFLOP/s
+ratio: 9.4x</code></pre>
+<p>The prediction is exactly what the two ecosystems look like. On a GPU, fitting attention into 228 KB per SM required an algorithm — tile, recompute the softmax online, never materialise the N×N matrix — and that algorithm has a name and a citation. On a TPU, keeping a layer's activations on chip across several fused operations is a scheduling decision the compiler makes, because there is room. Same idea, one is a paper and one is a pass.</p>
+<p><strong>6. Padding, twice</strong></p>
+<pre><code>257 tokens -&gt; ceil(257/128) x 128 = 384 tiles' worth of arithmetic
+wasted: 127/384 = 33.1%</code></pre>
+<p>A batch of 257 costs exactly what a batch of 384 costs. Sizing your server's step to land just past a tile boundary is one of the easiest large wins available, and one of the easiest to miss because nothing reports it.</p>
+<pre><code>50,257 -&gt; 50,304 (= 128 x 393), extra 47 columns = 0.093% more LM-head FLOPs</code></pre>
+<p>The padding itself is negligible — yet padding the vocabulary is a well-known and <em>large</em> speedup. The reason is that the extra 0.093% is not what you are buying. An unaligned dimension pushes the matmul off the library's fast path: it selects a different, slower kernel, or falls back to one that does not use the tensor cores efficiently at all. You are not saving the 0.093%; you are buying back the fast kernel. Whenever a tiny alignment change produces a large speedup, that is the shape of the explanation.</p>
+<p><strong>7. Collectives at TP-8 and TP-64</strong></p>
+<pre><code>per all-reduce, TP-8:   2 x 32 x 1 x 8192 x 2 x (7/8)   = 0.918 MB
+per token:              x 2 all-reduces x 80 layers      = 146.8 MB
+
+per all-reduce, TP-64:  2 x 32 x 1 x 8192 x 2 x (63/64)  = 1.032 MB
+per token:                                                = 165.2 MB</code></pre>
+<pre><code>TP-8,  NVLink   900 GB/s:  0.163 ms   ~3%  of a 5.27 ms step   free
+TP-64, ICI      600 GB/s:  0.275 ms   ~5%                      free
+TP-64, InfiniBand 50 GB/s: 3.30 ms    ~63%                     fatal</code></pre>
+<p>TP-64 is unremarkable on a torus and unusable across a commodity network, and the reason is not link speed — a single NVLink domain is faster per link than ICI. It is <em>reach</em>: the TPU's fast tier extends to the whole pod, so &quot;how many chips can I shard a layer across?&quot; has a different answer on each machine. Note also that this compares bandwidth only; ring all-reduce latency grows with hop count, so the torus's diameter shows up as a per-collective fixed cost the bandwidth model here ignores — one more reason the real crossover is workload-specific.</p>
+<p><strong>8. What changes at prefill</strong></p>
+<p>The ridge points (2) do not change — they are properties of the chip. The array-fill numbers (4) change completely and in the TPU's favour: prefill processes thousands of tokens at once, so <code>m</code> is large, <code>array_eff</code> is near 1, and the geometry penalty that dominates decode disappears. The decode floors (3) are replaced by a compute-bound calculation entirely. The collective volumes (7) scale with the number of tokens in the batch, so they grow by three orders of magnitude and stop being free — which is why prefill is where interconnect actually gets tested. In short: <strong>decode measures your memory system, prefill measures your arithmetic and your network.</strong> The two chips are nearly identical under the first measurement and quite different under the second, which is the entire content of this level in one sentence.</p></div>
+        </details>
+      </section>
+
+      <section class="section ghost ghost--clyde" id="code-lab">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--clyde)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>CLYDE · CODE LAB</p>
+        <h2 class="section__title">Code lab</h2>
+        <div class="prose"><p>Build a two-machine roofline calculator that models the one thing GPUs and TPUs genuinely differ on in the arithmetic path — how a matmul's shape maps onto the units — and use it to reproduce this level's central claim: that in the decode regime the difference is invisible, because both machines are waiting on HBM. No GPU, no TPU, no dependencies. Datasheet numbers in, ridge points and step times out.</p></div>
+        <div class="prose" style="max-width:none"><pre><code class="lang-python">&quot;&quot;&quot;Two accelerators, one roofline: an SIMT GPU and a systolic-array TPU.
+
+    python3 accelerators.py        # standard library only
+
+The point is not to simulate silicon. It is to show that the two designs
+differ in exactly one place that matters for inference -- how a matmul's
+shape maps onto the arithmetic units -- and that in the decode regime this
+whole course is about, that difference is invisible, because both machines
+are waiting on HBM either way.
+
+Peak FLOPs and bandwidth are datasheet figures (verify them). Everything
+else is derived: the clock is backed out of the array geometry, and the
+efficiency models are the two shape-quantization effects each design has.
+&quot;&quot;&quot;
+
+from math import ceil
+
+# ---- the model: Llama-3-8B, the same one used everywhere in this course ----
+N_PARAMS = 8.03e9
+DTYPE_B = 2
+W_BYTES = N_PARAMS * DTYPE_B          # 16.06 GB read once per forward pass
+FLOPS_PER_TOKEN = 2 * N_PARAMS        # 16.06 GFLOP
+D_MODEL = 4096
+
+
+class Machine:
+    &quot;&quot;&quot;peak: dense bf16 FLOP/s.  bw: HBM bytes/s.  hbm: bytes of HBM.&quot;&quot;&quot;
+
+    def __init__(self, name, peak, bw, hbm, kind, **kw):
+        self.name, self.peak, self.bw, self.hbm, self.kind = name, peak, bw, hbm, kind
+        self.__dict__.update(kw)
+
+    @property
+    def ridge(self):
+        &quot;&quot;&quot;FLOP per byte at which the machine stops being memory-bound.&quot;&quot;&quot;
+        return self.peak / self.bw
+
+    def clock(self):
+        &quot;&quot;&quot;Back the clock out of the array geometry. A 128x128 MXU retires
+        128*128 multiply-accumulates -- 2 FLOP each -- every cycle.&quot;&quot;&quot;
+        if self.kind != &quot;systolic&quot;:
+            return None
+        return self.peak / (self.n_mxu * self.dim * self.dim * 2)
+
+    def efficiency(self, m, n):
+        &quot;&quot;&quot;Fraction of peak a single [m, k] x [k, n] matmul can reach, from
+        shape quantization alone. Both effects below are real and neither is
+        a flaw: they are what you pay for the structure that makes the
+        arithmetic cheap in the first place.&quot;&quot;&quot;
+        if self.kind == &quot;systolic&quot;:
+            # Weight-stationary array: rows stream in one per cycle, and the
+            # first result leaves the array only after the wavefront has
+            # crossed all `dim` of its rows. That fill is paid per weight
+            # tile, and nothing about a small m makes it cheaper.
+            return m / (m + self.dim)
+        # SIMT: the output is cut into tiles handed to independent SMs. A
+        # batch of m &lt; tile_m pads its tile and the padding is computed for
+        # nothing; the tile count itself is kept a multiple of the SM count
+        # by splitting K, which is why there is no wave term here.
+        return m / (ceil(m / self.tile) * self.tile)
+
+    def decode_step(self, batch):
+        &quot;&quot;&quot;Time for one decode step: weights stream from HBM, arithmetic runs
+        on whatever fraction of peak the shape allows. Whichever is slower is
+        the step time -- that is the roofline, applied per machine.&quot;&quot;&quot;
+        t_mem = W_BYTES / self.bw
+        eff = self.efficiency(batch, D_MODEL)
+        t_math = FLOPS_PER_TOKEN * batch / (self.peak * eff)
+        return max(t_mem, t_math), t_mem, t_math, eff
+
+
+MACHINES = [
+    Machine(&quot;H100 SXM&quot;, 989e12, 3.35e12, 80e9, &quot;simt&quot;, units=132, tile=128),
+    Machine(&quot;TPU v5e&quot;, 197e12, 0.819e12, 16e9, &quot;systolic&quot;, n_mxu=4, dim=128),
+    Machine(&quot;TPU v5p&quot;, 459e12, 2.765e12, 95e9, &quot;systolic&quot;, n_mxu=8, dim=128),
+]
+
+if __name__ == &quot;__main__&quot;:
+    print(&quot;=== Part 1: the two numbers that decide everything ===\n&quot;)
+    print(f&quot;  {'machine':&lt;12} {'HBM':&gt;7} {'bandwidth':&gt;11} {'dense bf16':&gt;12} {'ridge':&gt;7} &quot;
+          f&quot;{'units':&gt;9} {'clock':&gt;8}&quot;)
+    for m in MACHINES:
+        clk = m.clock()
+        units = f&quot;{m.units} SMs&quot; if m.kind == &quot;simt&quot; else f&quot;{m.n_mxu} MXUs&quot;
+        print(f&quot;  {m.name:&lt;12} {m.hbm/1e9:6.0f}G {m.bw/1e12:10.3f}T {m.peak/1e12:11.0f}T &quot;
+              f&quot;{m.ridge:7.0f} {units:&gt;9} {(f'{clk/1e9:.2f} GHz' if clk else '-'):&gt;8}&quot;)
+    print(&quot;\n  ridge = dense FLOP/s / bandwidth = the arithmetic intensity, and so the&quot;)
+    print(&quot;  batch size, at which the machine stops being memory-bound.&quot;)
+
+    print(&quot;\n=== Part 2: shape quantization -- what each design wastes ===\n&quot;)
+    print(f&quot;  {'batch':&gt;6} {'H100 eff':&gt;10} {'v5p eff':&gt;9}   what is being wasted&quot;)
+    for b in (1, 8, 32, 64, 128, 256, 512, 1024, 2048):
+        gpu = MACHINES[0].efficiency(b, D_MODEL)
+        tpu = MACHINES[2].efficiency(b, D_MODEL)
+        note = &quot;padding / array fill&quot; if b &lt; 512 else &quot;both converging&quot;
+        print(f&quot;  {b:6d} {gpu*100:9.1f}% {tpu*100:8.1f}%   {note}&quot;)
+    print(&quot;\n  The GPU's loss is a step function -- it is zero once m is a multiple&quot;)
+    print(&quot;  of 128. The array's is a hyperbola: it never quite reaches 100%.&quot;)
+
+    print(&quot;\n=== Part 3: one decode step, Llama-3-8B fp16, one chip ===\n&quot;)
+    for m in MACHINES:
+        if m.hbm &lt; W_BYTES:
+            print(f&quot;  {m.name}: 16.06 GB of weights do not fit in {m.hbm/1e9:.0f} GB &quot;
+                  f&quot;-- needs {ceil(W_BYTES/(m.hbm*0.8))} chips before it can run at all\n&quot;)
+            continue
+        print(f&quot;  {m.name}&quot;)
+        print(f&quot;    {'batch':&gt;6} {'t_mem':&gt;9} {'t_math':&gt;9} {'step':&gt;9} {'tok/s':&gt;9} {'bound by':&gt;10}&quot;)
+        for b in (1, 32, 128, 256, 512, 1024, 2048):
+            t, tm, tc, eff = m.decode_step(b)
+            print(f&quot;    {b:6d} {tm*1e3:8.2f}m {tc*1e3:8.2f}m {t*1e3:8.2f}m &quot;
+                  f&quot;{b/t:9.0f} {'HBM' if tm &gt;= tc else 'arithmetic':&gt;10}&quot;)
+        print()
+
+    print(&quot;=== Part 4: where each machine turns the corner ===\n&quot;)
+    for m in MACHINES:
+        b = 1
+        while b &lt; 65536:
+            t, tm, tc, eff = m.decode_step(b)
+            if tc &gt; tm:
+                break
+            b += 1
+        eff_at = m.efficiency(b, D_MODEL)
+        print(f&quot;  {m.name:&lt;12} compute-bound from batch {b:5d}  &quot;
+              f&quot;(ideal ridge {m.ridge:5.0f}, shape efficiency there {eff_at*100:5.1f}%)&quot;)
+    print(&quot;\n  The gap between 'ideal ridge' and the batch you actually need is the&quot;)
+    print(&quot;  price of shape quantization -- and it is paid in the same currency on&quot;)
+    print(&quot;  both machines, just for different structural reasons.&quot;)
+
+# --- TODO for you ----------------------------------------------------------
+#   1. Add TPU v5e as a 4-chip tensor-parallel group: divide W_BYTES and
+#      peak by 4, then add an all-reduce of [batch, 4096] bf16 per layer at
+#      an ICI bandwidth of ~90 GB/s. At what batch does the collective stop
+#      being free?
+#   2. Model int8 weights: halve W_BYTES and double peak. Which machine
+#      gains more, and why is the answer &quot;the one whose ridge point moved&quot;?
+#   3. Replace the systolic efficiency model with a double-buffered one that
+#      hides the fill of tile i+1 behind the drain of tile i. How much of
+#      the batch-128 gap does that close?
+</code></pre></div>
+        <div class="prose"><h3>What you should see</h3><p>Part 1 reproduces the table from the first concept and adds the derived clocks — 1.50 GHz for the v5e and 1.75 GHz for the v5p, backed out of nothing but the MXU count and the published peak. Part 2 is the one to read carefully:</p>
+<pre><code>   batch   H100 eff   v5p eff
+       1       0.8%      0.8%
+      32      25.0%     20.0%
+     128     100.0%     50.0%
+     512     100.0%     80.0%
+    2048     100.0%     94.1%</code></pre>
+<p>Two different curves from two different causes. The GPU's loss is padding, so it is a sawtooth that hits exactly 100% whenever the batch is a multiple of the tile — and 0% waste is genuinely reachable. The array's loss is pipeline fill, so it is a hyperbola that approaches 100% and never arrives.</p>
+<p>Part 3 is the level's thesis, printed:</p>
+<pre><code>  H100 SXM
+     batch     t_mem    t_math      step     tok/s   bound by
+         1     4.79m     2.08m     4.79m       209        HBM
+       128     4.79m     2.08m     4.79m     26700        HBM
+       256     4.79m     4.16m     4.79m     53400        HBM
+       512     4.79m     8.31m     8.31m     61582 arithmetic
+
+  TPU v5e: 16.06 GB of weights do not fit in 16 GB -- needs 2 chips before it can run at all
+
+  TPU v5p
+         1     5.81m     4.51m     5.81m       172        HBM
+        32     5.81m     5.60m     5.81m      5509        HBM
+       128     5.81m     8.96m     8.96m     14290 arithmetic</code></pre>
+<p>At batch 1 both machines are HBM-bound and the step time is simply <code>16.06 GB / bandwidth</code>: 4.79 ms against 5.81 ms, a 1.21× gap that is exactly the bandwidth ratio and has nothing to do with anything else in this level. Every architectural difference you just spent five concepts on contributes precisely zero to that row.</p>
+<p>They diverge as batch grows, and not in the direction the peak-FLOPs column suggests. The v5p turns compute-bound at batch 128 while the H100 is still riding its memory ceiling at 256 — because the array's fill penalty is a <em>tax on effective peak</em>, and a lower effective peak means an earlier corner. Part 4 makes that explicit: the H100 turns at batch 257 against an ideal ridge of 295, the v5p at batch 39 against an ideal ridge of 166. Turning early is not a virtue here; it means the ceiling you hit is lower than the one on the datasheet.</p>
+<p>Treat the v5p rows as a pessimistic bound rather than a prediction — TODO 3 is where you find out how much of that gap double-buffering closes, and the honest answer is &quot;most of it, for large matmuls.&quot; If your numbers differ, check that <code>efficiency</code> divides by <code>ceil(m/tile)*tile</code> for the SIMT machine and by <code>(m + dim)</code> for the systolic one; swapping those two models is the one mistake that still produces plausible-looking output.</p></div>
+        <div class="prose"><h3>Stretch</h3><p>Add a fourth machine that does not exist: same 3.35 TB/s of bandwidth as an H100, but ten times the peak FLOPs. Re-run every part. Watch the ridge point go to 2,950 and the decode rows not move at all — that is the memory wall in one experiment, and it is why &quot;10× the FLOPs&quot; in a launch keynote should be read as a claim about training.</p>
+<p>Then do the reverse and the more useful one: hold peak fixed and double bandwidth, the H100→H200 change. Notice which parts of the output move. The gap between those two experiments is the whole argument of this course, expressed as a diff.</p>
+<p>Finally, implement TODO 1 and extend it: shard Llama-3-70B across 8 chips of each machine, with the per-layer all-reduce priced at NVLink bandwidth for the GPU and ICI bandwidth for the TPU, and then across 64. The 8-chip answers will be close. The 64-chip answers will not be, and the reason will be the fabric rather than the chip — which is the one place in this level where the two designs produce genuinely different serving architectures.</p></div>
+      </section>
+
+      <section class="section ghost ghost--pac" id="papers">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>THE KEY · PAPERS</p>
+        <h2 class="section__title">Papers, with a reading frame</h2>
+        <div class="papers">
+          <article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/1704.04760" target="_blank" rel="noopener">In-Datacenter Performance Analysis of a Tensor Processing Unit</a></h3>
+            <p class="paper__by">Jouppi et al., ISCA 2017</p>
+            <p class="paper__why">The original TPU paper, and still the clearest statement of why a systolic array is the right answer to a specific question.</p>
+            <div class="paper__frame"><p>Read Section 3 for the systolic array itself, then read the roofline analysis in Section 6 as the ancestor of Module 4's — this is where the &quot;your workload is memory-bound and your accelerator is not the problem&quot; argument was made for inference, years before LLMs. Note that the TPU v1 was an <em>inference</em> chip with no training support at all, and that its authors spend much of the paper arguing about memory bandwidth rather than FLOPs. The field rediscovered that argument in 2022.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2304.01433" target="_blank" rel="noopener">TPU v4: An Optically Reconfigurable Supercomputer with Hardware Support for Embeddings</a></h3>
+            <p class="paper__by">Jouppi et al., ISCA 2023</p>
+            <p class="paper__why">The fabric half of this level. Optical circuit switches, the 3D torus, and what &quot;no bandwidth cliff&quot; costs to build.</p>
+            <div class="paper__frame"><p>Read for the interconnect, not the chip. The argument to extract is why a reconfigurable topology matters operationally — jobs get the shape of mesh they want, failed cubes are routed around instead of downing a pod — and then compare that to the NVLink-domain model in Module 9. Both are answers to &quot;how far does my fast tier reach?&quot;, and reading them together is more useful than reading either alone.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2211.05102" target="_blank" rel="noopener">Efficiently Scaling Transformer Inference</a></h3>
+            <p class="paper__by">Pope et al., MLSys 2023</p>
+            <p class="paper__why">The best worked example of inference partitioning on TPUs, and the paper that makes the multi-dimensional sharding trade-offs concrete.</p>
+            <div class="paper__frame"><p>This is Module 9's material re-derived on a torus, and the contrast is the lesson: because the fast fabric reaches the whole pod, the partitioning search space is larger and the paper spends its effort choosing among layouts rather than avoiding a cliff. Their per-regime analysis of which sharding wins at which batch size and context length is directly transferable to GPUs — the arithmetic does not care which chip it is on, only which link.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2402.13499" target="_blank" rel="noopener">Benchmarking and Dissecting the Nvidia Hopper GPU Architecture</a></h3>
+            <p class="paper__by">Luo et al., 2024</p>
+            <p class="paper__why">What an H100 actually does, measured rather than claimed — latencies, tensor core throughput, TMA and the memory hierarchy.</p>
+            <div class="paper__frame"><p>Read this as the empirical counterweight to the vendor whitepaper. The numbers to carry away are the achieved latencies and bandwidths at each level of the hierarchy, since those are what Module 7's kernels are written against. Notice how much of the paper is about <em>asynchrony</em> — TMA, warp specialization, clusters — which is the modern GPU's answer to the same problem the TPU solves by compiling a static schedule.</p></div>
+          </article>
+<article class="paper">
+            <h3 class="paper__title"><a href="https://arxiv.org/abs/2105.04663" target="_blank" rel="noopener">GSPMD: General and Scalable Parallelization for ML Computation Graphs</a></h3>
+            <p class="paper__by">Xu et al., 2021</p>
+            <p class="paper__why">The compiler half of this level: how XLA turns per-tensor sharding annotations into a partitioned program, and why static shapes are the price.</p>
+            <div class="paper__frame"><p>Read for the mental model of ahead-of-time partitioning — you annotate tensors, the compiler infers the rest and inserts the collectives — and then ask what that model demands of the serving loop. Every dynamic-shape workload in Modules 5, 6 and 12 is in tension with this design, and the bucketing strategy in this level's fifth concept is the reconciliation. The paper will also make it obvious why TPU parallelism is described in terms of mesh axes rather than TP and PP degrees.</p></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--blinky" id="pitfalls">
+        <p class="ghost__tag"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><g class="ghost-sprite" style="color:var(--blinky)" transform="translate(12,12)"><path class="ghost__body" d="M-11.00,10.00 V0.00 A11.00,11.00 0 0 1 11.00,0.00 L11.00,10.00 L5.50,6.00 L0.00,10.00 L-5.50,6.00 Z" fill="currentColor"/><ellipse class="ghost__eye" cx="-3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="-2.50" cy="0.00" r="1.70" fill="#1414A0"/><ellipse class="ghost__eye" cx="3.50" cy="-1.00" rx="3.10" ry="3.90" fill="#fff"/><circle class="ghost__pupil" cx="4.50" cy="0.00" r="1.70" fill="#1414A0"/></g></svg>BLINKY · PITFALLS</p>
+        <h2 class="section__title">What people get wrong</h2>
+        <div class="pitfall">
+          <p class="pitfall__wrong"><span>TPUs are faster than GPUs for inference (or the reverse).</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>The question is malformed until you say which regime. At batch 1 the comparison is purely a bandwidth comparison — both chips read every weight once per token and both sit on the memory-bound slope, so the winner is whichever part has the higher HBM bandwidth, and the margin is exactly the bandwidth ratio. At large batch the comparison becomes a compute comparison, where peak FLOPs and shape quantization decide it. At scale it becomes an interconnect comparison, where reach matters more than link speed. These three regimes can and do have different winners for the same pair of chips, which is why a single &quot;X is faster&quot; claim is almost always a claim about one unstated workload. Ask which regime, then compute the relevant ratio — it is one division either way.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>A GPU's FLOPs come from its thousands of CUDA cores.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>They come from the tensor cores, and it is not close. An H100's non-tensor FP32 throughput is roughly 67 TFLOP/s against 989 TFLOP/s of dense BF16 on the tensor cores — so a kernel that does its matmuls on the general-purpose lanes is using something like 7% of the machine. This matters practically rather than trivially: it is why an unaligned tensor dimension that pushes a matmul onto a fallback path can cost far more than the padding arithmetic suggests, why &quot;the GPU is at 100% utilization&quot; (as reported by <code>nvidia-smi</code>, which measures whether <em>any</em> kernel is resident) tells you nothing about whether the tensor cores did anything, and why achieved-FLOPs is the only utilization number worth quoting. The CUDA cores are there for everything that is not a matmul — and in a transformer, that is softmax, normalisation and activations, not the bulk of the work.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>A systolic array can only do matmuls, so TPUs must be bad at softmax and normalization.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>The MXU only does matmuls; the TensorCore around it also has a VPU — a (8, 128)-shaped vector lane array — and a scalar unit, precisely because a transformer is not only matmuls. Softmax, RMSNorm, SwiGLU's gating and the residual adds all run there, and they run fine. The real thing to notice is more interesting than the myth: because the MXU is so fast relative to everything else, the <em>non-matmul</em> work is disproportionately likely to be what limits a kernel — the same phenomenon Module 7 describes on GPUs, where attention's exponentials and reductions can cost more than its matmuls at short sequence lengths. This is a general property of any accelerator with a big matrix unit bolted to a modest vector unit, not a TPU quirk, and it is why operator fusion matters so much on both machines.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>TPUs cannot do PagedAttention or continuous batching, because they need static shapes.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>They can, and both exist in production TPU serving stacks — vLLM has a TPU backend, and JAX/Pallas exists for exactly the kernels XLA will not generate on its own. What static shapes change is the <em>cost structure</em>, not the capability. Dynamic dimensions get bucketed and padded, each bucket is a separately compiled program, and the padding is computed at full price; per-step host-side decisions are more expensive than on a GPU because they interrupt a precomputed schedule. So the honest statement is that a dynamic-shape workload on a static-shape machine pays in compilation, padding and engineering effort. Overstating this into &quot;impossible&quot; leads teams to dismiss a platform on architecture-astronomy grounds instead of measuring; understating it leads them to port a GPU serving loop unchanged and wonder why it is slow.</p></div></div>
+        </div>
+<div class="pitfall">
+          <p class="pitfall__wrong"><span>Compare accelerators by peak FLOPs.</span></p>
+          <div class="pitfall__right"><div class="prose" style="max-width:none"><p>Peak FLOPs is the least informative number on the datasheet for inference, and the most likely to be inflated. Vendors headline the 2:4 structured-sparsity figure, which is double the dense number and does not apply to production LLMs; they quote FP8 or INT8 where the comparison part is quoted in BF16; and they compare a full chip against a competitor's single die. Meanwhile the number that actually sets your decode latency — HBM bandwidth — is stable, hard to game, and usually printed two rows below. Compute the ridge point (<code>dense FLOP/s ÷ bandwidth</code>) and you have collapsed both numbers into the one that says something: the batch size at which the machine stops being memory-bound. A part whose ridge point went up between generations got <em>worse</em> at decode relative to its own peak, however impressive the headline is — which is exactly what has happened across most of the last decade on both sides.</p></div></div>
+        </div>
+      </section>
+
+      <section class="section" id="checkpoint">
+        <div class="wall checkpoint">
+          <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--pac)"/></svg>POWER PELLET · CHECKPOINT</p>
+          <p class="checkpoint__claim">You can read any accelerator datasheet and predict its inference behaviour: compute
+the ridge point, work out the batch size the arithmetic geometry demands, identify how far the
+fast interconnect reaches, and say which of those three binds first for a given workload — and you
+can explain why almost none of it matters at batch 1.</p>
+          <details class="qa">
+            <summary>A colleague benchmarks single-stream decode of an 8B model on an H100 and a TPU v5p, gets 4.8 ms and 5.8 ms per token, and concludes the GPU's tensor cores beat the systolic array. What is wrong with the conclusion?</summary>
+            <div class="qa__a prose"><p>The measurement is right and the explanation is unrelated to it. At batch 1 both machines read all 16.06 GB of weights once per token and do about 16 GFLOP with them — an arithmetic intensity of 1, which is a hundred-plus times below either chip's ridge point. Both are sitting on the memory-bound slope of their roofline, so the step time is <code>weight_bytes / bandwidth</code> on each: 16.06/3.35 = 4.79 ms and 16.06/2.765 = 5.81 ms. The ratio of the two measurements, 1.21, is exactly the ratio of the bandwidths. Neither machine's matrix units were meaningfully involved in the result; you could have replaced either chip's arithmetic with something 10× slower and measured the same numbers. The benchmark is a bandwidth test wearing a compute test's clothes, and the conclusion attaches the outcome to the one component that had nothing to do with it.</p></div>
+          </details>
+<details class="qa">
+            <summary>A TPU's MXU is a 128×128 systolic array. Give two distinct consequences of that geometry for inference, one about batch size and one about model architecture.</summary>
+            <div class="qa__a prose"><p><strong>Batch size:</strong> the array has a pipeline to fill. Results only start emerging after the wavefront has crossed all 128 rows, so streaming <code>m</code> rows through a weight tile costs roughly <code>m + 128</code> cycles for <code>m</code> rows of work — 50% of peak at m = 128, 80% at 512, and under 1% at m = 1. That gives a systolic machine a second, independent reason to want a large batch, on top of the roofline reason every machine has. The batch you need is the larger of the two, not the ridge point alone.</p>
+<p><strong>Model architecture:</strong> 128 becomes a quantum. A tensor dimension that is not a multiple of 128 gets padded, and the padded lanes compute zeros at full cost and full energy. This has quietly shaped model design — hidden sizes, head dimensions, intermediate widths and vocabularies in modern architectures are nearly always multiples of 128, and the well-known trick of padding GPT-2's 50,257-token vocabulary to 50,304 is the same effect on the GPU side, where the tensor-core tiling imposes its own alignment. The hardware's shape has propagated into the models.</p></div>
+          </details>
+<details class="qa">
+            <summary>Why does a TPU need roughly nine times as much on-chip scratchpad per unit of compute as a GPU, and what does that predict about how attention kernels get written on each?</summary>
+            <div class="qa__a prose"><p>Because it has nothing else. A GPU has 228 KB of shared memory per SM plus a 50 MB hardware-managed L2 that rescues access patterns nobody planned for; a TPU has ~128 MiB of VMEM, no cache, and a compiler that must place every byte ahead of time. Normalised to compute that is about 31 KB per TFLOP/s versus about 292 KB per TFLOP/s. A statically scheduled machine cannot rely on a cache to cover a mistake, so it needs enough explicit staging area that the schedule does not have to be tight.</p>
+<p>The prediction is borne out by what each ecosystem produced. On a GPU, fitting attention into a 228 KB scratchpad required an algorithm — tiling plus online softmax so the N×N matrix never materialises — which is FlashAttention, a paper with a lineage of successors. On a TPU, holding a layer's activations across several fused operations is just what the compiler does when it fuses a subgraph, because there is room. The same underlying idea shows up as a research contribution on one machine and a compiler pass on the other.</p></div>
+          </details>
+<details class="qa">
+            <summary>You want tensor parallelism across 64 chips. Explain why that is routine on a TPU pod and usually a mistake on a GPU cluster, without saying &quot;TPU links are faster&quot;.</summary>
+            <div class="qa__a prose"><p>Because they are not faster — NVLink is faster per link than ICI. The difference is reach. A GPU's fast fabric is an island: 900 GB/s to every peer inside an 8-GPU NVLink domain (72 on an NVL72 rack), and then a cliff to roughly 50 GB/s per GPU on InfiniBand the moment you cross the boundary. TP-64 on 8-GPU nodes puts most of the all-reduce traffic across that cliff. A TPU pod has no cliff: each chip has direct ICI links to its neighbours in a torus at about 100 GB/s per link, and that is the bandwidth whether the pod is 64 chips or 8,960.</p>
+<p>The arithmetic makes it concrete. Llama-3-70B at batch 32 moves about 165 MB per token of all-reduce traffic at TP-64: 0.28 ms at aggregate ICI bandwidth against a ~5 ms decode step, versus 3.30 ms over InfiniBand — about 63% of the step spent communicating. Same model, same parallelism degree, same collective volume; the only variable is how far the fast tier extends. And note that NVL72 is NVIDIA moving the cliff rather than removing it, which is the same insight approached from the other side.</p></div>
+          </details>
+<details class="qa">
+            <summary>Your team runs a continuous-batching server on GPUs and is evaluating a TPU port. What specifically gets harder, and what is the standard answer?</summary>
+            <div class="qa__a prose"><p>Everything that makes continuous batching what it is. The batch composition changes on every iteration, sequence lengths differ per request, and paged attention gathers KV blocks through a table computed at runtime. A GPU absorbs all of that: kernel launches are runtime events, the hardware distributes blocks to SMs as they free, and a batch of 1 and a batch of 137 use the same binary. XLA compiles a static schedule against known shapes, so each distinct shape is a distinct program, compiled on first use and cached under a key that includes those shapes. Left alone, a continuous-batching server would trigger recompilation constantly.</p>
+<p>The standard answer is <strong>bucketing</strong>: quantize the dynamic dimensions — batch to 8/16/32/64, context to powers of two — pad up to the nearest bucket, and compile one program per bucket, so unbounded shape variety becomes a handful of cached executables. The cost is computing on padding, which is the same waste the 128-quantum imposes inside the matmul, now applied at the level of the serving loop. The related discipline is keeping host-side per-step decisions out of the inner loop. What is <em>not</em> true is that any of this is impossible: paged attention and continuous batching exist on TPUs — vLLM has a TPU backend, and Pallas exists for kernels the compiler will not generate. The cost is compilation time, padded compute and engineering effort, not capability.</p></div>
+          </details>
+          <p style="margin-top:var(--s7)">
+            <button class="done-toggle" type="button" data-complete="13" aria-pressed="false">
+              MARK LEVEL 13 CLEARED
+            </button>
+          </p>
+        </div>
+      </section>
+
+      <section class="section ghost ghost--pellet" id="glossary">
+        <p class="ghost__tag"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="var(--pellet)"/></svg>GLOSSARY</p>
+        <h2 class="section__title">Glossary</h2>
+        <div class="gloss">
+          <div class="gloss__row"><div class="gloss__term">SIMT</div><div class="gloss__def">Single instruction, multiple threads — the GPU execution model where a warp of 32 threads issues one instruction together, with divergent branches serialized under lane masks.</div></div><div class="gloss__row"><div class="gloss__term">streaming multiprocessor (SM)</div><div class="gloss__def">The GPU's independent execution unit: warp schedulers, registers, shared memory and tensor cores. An H100 SXM has 132 of them.</div></div><div class="gloss__row"><div class="gloss__term">warp</div><div class="gloss__def">The 32-thread group a GPU schedules as a unit. Hopper adds the warpgroup — four warps issuing one wgmma matrix instruction together.</div></div><div class="gloss__row"><div class="gloss__term">occupancy</div><div class="gloss__def">How many warps are resident on an SM relative to the maximum. It is the GPU's mechanism for hiding memory latency: with nothing else resident, a stall is an idle cycle.</div></div><div class="gloss__row"><div class="gloss__term">tensor core</div><div class="gloss__def">The matrix-multiply unit inside an SM, where essentially all of a GPU's FLOPs live. Not a systolic array in the TPU sense, despite the name.</div></div><div class="gloss__row"><div class="gloss__term">TMA (Tensor Memory Accelerator)</div><div class="gloss__def">Hopper's asynchronous DMA engine for moving tiles between global and shared memory without spending warps on address arithmetic.</div></div><div class="gloss__row"><div class="gloss__term">systolic array</div><div class="gloss__def">A mesh of multiply-accumulate cells wired to their neighbours, through which operands flow and partial sums accumulate. One memory read feeds many multiplications, which is where its energy advantage comes from.</div></div><div class="gloss__row"><div class="gloss__term">MXU</div><div class="gloss__def">A TPU's Matrix Multiply Unit: a 128×128 weight-stationary systolic array. A v5p TensorCore has four; a chip has two TensorCores.</div></div><div class="gloss__row"><div class="gloss__term">weight-stationary</div><div class="gloss__def">A dataflow in which a tile of weights is loaded into the array and held while activations stream through, rather than both operands moving.</div></div><div class="gloss__row"><div class="gloss__term">pipeline fill (array)</div><div class="gloss__def">The cycles before a systolic array's first result emerges, while the wavefront crosses it. Costs a matmul of m rows roughly m/(m+128) of peak on a 128-wide array.</div></div><div class="gloss__row"><div class="gloss__term">VPU</div><div class="gloss__def">The TPU's vector unit, an (8, 128) lane array that handles the elementwise work — softmax, normalization, activations, residual adds — that the MXU cannot.</div></div><div class="gloss__row"><div class="gloss__term">VMEM</div><div class="gloss__def">A TPU's on-chip scratchpad, roughly 128 MiB on recent generations, entirely managed by the compiler. There is no cache behind it.</div></div><div class="gloss__row"><div class="gloss__term">XLA</div><div class="gloss__def">The compiler that turns a JAX or TensorFlow graph into a statically scheduled TPU program. It specializes on tensor shapes, which is why shape variety costs compilations.</div></div><div class="gloss__row"><div class="gloss__term">shape bucketing</div><div class="gloss__def">Quantizing dynamic dimensions (batch, context length) to a small set of values and padding up, so a serving loop needs only a few cached compiled programs instead of one per distinct shape.</div></div><div class="gloss__row"><div class="gloss__term">ICI (Inter-Chip Interconnect)</div><div class="gloss__def">The direct chip-to-chip links forming a TPU pod's 2D or 3D torus. Around 100 GB/s per link on a v5p, and the same bandwidth whether the pod has 64 chips or thousands.</div></div><div class="gloss__row"><div class="gloss__term">optical circuit switch (OCS)</div><div class="gloss__def">The reconfigurable optical fabric connecting TPU v4 cubes, allowing a job's topology to be chosen at schedule time and failed cubes to be routed around.</div></div>
+        </div>
+      </section>
+
+      <nav class="pagenav">
+        <a href="how-vllm-works.html" data-nav="prev"><span>◀ PREVIOUS LEVEL</span>12 HOW VLLM WORKS</a>
+        <span></span>
+      </nav>
+
+    </main>
+  </div>
+</div>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <p class="foot__h">LEVELS</p>
+        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">&nbsp;</p>
+        <ul><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li><li><a href="../modules/model-architectures.html">11 · MODEL ARCHITECTURES</a></li><li><a href="../modules/how-vllm-works.html">12 · HOW VLLM WORKS</a></li><li><a href="../modules/gpus-and-tpus.html">13 · GPUS AND TPUS</a></li></ul>
+      </div>
+      <div>
+        <p class="foot__h">REFERENCE</p>
+        <ul>
+          <li><a href="../reference/timeline.html">Timeline</a></li>
+          <li><a href="../reference/hardware.html">GPU spec table</a></li>
+          <li><a href="../reference/engines.html">Serving engines</a></li>
+          <li><a href="../reference/frontier.html">Open problems</a></li>
+          <li><a href="../reference/glossary.html">Glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="foot__h">SOURCE</p>
+        <ul>
+          <li><a href="https://github.com/tushar-amrit-6/inference">GitHub repository</a></li>
+          <li><a href="../reference/how-to-use.html">How to work through this</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot__note">Built as a self-paced course. Every number here is meant to be
+    re-derived rather than trusted — if one of them is wrong, the fastest way to find out is to
+    do the arithmetic yourself.</p>
+  </div>
+</footer>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>
