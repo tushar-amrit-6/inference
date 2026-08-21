@@ -10,8 +10,8 @@
   'use strict';
 
   var KEY = 'llm-inference:cleared';
-  var TOTAL = 14;
-  var POINTS = 2200;          // per level. 14 x 2200 = 30800 for a clean sweep.
+  var TOTAL = 15;
+  var POINTS = 2200;          // per level. 15 x 2200 = 33000 for a clean sweep.
 
   /* --- state ------------------------------------------------------------- */
 

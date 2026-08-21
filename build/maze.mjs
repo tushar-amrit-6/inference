@@ -2,11 +2,11 @@
    Maze renderer — builds the chapter map as static SVG at build time.
 
    The map is a tile grid, the way the real game is (Pac-Man is a 28x36 grid
-   of 8px tiles). Ours is 21x19 with bigger tiles so the module discs have
+   of 8px tiles). Ours is 21x23 with bigger tiles so the module discs have
    room to sit in the corridors.
 
      #  wall        .  pellet       o  power pellet
-     (space) void   0-9,A-D  module node (A = 10, B = 11, C = 12, D = 13)
+     (space) void   0-9,A-E  module node (A = 10, B = 11, C = 12, D = 13, E = 14)
 
    Walls render as rounded outlines, not fills — that is how the arcade maze
    is actually drawn.
@@ -28,6 +28,10 @@ export const MAP = [
   '#.#.......#.......#.#',
   '#.#.#####.#.#####.#.#',
   '#.9.......A.......B.#',
+  '#.#.#####.#.#####.#.#',
+  '#.#.......#.......#.#',
+  '#.#.#####.#.#####.#.#',
+  '#.E.................#',
   '#.###.#########.###.#',
   '#.....#       #.....#',
   '#.o.C.#       #.D.o.#',
@@ -35,7 +39,7 @@ export const MAP = [
 ];
 
 /** Node tiles are labelled 0-9 then A, B, … so one character stays one tile. */
-const NODE_CHARS = '0123456789ABCD';
+const NODE_CHARS = '0123456789ABCDE';
 const nodeNum = (ch) => NODE_CHARS.indexOf(ch);
 const isNode = (ch) => NODE_CHARS.includes(ch);
 
@@ -51,13 +55,13 @@ export const PAC_START = [1, 15];
  * The four ghosts. `seat` is their idle x-offset inside the house; `spawn` is
  * the corridor tile they take up station on when a game begins. The house has
  * no gate in the tilemap, so rather than fake one we simply station them on
- * row 14 — the long corridor that runs directly above it.
+ * row 18 — the long corridor that runs directly above it.
  */
 export const GHOSTS = [
-  { name: 'blinky', seat: -42, spawn: [14, 8], style: 'chase' },
-  { name: 'pinky', seat: -14, spawn: [14, 9], style: 'ambush' },
-  { name: 'inky', seat: 14, spawn: [14, 11], style: 'flank' },
-  { name: 'clyde', seat: 42, spawn: [14, 12], style: 'shy' },
+  { name: 'blinky', seat: -42, spawn: [18, 8], style: 'chase' },
+  { name: 'pinky', seat: -14, spawn: [18, 9], style: 'ambush' },
+  { name: 'inky', seat: 14, spawn: [18, 11], style: 'flank' },
+  { name: 'clyde', seat: 42, spawn: [18, 12], style: 'shy' },
 ];
 
 /** A tile you can walk on: corridor, pellet, power pellet, or a module node. */
@@ -200,7 +204,7 @@ export function renderMaze(modules) {
 
   // ghost house residents — the four pedagogical modes live here.
   // These are their idle seats; the game moves them out onto the corridors.
-  const houseX = cx(10), houseY = cy(16) + 10;
+  const houseX = cx(10), houseY = cy(20) + 10;
   for (let i = 0; i < GHOSTS.length; i++) {
     const g = GHOSTS[i];
     out.push(ghost(houseX + g.seat, houseY, `var(--${g.name})`, 22, `ghost-${i}`));

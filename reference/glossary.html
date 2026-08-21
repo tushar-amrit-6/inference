@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GLOSSARY — LLM INFERENCE</title>
-<meta name="description" content="138 terms from across all fourteen levels, each linked back to where it is explained.">
+<meta name="description" content="152 terms from across all fifteen levels, each linked back to where it is explained.">
 <meta name="color-scheme" content="dark light">
 <script>/* set the stored theme before first paint, so there is no flash of the wrong one */
 (function(){try{var t=localStorage.getItem('llm-inference:theme');
 if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <meta property="og:title" content="GLOSSARY — LLM INFERENCE">
-<meta property="og:description" content="138 terms from across all fourteen levels, each linked back to where it is explained.">
+<meta property="og:description" content="152 terms from across all fifteen levels, each linked back to where it is explained.">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,7 +24,7 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
   <a class="scorebar__home" href="../index.html"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path class="" fill="currentColor" d="M12,12 L20.66,7 A10,10 0 1 0 20.66,17 Z"/></svg> LLM INFERENCE</a>
   
   <span class="scorebar__item"><span class="scorebar__label">SCORE</span><span class="scorebar__value" data-score>000000</span></span>
-  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/14</span></span>
+  <span class="scorebar__item"><span class="scorebar__label">CLEARED</span><span class="scorebar__value" data-cleared>00/15</span></span>
   <span class="scorebar__spacer"></span>
   <span class="scorebar__item scorebar__lives" data-lives aria-label="Modules remaining"></span>
   <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch theme">
@@ -37,7 +37,7 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
     <div class="mod-head">
       <p class="mod-head__level">REFERENCE</p>
       <h1 class="mod-head__title">GLOSSARY</h1>
-      <p class="mod-head__tag">138 terms from across all fourteen levels, each linked back to where it is explained.</p>
+      <p class="mod-head__tag">152 terms from across all fifteen levels, each linked back to where it is explained.</p>
     </div>
     <section class="section">
     <div class="gloss">
@@ -53,6 +53,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
       </div><div class="gloss__row">
         <div class="gloss__term">active parameters<br><a href="../modules/model-architectures.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 11</a></div>
         <div class="gloss__def">The parameters read to produce one token. Equal to the total in a dense model; a small fraction of it in a sparse one.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">adapter (Houlsby adapter)<br><a href="../modules/fine-tuning.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 14</a></div>
+        <div class="gloss__def">A small bottleneck feed-forward block inserted inline into each transformer sublayer. Cannot be merged away, so it adds latency at every inference call.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">admission control<br><a href="../modules/batching.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 05</a></div>
         <div class="gloss__def">Deciding how many sequences to admit given that their eventual lengths, and therefore memory needs, are unknown.</div>
@@ -89,6 +92,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
       </div><div class="gloss__row">
         <div class="gloss__term">capacity factor<br><a href="../modules/distributed-inference.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 09</a></div>
         <div class="gloss__def">A cap on tokens routed to any single MoE expert, bounding load imbalance at the cost of dropping or rerouting overflow.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">catastrophic forgetting<br><a href="../modules/fine-tuning.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 14</a></div>
+        <div class="gloss__def">A model loses previously-held capabilities while being fine-tuned on new data. PEFT methods generally cause less of it than full fine-tuning does.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">chunked prefill<br><a href="../modules/batching.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 05</a></div>
         <div class="gloss__def">Splitting a long prefill into fixed-size pieces processed one per iteration, mixed with ongoing decode.</div>
@@ -138,6 +144,12 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="gloss__term">disaggregation<br><a href="../modules/distributed-inference.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 09</a></div>
         <div class="gloss__def">Running prefill and decode on separate machine pools, transferring the KV cache between them.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">DoRA<br><a href="../modules/fine-tuning.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 14</a></div>
+        <div class="gloss__def">Weight-Decomposed LoRA. Splits a frozen weight into magnitude and direction, trains both, and still merges for free — usually a small quality step up from plain LoRA.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">DPO<br><a href="../modules/fine-tuning.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 14</a></div>
+        <div class="gloss__def">Direct Preference Optimization — reparameterizes RLHF's objective so the reward model cancels out, turning preference learning into a classification loss over the policy's own log-probabilities.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">draft model<br><a href="../modules/speculative-decoding.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 08</a></div>
         <div class="gloss__def">A small, cheap model that proposes candidate tokens for the target model to verify.</div>
       </div><div class="gloss__row">
@@ -176,6 +188,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
       </div><div class="gloss__row">
         <div class="gloss__term">GQA<br><a href="../modules/transformer-fundamentals.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 00</a></div>
         <div class="gloss__def">Grouped-query attention. Fewer K/V heads than Q heads, with each K/V head shared by a group of query heads. Shrinks the KV cache proportionally.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">GRPO<br><a href="../modules/fine-tuning.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 14</a></div>
+        <div class="gloss__def">Group Relative Policy Optimization — drops PPO's critic network by scoring each sampled completion's advantage against the mean/std of a group sampled for the same prompt.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">head_dim<br><a href="../modules/transformer-fundamentals.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 00</a></div>
         <div class="gloss__def">The width of one attention head. Usually d_model / n_heads, though it can be set independently.</div>
@@ -222,6 +237,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="gloss__term">logits<br><a href="../modules/transformer-fundamentals.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 00</a></div>
         <div class="gloss__def">The unnormalized [.., vocab_size] scores produced by the LM head, before any softmax or sampling.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">LoRA<br><a href="../modules/fine-tuning.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 14</a></div>
+        <div class="gloss__def">Low-Rank Adaptation. Freezes W0 and trains a rank-r product BA added beside it; merges back into W0 for zero added inference cost.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">Medusa<br><a href="../modules/speculative-decoding.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 08</a></div>
         <div class="gloss__def">Self-speculation with multiple independent decoding heads predicting several positions ahead, verified as a tree.</div>
       </div><div class="gloss__row">
@@ -243,6 +261,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="gloss__term">n-gram lookup<br><a href="../modules/speculative-decoding.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 08</a></div>
         <div class="gloss__def">Drafting by searching the context for the current suffix and proposing what followed it. Free, and excellent on repetitive text.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">NF4<br><a href="../modules/fine-tuning.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 14</a></div>
+        <div class="gloss__def">4-bit NormalFloat — a quantization data type whose bins are spaced to match a roughly-Gaussian weight distribution, rather than uniform INT4 bins.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">NVLink<br><a href="../modules/distributed-inference.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 09</a></div>
         <div class="gloss__def">High-bandwidth GPU-to-GPU interconnect, ~900 GB/s on H100. Roughly 14x faster than PCIe Gen5.</div>
       </div><div class="gloss__row">
@@ -260,6 +281,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
       </div><div class="gloss__row">
         <div class="gloss__term">PagedAttention<br><a href="../modules/memory-optimization.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 06</a></div>
         <div class="gloss__def">Fixed-size block allocation for the KV cache with per-sequence block tables, borrowed from OS virtual memory. Cuts fragmentation waste from 60-80% to under 4%.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">PEFT<br><a href="../modules/fine-tuning.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 14</a></div>
+        <div class="gloss__def">Parameter-efficient fine-tuning — the family of methods that update a small fraction of parameters, or none of the original ones, instead of every weight.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">per-channel quantization<br><a href="../modules/memory-optimization.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 06</a></div>
         <div class="gloss__def">A separate scale for each channel of a tensor. Necessary for keys, which have strong per-channel outliers.</div>
@@ -288,8 +312,14 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="gloss__term">prefix caching<br><a href="../modules/kv-cache.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 02</a></div>
         <div class="gloss__def">Reusing cached KV state across requests that share a leading token sequence. Exact, not approximate.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">QLoRA<br><a href="../modules/fine-tuning.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 14</a></div>
+        <div class="gloss__def">LoRA with the frozen base model stored in 4-bit NF4, dequantized on the fly per matmul — cuts base-weight storage 4x on top of what freezing already saves.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">RadixAttention<br><a href="../modules/kv-cache.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 02</a></div>
         <div class="gloss__def">SGLang's radix-tree index over cached prefixes, enabling automatic longest-prefix reuse across arbitrary sharing patterns.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">rank (r) / alpha<br><a href="../modules/fine-tuning.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 14</a></div>
+        <div class="gloss__def">r sets the dimensionality of a LoRA update; alpha scales it (the update is multiplied by alpha/r) so quality is stable as r changes.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">reasoning workload<br><a href="../modules/systems-and-frontier.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 10</a></div>
         <div class="gloss__def">Requests that generate thousands of hidden chain-of-thought tokens, shifting nearly all wall-clock into memory-bound decode.</div>
@@ -312,8 +342,17 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="gloss__term">residual stream<br><a href="../modules/transformer-fundamentals.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 00</a></div>
         <div class="gloss__def">The [batch, seq, d_model] tensor that every block reads from and adds back into. Its width is constant through the network.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">reward model<br><a href="../modules/fine-tuning.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 14</a></div>
+        <div class="gloss__def">A model trained on pairwise human preference comparisons to output a scalar score, used as the reward signal in RLHF's PPO stage.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">ridge point<br><a href="../modules/autoregressive-loop.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 01</a></div>
         <div class="gloss__def">The arithmetic intensity at which a machine transitions from memory-bound to compute-bound. About 295 FLOP/byte for an H100.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">RLHF<br><a href="../modules/fine-tuning.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 14</a></div>
+        <div class="gloss__def">Reinforcement learning from human feedback: train a reward model on preference pairs, then run PPO against it with a KL penalty back to the SFT policy.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">RLVR<br><a href="../modules/fine-tuning.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 14</a></div>
+        <div class="gloss__def">RL with verifiable rewards — reward comes from a deterministic checker (does the math answer match, do the tests pass) instead of a learned reward model.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">RMSNorm<br><a href="../modules/transformer-fundamentals.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 00</a></div>
         <div class="gloss__def">Normalization by root-mean-square only, with no mean subtraction and no bias. Cheaper than LayerNorm and works as well.</div>
@@ -338,6 +377,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
       </div><div class="gloss__row">
         <div class="gloss__term">sequence / context parallelism<br><a href="../modules/distributed-inference.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 09</a></div>
         <div class="gloss__def">Splitting the sequence dimension across devices, as in Ring Attention. Used when one sequence exceeds a single GPU.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">SFT (supervised fine-tuning)<br><a href="../modules/fine-tuning.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 14</a></div>
+        <div class="gloss__def">Fine-tuning a pretrained model on curated (instruction, response) pairs with the ordinary next-token loss, masked so gradient only flows through the response tokens.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">SGLang<br><a href="../modules/systems-and-frontier.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 10</a></div>
         <div class="gloss__def">Serving engine organized around structured, prefix-sharing workloads: RadixAttention plus a frontend programming language.</div>
@@ -469,7 +511,7 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
       </div>
       <div>
         <p class="foot__h">&nbsp;</p>
-        <ul><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li><li><a href="../modules/model-architectures.html">11 · MODEL ARCHITECTURES</a></li><li><a href="../modules/how-vllm-works.html">12 · HOW VLLM WORKS</a></li><li><a href="../modules/gpus-and-tpus.html">13 · GPUS AND TPUS</a></li></ul>
+        <ul><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li><li><a href="../modules/model-architectures.html">11 · MODEL ARCHITECTURES</a></li><li><a href="../modules/how-vllm-works.html">12 · HOW VLLM WORKS</a></li><li><a href="../modules/gpus-and-tpus.html">13 · GPUS AND TPUS</a></li><li><a href="../modules/fine-tuning.html">14 · FINE-TUNING</a></li></ul>
       </div>
       <div>
         <p class="foot__h">REFERENCE</p>

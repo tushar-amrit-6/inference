@@ -3,8 +3,9 @@
 A self-paced set of chapters on how LLM inference works and why it is hard, built as a static
 site with a Pac-Man arcade theme.
 
-Fourteen levels, from the transformer forward pass to distributed serving, the architecture zoo,
-inside vLLM itself, and down to the silicon the whole thing runs on, organised around one idea:
+Fifteen levels, from the transformer forward pass to distributed serving, the architecture zoo,
+inside vLLM itself, down to the silicon the whole thing runs on, and back up to where the weights
+came from in the first place, organised around one idea:
 
 > Generating a token requires reading **every** model weight from memory. Moving those bytes takes
 > far longer than the arithmetic performed on them, so decoding a single sequence leaves the GPU
@@ -31,6 +32,7 @@ Pac-Man is memory-bound too — one pellet per move, however fast he runs.
 | 11 | Model architectures | 7–9 |
 | 12 | How vLLM works | 6–8 |
 | 13 | GPUs and TPUs | 6–8 |
+| 14 | Fine-tuning | 7–9 |
 
 Plus reference pages: a GPU and TPU spec table with ridge points, a timeline of the field, a
 serving-engine comparison, open problems, and a combined glossary.
@@ -98,7 +100,7 @@ assets/js/app.js       progress tracking, scroll spy, keyboard nav
 start.md               the original outline this was built from
 ```
 
-The maze on the landing page is authored as a 21×19 tile grid in `build/maze.mjs`, the same way the
+The maze on the landing page is authored as a 21×23 tile grid in `build/maze.mjs`, the same way the
 real game does it, and rendered to SVG at build time — so it works with JavaScript disabled.
 Progress is stored in `localStorage`; nothing is sent anywhere and there is no account. Arrow keys
 move between levels.

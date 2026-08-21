@@ -859,4 +859,67 @@ export default {
       g.note(39.5, 25.5, ['TP-64: 0.28 ms on a torus,', '3.30 ms across InfiniBand'], { fill: DIM }),
     ].join(''),
   },
+
+  /* ---------------------------------------------------------------- 14 --- */
+  14: {
+    w: 58, h: 29,
+    title: 'What fine-tuning costs: memory, and who is in the room',
+    desc: 'Full fine-tuning of Llama-3-8B under mixed-precision Adam needs 128.5 gigabytes, past ' +
+      'a single 80 gigabyte GPU. LoRA drops that to 16.3 gigabytes by freezing the base weights; ' +
+      'QLoRA drops it again to 4.2 gigabytes by storing the frozen base in 4-bit. Separately, ' +
+      'RLHF keeps four models resident during training — policy, reference, reward model, and ' +
+      'critic — while DPO and GRPO need only two, policy and reference, with GRPO trading the ' +
+      'critic for repeated sampling from the policy itself.',
+    caption: 'Two different kinds of cost, two different fixes: PEFT shrinks what has to sit in ' +
+      'memory; DPO and GRPO shrink how many models have to sit in memory at all — and GRPO pays ' +
+      'for that with decode passes instead.',
+    draw: (g, id) => [
+      g.heading(1.5, 1.6, 'LEVEL 14 · WHAT FINE-TUNING COSTS'),
+      g.line(1.5, 2.4, 56.5, 2.4, { stroke: FAINT, width: 1 }),
+
+      /* --- panel A: memory to fine-tune Llama-3-8B --------------------- */
+      g.heading(1.5, 4.0, 'MEMORY TO FINE-TUNE LLAMA-3-8B · ADAM, MIXED PRECISION', { fill: INKY }),
+
+      g.text(12.6, 5.6, '24 GB', { font: 'sub', fill: FAINT, anchor: 'middle' }),
+      g.text(16.2, 5.6, '48 GB', { font: 'sub', fill: FAINT, anchor: 'middle' }),
+      g.text(21, 5.6, '80 GB', { font: 'sub', fill: FAINT, anchor: 'middle' }),
+      g.line(12.6, 6.0, 12.6, 15.6, { stroke: FAINT, dashed: true, width: 1 }),
+      g.line(16.2, 6.0, 16.2, 15.6, { stroke: FAINT, dashed: true, width: 1 }),
+      g.line(21, 6.0, 21, 15.6, { stroke: FAINT, dashed: true, width: 1 }),
+
+      g.text(8.5, 7.5, 'FULL FT', { font: 'label', fill: BLINKY, anchor: 'end' }),
+      g.bar(9, 6.4, 2.2, [{ w: 19.3, fill: BLINKY }]),
+      g.chip(28.8, 6.9, '128.5 GB — does not fit', { accent: BLINKY }),
+
+      g.text(8.5, 10.9, 'LORA', { font: 'label', fill: A, anchor: 'end' }),
+      g.bar(9, 9.8, 2.2, [{ w: 2.45, fill: A }]),
+      g.chip(12, 10.3, '16.3 GB — fits 24 GB', { accent: A }),
+
+      g.text(8.5, 14.3, 'QLORA', { font: 'label', fill: PAC, anchor: 'end' }),
+      g.bar(9, 13.2, 2.2, [{ w: 0.63, fill: PAC }]),
+      g.chip(10.2, 13.7, '4.2 GB — fits any of them', { accent: PAC }),
+
+      /* --- panel B: models resident during alignment training ---------- */
+      g.line(1.5, 16.6, 56.5, 16.6, { stroke: FAINT, width: 1 }),
+      g.heading(1.5, 17.4, 'MODELS RESIDENT DURING ALIGNMENT TRAINING', { fill: CLYDE }),
+
+      g.text(8.5, 19.9, 'RLHF', { font: 'label', fill: BLINKY, anchor: 'end' }),
+      g.box(9.2, 18.6, 7.5, 2.6, 'POLICY', { accent: BLINKY }),
+      g.box(17.1, 18.6, 7.5, 2.6, 'REFERENCE', { accent: FAINT }),
+      g.box(25.0, 18.6, 7.5, 2.6, 'REWARD MODEL', { accent: FAINT }),
+      g.box(32.9, 18.6, 7.5, 2.6, 'CRITIC', { accent: FAINT }),
+      g.chip(41.5, 19.4, '4 MODELS RESIDENT', { accent: BLINKY }),
+
+      g.text(8.5, 23.5, 'DPO', { font: 'label', fill: A, anchor: 'end' }),
+      g.box(9.2, 22.2, 7.5, 2.6, 'POLICY', { accent: A }),
+      g.box(17.1, 22.2, 7.5, 2.6, 'REFERENCE', { accent: FAINT }),
+      g.chip(26, 23.0, '2 MODELS RESIDENT', { accent: A }),
+
+      g.text(8.5, 27.1, 'GRPO', { font: 'label', fill: PAC, anchor: 'end' }),
+      g.box(9.2, 25.8, 7.5, 2.6, 'POLICY', { accent: PAC }),
+      g.box(17.1, 25.8, 7.5, 2.6, 'REFERENCE', { accent: FAINT }),
+      g.chip(26, 26.6, '2 MODELS RESIDENT', { accent: PAC }),
+      g.box(36.5, 25.8, 14.5, 2.6, '× G DECODE PASSES / STEP', { accent: PAC, fill: 'none', dashed: true, labelFont: 'sub' }),
+    ].join(''),
+  },
 };
