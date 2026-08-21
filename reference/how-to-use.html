@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HOW TO WORK THROUGH THIS — LLM INFERENCE</title>
-<meta name="description" content="Fourteen levels, roughly three months at a few hours a week. Levels 00 to 03 are the foundation — do not rush them.">
+<meta name="description" content="Sixteen levels, roughly three months at a few hours a week. Levels 00 to 03 are the foundation — do not rush them.">
 <meta name="color-scheme" content="dark light">
 <script>/* set the stored theme before first paint, so there is no flash of the wrong one */
 (function(){try{var t=localStorage.getItem('llm-inference:theme');
 if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <meta property="og:title" content="HOW TO WORK THROUGH THIS — LLM INFERENCE">
-<meta property="og:description" content="Fourteen levels, roughly three months at a few hours a week. Levels 00 to 03 are the foundation — do not rush them.">
+<meta property="og:description" content="Sixteen levels, roughly three months at a few hours a week. Levels 00 to 03 are the foundation — do not rush them.">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -37,7 +37,7 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
     <div class="mod-head">
       <p class="mod-head__level">START HERE</p>
       <h1 class="mod-head__title">HOW TO WORK THROUGH THIS</h1>
-      <p class="mod-head__tag">Fourteen levels, roughly three months at a few hours a week. Levels 00 to 03 are the foundation — do not rush them.</p>
+      <p class="mod-head__tag">Sixteen levels, roughly three months at a few hours a week. Levels 00 to 03 are the foundation — do not rush them.</p>
     </div>
     <section class="section"><div class="prose" style="max-width:none"><h3>The one idea that organizes everything</h3>
 <p>Generating a token requires reading <strong>every</strong> model weight from memory. On modern hardware, moving those bytes takes far longer than the arithmetic performed on them. So decoding a single sequence leaves the GPU almost entirely idle.</p>
@@ -53,12 +53,12 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
 <p><strong>4. Papers.</strong> Use the reading frame — most of these papers have a payload of two or three sections and a lot of context you can skim. Read those sections properly.</p>
 <p><strong>5. Checkpoint.</strong> Answer each question out loud, in full sentences, before revealing the answer. If you cannot, go back. Marking a level cleared is for you, not for anyone else, so be honest about it.</p>
 <h3>Pacing</h3>
-<table><thead><tr><th>levels</th><th>why</th></tr></thead><tbody><tr><td><strong>00–03</strong></td><td>The foundation. Take your time. Everything later assumes you can trace a forward pass and compute a KV cache without notes.</td></tr><tr><td><strong>04</strong></td><td>The analytical core. If you only truly master one level, make it this one — everything after it is applied roofline reasoning.</td></tr><tr><td><strong>05–07</strong></td><td>Systems and kernels. Faster going, because you now have the framework.</td></tr><tr><td><strong>08–10</strong></td><td>The frontier. More reading, less arithmetic.</td></tr><tr><td><strong>11</strong></td><td>The architecture zoo. Read it any time after 06 — it is the level that makes the others compose.</td></tr><tr><td><strong>12</strong></td><td>Inside one engine. Read it after 05, 06 and 09 — it is where their scheduling, memory and distributed-execution material meets in a single running system.</td></tr><tr><td><strong>13</strong></td><td>The silicon underneath. Read it after 04 — it is the roofline applied to the machine itself, and it explains why the GPU/TPU comparisons you will be asked to make are usually bandwidth comparisons in disguise.</td></tr></tbody></table>
+<table><thead><tr><th>levels</th><th>why</th></tr></thead><tbody><tr><td><strong>00–03</strong></td><td>The foundation. Take your time. Everything later assumes you can trace a forward pass and compute a KV cache without notes.</td></tr><tr><td><strong>04</strong></td><td>The analytical core. If you only truly master one level, make it this one — everything after it is applied roofline reasoning.</td></tr><tr><td><strong>05–07</strong></td><td>Systems and kernels. Faster going, because you now have the framework.</td></tr><tr><td><strong>08–10</strong></td><td>The frontier. More reading, less arithmetic.</td></tr><tr><td><strong>11</strong></td><td>The architecture zoo. Read it any time after 06 — it is the level that makes the others compose.</td></tr><tr><td><strong>12</strong></td><td>Inside one engine. Read it after 05, 06 and 09 — it is where their scheduling, memory and distributed-execution material meets in a single running system.</td></tr><tr><td><strong>13</strong></td><td>The silicon underneath. Read it after 04 — it is the roofline applied to the machine itself, and it explains why the GPU/TPU comparisons you will be asked to make are usually bandwidth comparisons in disguise.</td></tr><tr><td><strong>14</strong></td><td>Where the weights came from. Read it after 00, 01 and 06 — LoRA's mergeability and GRPO's group sampling both reuse tricks from earlier levels, applied to a training loop instead of a serving one.</td></tr><tr><td><strong>15</strong></td><td>The frontier, live. Read it after 02, 06 and 09 — days-old research, not a settled technique, held to the same arithmetic standard as everything before it.</td></tr></tbody></table>
 <p>At a few hours a week this is roughly three months. There is no benefit to going faster; the checkpoints are honest gates and the material compounds.</p>
 <h3>What you need</h3>
 <ul><li>Python and NumPy. PyTorch for a few labs.</li><li>No GPU required. Every code lab runs on CPU; a couple are more interesting on a free Colab GPU and say so.</li><li>A pen and paper. Genuinely — the math labs do not work typed.</li></ul>
 <h3>Progress</h3>
-<p>Marking a level cleared stores it in your browser's local storage. Nothing is sent anywhere, there is no account, and clearing your browser data resets it. The score is cosmetic: 2,200 points a level, 30,800 for all fourteen.</p>
+<p>Marking a level cleared stores it in your browser's local storage. Nothing is sent anywhere, there is no account, and clearing your browser data resets it. The score is cosmetic: 2,200 points a level, 35,200 for all sixteen.</p>
 <p>Arrow keys move between levels.</p>
 <h3>A note on currency</h3>
 <p>The foundational papers here are stable and will not go out of date. The systems material, hardware numbers and frontier discussion will. Where a claim matters to a decision you are making, verify it — particularly hardware specifications, which change between silicon revisions, and anything about which serving engine currently does what.</p>
@@ -70,11 +70,11 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
     <div class="foot__grid">
       <div>
         <p class="foot__h">LEVELS</p>
-        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li></ul>
+        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li></ul>
       </div>
       <div>
         <p class="foot__h">&nbsp;</p>
-        <ul><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li><li><a href="../modules/model-architectures.html">11 · MODEL ARCHITECTURES</a></li><li><a href="../modules/how-vllm-works.html">12 · HOW VLLM WORKS</a></li><li><a href="../modules/gpus-and-tpus.html">13 · GPUS AND TPUS</a></li><li><a href="../modules/fine-tuning.html">14 · FINE-TUNING</a></li></ul>
+        <ul><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li><li><a href="../modules/model-architectures.html">11 · MODEL ARCHITECTURES</a></li><li><a href="../modules/how-vllm-works.html">12 · HOW VLLM WORKS</a></li><li><a href="../modules/gpus-and-tpus.html">13 · GPUS AND TPUS</a></li><li><a href="../modules/fine-tuning.html">14 · FINE-TUNING</a></li><li><a href="../modules/cross-model-kv-transfer.html">15 · CROSS-MODEL KV CACHE TRANSFER</a></li></ul>
       </div>
       <div>
         <p class="foot__h">REFERENCE</p>

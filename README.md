@@ -3,9 +3,9 @@
 A self-paced set of chapters on how LLM inference works and why it is hard, built as a static
 site with a Pac-Man arcade theme.
 
-Fifteen levels, from the transformer forward pass to distributed serving, the architecture zoo,
-inside vLLM itself, down to the silicon the whole thing runs on, and back up to where the weights
-came from in the first place, organised around one idea:
+Sixteen levels, from the transformer forward pass to distributed serving, the architecture zoo,
+inside vLLM itself, down to the silicon the whole thing runs on, back up to where the weights came
+from in the first place, and cross-model KV cache transfer, organised around one idea:
 
 > Generating a token requires reading **every** model weight from memory. Moving those bytes takes
 > far longer than the arithmetic performed on them, so decoding a single sequence leaves the GPU
@@ -33,6 +33,7 @@ Pac-Man is memory-bound too — one pellet per move, however fast he runs.
 | 12 | How vLLM works | 6–8 |
 | 13 | GPUs and TPUs | 6–8 |
 | 14 | Fine-tuning | 7–9 |
+| 15 | Cross-model KV cache transfer | 6–8 |
 
 Plus reference pages: a GPU and TPU spec table with ridge points, a timeline of the field, a
 serving-engine comparison, open problems, and a combined glossary.
@@ -120,5 +121,10 @@ Two caveats worth stating plainly:
 - **Hardware figures are working estimates.** Blackwell and MI300X numbers in particular should be
   checked against a current vendor datasheet. Bandwidth figures are the most stable and the most
   important — for decode, bandwidth is essentially the only spec that matters.
+- **Level 15 is the exception to "foundational papers are stable."** Its subject is weeks old at
+  the time it was written, most of its specific figures trace to one company's own research blog
+  rather than peer review, and the level says so explicitly rather than presenting it with the same
+  confidence as the rest of the book. Its math lab and code lab are independently re-derived and
+  verified; the underlying research's magnitude is not yet settled the way PagedAttention's is.
 
 If you find an error, the fastest way to confirm it is to do the multiplication.

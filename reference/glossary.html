@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GLOSSARY — LLM INFERENCE</title>
-<meta name="description" content="152 terms from across all fifteen levels, each linked back to where it is explained.">
+<meta name="description" content="164 terms from across all sixteen levels, each linked back to where it is explained.">
 <meta name="color-scheme" content="dark light">
 <script>/* set the stored theme before first paint, so there is no flash of the wrong one */
 (function(){try{var t=localStorage.getItem('llm-inference:theme');
 if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <meta property="og:title" content="GLOSSARY — LLM INFERENCE">
-<meta property="og:description" content="152 terms from across all fifteen levels, each linked back to where it is explained.">
+<meta property="og:description" content="164 terms from across all sixteen levels, each linked back to where it is explained.">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -37,7 +37,7 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
     <div class="mod-head">
       <p class="mod-head__level">REFERENCE</p>
       <h1 class="mod-head__title">GLOSSARY</h1>
-      <p class="mod-head__tag">152 terms from across all fifteen levels, each linked back to where it is explained.</p>
+      <p class="mod-head__tag">164 terms from across all sixteen levels, each linked back to where it is explained.</p>
     </div>
     <section class="section">
     <div class="gloss">
@@ -62,6 +62,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
       </div><div class="gloss__row">
         <div class="gloss__term">all-reduce<br><a href="../modules/distributed-inference.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 09</a></div>
         <div class="gloss__def">Collective that sums a tensor across all GPUs and returns the result to all. Ring implementation moves 2(N-1)/N of the data per GPU.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">answer evidence<br><a href="../modules/cross-model-kv-transfer.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 15</a></div>
+        <div class="gloss__def">Whether a downstream probe shows the information a cached context should have carried, independent of whether the model's exact next-token continuation matches — the &quot;memory&quot; axis, distinct from trajectory fidelity.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">arithmetic intensity<br><a href="../modules/autoregressive-loop.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 01</a></div>
         <div class="gloss__def">FLOPs performed per byte moved from memory. Compare it against the hardware ratio to find your bottleneck.</div>
@@ -96,6 +99,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="gloss__term">catastrophic forgetting<br><a href="../modules/fine-tuning.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 14</a></div>
         <div class="gloss__def">A model loses previously-held capabilities while being fine-tuned on new data. PEFT methods generally cause less of it than full fine-tuning does.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">chance-normalized task-quality retention<br><a href="../modules/cross-model-kv-transfer.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 15</a></div>
+        <div class="gloss__def">(mapped_score − chance_floor) / (oracle_score − chance_floor) — a benchmark-accuracy comparison that accounts for different multiple-choice baselines, making retention comparable across benchmarks.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">chunked prefill<br><a href="../modules/batching.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 05</a></div>
         <div class="gloss__def">Splitting a long prefill into fixed-size pieces processed one per iteration, mixed with ongoing decode.</div>
       </div><div class="gloss__row">
@@ -107,6 +113,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
       </div><div class="gloss__row">
         <div class="gloss__term">constrained decoding<br><a href="../modules/decoding-and-sampling.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 03</a></div>
         <div class="gloss__def">Masking logits each step so only tokens consistent with a grammar or schema can be sampled.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">content space<br><a href="../modules/cross-model-kv-transfer.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 15</a></div>
+        <div class="gloss__def">A source model's K/V representation with RoPE's positional rotation removed, leaving only position-independent information about the token — the space a cross-model map is fit in.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">continuous batching<br><a href="../modules/batching.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 05</a></div>
         <div class="gloss__def">Iteration-level scheduling: evict finished sequences and admit waiting ones at every decode step. From Orca.</div>
@@ -122,6 +131,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
       </div><div class="gloss__row">
         <div class="gloss__term">cross-layer KV sharing<br><a href="../modules/model-architectures.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 11</a></div>
         <div class="gloss__def">Letting neighbouring layers reuse one set of K and V, cutting n_layers in the cache formula rather than the head count.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">cross-model KV cache transfer<br><a href="../modules/cross-model-kv-transfer.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 15</a></div>
+        <div class="gloss__def">Reusing a KV cache built by one model to skip or shorten prefill on a different, larger model in the same family, via a learned coordinate mapping rather than a direct copy.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">crossover point<br><a href="../modules/kv-cache.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 02</a></div>
         <div class="gloss__def">The number of cached tokens in flight at which KV traffic overtakes weight traffic. About 114k tokens for Llama-3-8B at fp16.</div>
@@ -210,8 +222,14 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="gloss__term">iteration-level scheduling<br><a href="../modules/how-vllm-works.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 12</a></div>
         <div class="gloss__def">Scheduling once per forward pass rather than once per request, so a sequence can join or leave the batch on any step. Introduced by Orca; the mechanism continuous batching runs on.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">k (source-layer width)<br><a href="../modules/cross-model-kv-transfer.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 15</a></div>
+        <div class="gloss__def">How many top-predictive source layers are concatenated as input to one target layer's mapper. Larger k improves output-distribution fidelity (prefix NLL) but costs more to compute and can hurt intermediate-representation fidelity past a point.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">kernel fusion<br><a href="../modules/attention-kernels.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 07</a></div>
         <div class="gloss__def">Combining adjacent operations into one kernel so intermediates never round-trip to HBM.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">KL32<br><a href="../modules/cross-model-kv-transfer.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 15</a></div>
+        <div class="gloss__def">KL divergence between a mapped-cache continuation and the native-prefill continuation, measured over a 32-step forced rollout rather than a single token — designed to catch drift that single-step agreement misses.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">knee<br><a href="../modules/batching.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 05</a></div>
         <div class="gloss__def">The batch size beyond which throughput gains become small relative to the latency cost. The right default operating point.</div>
@@ -249,6 +267,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="gloss__term">MLA<br><a href="../modules/memory-optimization.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 06</a></div>
         <div class="gloss__def">Multi-head latent attention. Compresses K and V into a shared low-rank latent per token; the up-projections are absorbed into neighbouring matrices.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">model routing (cross-model transfer)<br><a href="../modules/cross-model-kv-transfer.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 15</a></div>
+        <div class="gloss__def">A deployment pattern where a cheap model handles a request by default and escalates to a larger model only when needed, carrying its KV cache forward instead of discarding the reading already done.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">modified rejection sampling<br><a href="../modules/speculative-decoding.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 08</a></div>
         <div class="gloss__def">Accept with probability min(1, p/q); on rejection sample from normalized max(0, p - q). Provably yields p.</div>
       </div><div class="gloss__row">
@@ -260,6 +281,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
       </div><div class="gloss__row">
         <div class="gloss__term">n-gram lookup<br><a href="../modules/speculative-decoding.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 08</a></div>
         <div class="gloss__def">Drafting by searching the context for the current suffix and proposing what followed it. Free, and excellent on repetitive text.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">next-token top-1 agreement<br><a href="../modules/cross-model-kv-transfer.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 15</a></div>
+        <div class="gloss__def">Whether a target model's single most-likely next token, continuing from a transferred cache, matches what it would have produced from its own native prefill.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">NF4<br><a href="../modules/fine-tuning.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 14</a></div>
         <div class="gloss__def">4-bit NormalFloat — a quantization data type whose bins are spaced to match a roughly-Gaussian weight distribution, rather than uniform INT4 bins.</div>
@@ -281,6 +305,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
       </div><div class="gloss__row">
         <div class="gloss__term">PagedAttention<br><a href="../modules/memory-optimization.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 06</a></div>
         <div class="gloss__def">Fixed-size block allocation for the KV cache with per-sequence block tables, borrowed from OS virtual memory. Cuts fragmentation waste from 60-80% to under 4%.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">partial recomputation (cross-model)<br><a href="../modules/cross-model-kv-transfer.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 15</a></div>
+        <div class="gloss__def">Recomputing a target model's last one or two layers exactly from a shared boundary, instead of mapping them, to eliminate the nonlinear-drift ceiling a pure map cannot cross.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">PEFT<br><a href="../modules/fine-tuning.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 14</a></div>
         <div class="gloss__def">Parameter-efficient fine-tuning — the family of methods that update a small fraction of parameters, or none of the original ones, instead of every weight.</div>
@@ -321,6 +348,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="gloss__term">rank (r) / alpha<br><a href="../modules/fine-tuning.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 14</a></div>
         <div class="gloss__def">r sets the dimensionality of a LoRA update; alpha scales it (the update is multiplied by alpha/r) so quality is stable as r changes.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">rank-r residual adapter<br><a href="../modules/cross-model-kv-transfer.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 15</a></div>
+        <div class="gloss__def">A small trained correction added on top of a frozen ridge map, factored through a low-rank bottleneck (rank r) to keep its parameter count small — linear (BAz) or a factorized-quadratic, genuinely nonlinear variant.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">reasoning workload<br><a href="../modules/systems-and-frontier.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 10</a></div>
         <div class="gloss__def">Requests that generate thousands of hidden chain-of-thought tokens, shifting nearly all wall-clock into memory-bound decode.</div>
       </div><div class="gloss__row">
@@ -344,6 +374,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
       </div><div class="gloss__row">
         <div class="gloss__term">reward model<br><a href="../modules/fine-tuning.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 14</a></div>
         <div class="gloss__def">A model trained on pairwise human preference comparisons to output a scalar score, used as the reward signal in RLHF's PPO stage.</div>
+      </div><div class="gloss__row">
+        <div class="gloss__term">ridge mapping<br><a href="../modules/cross-model-kv-transfer.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 15</a></div>
+        <div class="gloss__def">A per-attention-head linear transform, fit by ridge regression (least squares with an L2 penalty) from source-model K/V vectors onto target-model K/V vectors, using an offline calibration set.</div>
       </div><div class="gloss__row">
         <div class="gloss__term">ridge point<br><a href="../modules/autoregressive-loop.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 01</a></div>
         <div class="gloss__def">The arithmetic intensity at which a machine transitions from memory-bound to compute-bound. About 295 FLOP/byte for an H100.</div>
@@ -489,6 +522,9 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
         <div class="gloss__term">weight-stationary<br><a href="../modules/gpus-and-tpus.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 13</a></div>
         <div class="gloss__def">A dataflow in which a tile of weights is loaded into the array and held while activations stream through, rather than both operands moving.</div>
       </div><div class="gloss__row">
+        <div class="gloss__term">width-pruned sibling<br><a href="../modules/cross-model-kv-transfer.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 15</a></div>
+        <div class="gloss__def">A smaller model derived from a larger one by pruning (reducing width, depth, attention or MLP dimensions) and distillation-based retraining — e.g. NVIDIA's Minitron family — structurally closer to its parent than an independently-trained model of the same size.</div>
+      </div><div class="gloss__row">
         <div class="gloss__term">worker process<br><a href="../modules/how-vllm-works.html" style="font-family:var(--display);font-size:8px;color:var(--ink-faint);text-decoration:none">LEVEL 12</a></div>
         <div class="gloss__def">One per GPU in a multi-GPU deployment; holds a shard of the model and executes the batch the driver assigned, exchanging activations with other workers via NCCL under tensor parallelism.</div>
       </div><div class="gloss__row">
@@ -507,11 +543,11 @@ if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)
     <div class="foot__grid">
       <div>
         <p class="foot__h">LEVELS</p>
-        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li></ul>
+        <ul><li><a href="../modules/transformer-fundamentals.html">00 · TRANSFORMER FUNDAMENTALS</a></li><li><a href="../modules/autoregressive-loop.html">01 · THE AUTOREGRESSIVE LOOP</a></li><li><a href="../modules/kv-cache.html">02 · THE KV CACHE</a></li><li><a href="../modules/decoding-and-sampling.html">03 · DECODING AND SAMPLING</a></li><li><a href="../modules/roofline.html">04 · METRICS AND THE ROOFLINE</a></li><li><a href="../modules/batching.html">05 · BATCHING</a></li><li><a href="../modules/memory-optimization.html">06 · MEMORY OPTIMIZATION</a></li><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li></ul>
       </div>
       <div>
         <p class="foot__h">&nbsp;</p>
-        <ul><li><a href="../modules/attention-kernels.html">07 · ATTENTION KERNELS</a></li><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li><li><a href="../modules/model-architectures.html">11 · MODEL ARCHITECTURES</a></li><li><a href="../modules/how-vllm-works.html">12 · HOW VLLM WORKS</a></li><li><a href="../modules/gpus-and-tpus.html">13 · GPUS AND TPUS</a></li><li><a href="../modules/fine-tuning.html">14 · FINE-TUNING</a></li></ul>
+        <ul><li><a href="../modules/speculative-decoding.html">08 · SPECULATIVE DECODING</a></li><li><a href="../modules/distributed-inference.html">09 · DISTRIBUTED INFERENCE</a></li><li><a href="../modules/systems-and-frontier.html">10 · SYSTEMS AND THE FRONTIER</a></li><li><a href="../modules/model-architectures.html">11 · MODEL ARCHITECTURES</a></li><li><a href="../modules/how-vllm-works.html">12 · HOW VLLM WORKS</a></li><li><a href="../modules/gpus-and-tpus.html">13 · GPUS AND TPUS</a></li><li><a href="../modules/fine-tuning.html">14 · FINE-TUNING</a></li><li><a href="../modules/cross-model-kv-transfer.html">15 · CROSS-MODEL KV CACHE TRANSFER</a></li></ul>
       </div>
       <div>
         <p class="foot__h">REFERENCE</p>

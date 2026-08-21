@@ -6,7 +6,7 @@
    room to sit in the corridors.
 
      #  wall        .  pellet       o  power pellet
-     (space) void   0-9,A-E  module node (A = 10, B = 11, C = 12, D = 13, E = 14)
+     (space) void   0-9,A-F  module node (A = 10, B = 11, C = 12, D = 13, E = 14, F = 15)
 
    Walls render as rounded outlines, not fills — that is how the arcade maze
    is actually drawn.
@@ -31,7 +31,7 @@ export const MAP = [
   '#.#.#####.#.#####.#.#',
   '#.#.......#.......#.#',
   '#.#.#####.#.#####.#.#',
-  '#.E.................#',
+  '#.E.......F.........#',
   '#.###.#########.###.#',
   '#.....#       #.....#',
   '#.o.C.#       #.D.o.#',
@@ -39,7 +39,7 @@ export const MAP = [
 ];
 
 /** Node tiles are labelled 0-9 then A, B, … so one character stays one tile. */
-const NODE_CHARS = '0123456789ABCDE';
+const NODE_CHARS = '0123456789ABCDEF';
 const nodeNum = (ch) => NODE_CHARS.indexOf(ch);
 const isNode = (ch) => NODE_CHARS.includes(ch);
 

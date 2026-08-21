@@ -573,7 +573,7 @@ work gets done.
      HOW TO USE
      ====================================================================== */
   howToLede:
-    'Fourteen levels, roughly three months at a few hours a week. Levels 00 to 03 are the foundation — do not rush them.',
+    'Sixteen levels, roughly three months at a few hours a week. Levels 00 to 03 are the foundation — do not rush them.',
 
   howTo: `## The one idea that organizes everything
 
@@ -636,6 +636,8 @@ about it.
 | **11** | The architecture zoo. Read it any time after 06 — it is the level that makes the others compose. |
 | **12** | Inside one engine. Read it after 05, 06 and 09 — it is where their scheduling, memory and distributed-execution material meets in a single running system. |
 | **13** | The silicon underneath. Read it after 04 — it is the roofline applied to the machine itself, and it explains why the GPU/TPU comparisons you will be asked to make are usually bandwidth comparisons in disguise. |
+| **14** | Where the weights came from. Read it after 00, 01 and 06 — LoRA's mergeability and GRPO's group sampling both reuse tricks from earlier levels, applied to a training loop instead of a serving one. |
+| **15** | The frontier, live. Read it after 02, 06 and 09 — days-old research, not a settled technique, held to the same arithmetic standard as everything before it. |
 
 At a few hours a week this is roughly three months. There is no benefit to going faster; the
 checkpoints are honest gates and the material compounds.
@@ -651,7 +653,7 @@ checkpoints are honest gates and the material compounds.
 
 Marking a level cleared stores it in your browser's local storage. Nothing is sent anywhere,
 there is no account, and clearing your browser data resets it. The score is cosmetic: 2,200
-points a level, 30,800 for all fourteen.
+points a level, 35,200 for all sixteen.
 
 Arrow keys move between levels.
 

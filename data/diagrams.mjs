@@ -922,4 +922,74 @@ export default {
       g.box(36.5, 25.8, 14.5, 2.6, '× G DECODE PASSES / STEP', { accent: PAC, fill: 'none', dashed: true, labelFont: 'sub' }),
     ].join(''),
   },
+
+  /* ---------------------------------------------------------------- 15 --- */
+  15: {
+    w: 58, h: 28,
+    title: 'The mapping pipeline, and the fidelity ladder it climbs',
+    desc: 'On the left, a four-stage pipeline: source K and V, with RoPE stripped to leave a ' +
+      'position-independent content-space representation, a ridge map plus a trained residual ' +
+      'applied in that space, then RoPE reapplied at the target positions before injection into ' +
+      'the target model, which never runs its own prefill. On the right, this level’s own ' +
+      'code lab measures four rungs of a fidelity ladder on synthetic data: direct copy with no ' +
+      'mapping reaches 1.4 percent next-token agreement, a ridge map reaches 56.9 percent, adding ' +
+      'a trained residual reaches 90.8 percent, and exact partial recomputation from the shared ' +
+      'boundary reaches 100 percent.',
+    caption: 'Each rung removes one more source of error — a linear coordinate change, then ' +
+      'a nonlinear residual, then recomputation — until nothing is left to approximate.',
+    draw: (g, id) => [
+      g.heading(1.5, 1.6, 'LEVEL 15 · THE MAPPING PIPELINE AND THE FIDELITY LADDER'),
+      g.line(1.5, 2.4, 56.5, 2.4, { stroke: FAINT, width: 1 }),
+
+      /* --- left: the three-step mapping pipeline ----------------------- */
+      g.heading(1.5, 4.2, 'THE MAPPING PIPELINE'),
+
+      g.box(1.5, 6.0, 24, 2.6, 'SOURCE K/V', { sub: 'small model’s own prefill', accent: DIM }),
+      g.arrow(13.5, 8.6, 13.5, 9.7, { id, label: 'strip RoPE' }),
+
+      g.box(1.5, 9.9, 24, 2.6, 'CONTENT SPACE', { sub: 'position-independent', accent: INKY }),
+      g.arrow(13.5, 12.5, 13.5, 13.6, { id, label: 'ridge map + residual' }),
+
+      g.box(1.5, 13.8, 24, 2.6, 'CONTENT SPACE, MAPPED', { sub: 'target’s coordinates', accent: INKY }),
+      g.arrow(13.5, 16.4, 13.5, 17.5, { id, label: 'reapply RoPE' }),
+
+      g.box(1.5, 17.7, 24, 2.6, 'TARGET K/V, INJECTED', { sub: 'target runs no prefill of its own', accent: A, fill: TINT }),
+
+      g.note(1.5, 21.6, [
+        'Fit once, offline, on a calibration set of prompts run',
+        'through both models — nothing here happens per request.',
+      ], { fill: FAINT }),
+
+      g.line(27, 4.4, 27, 22.6, { stroke: FAINT, width: 1 }),
+
+      /* --- right: the fidelity ladder, this level's own code lab ------- */
+      g.heading(29, 4.2, 'THE FIDELITY LADDER · CODE LAB'),
+
+      g.text(29, 6.1, 'direct (no mapping)', { font: 'sub', fill: DIM }),
+      g.box(29, 6.5, 0.4, 2, null, { accent: BLINKY, fill: BLINKY }),
+      g.text(30, 7.5, '1.4%', { font: 'sub', fill: BLINKY }),
+
+      g.text(29, 9.9, 'ridge map', { font: 'sub', fill: DIM }),
+      g.box(29, 10.3, 13.66, 2, null, { accent: INKY, fill: TINT }),
+      g.text(43.16, 11.3, '56.9%', { font: 'sub', fill: INKY }),
+
+      g.text(29, 13.7, 'ridge + trained residual', { font: 'sub', fill: DIM }),
+      g.box(29, 14.1, 21.79, 2, null, { accent: A, fill: TINT }),
+      g.text(51.29, 15.1, '90.8%', { font: 'sub', fill: A }),
+
+      g.text(29, 17.5, 'partial recomputation', { font: 'sub', fill: DIM }),
+      g.box(29, 17.9, 24, 2, null, { accent: A, fill: A }),
+      g.text(53.5, 18.9, '100.0%', { font: 'sub', fill: 'var(--on-pac)' }),
+
+      g.line(29, 21.1, 53, 21.1, { stroke: FAINT, width: 1 }),
+      g.text(29, 21.9, '0%', { font: 'sub', fill: FAINT }),
+      g.text(53, 21.9, '100% next-token agreement', { font: 'sub', fill: FAINT, anchor: 'end' }),
+
+      g.line(1.5, 24.4, 56.5, 24.4, { stroke: FAINT, width: 1 }),
+      g.note(1.5, 25.6, [
+        'The ladder on the right is this level’s own toy-model code lab, not a citation — ',
+        'run with a fixed seed, so every number reproduces exactly if you run it yourself.',
+      ], { fill: DIM }),
+    ].join(''),
+  },
 };

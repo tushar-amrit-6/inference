@@ -105,11 +105,11 @@ function footer(up, modules) {
     <div class="foot__grid">
       <div>
         <p class="foot__h">LEVELS</p>
-        <ul>${modules.slice(0, 7).map((m) => `<li><a href="${up}modules/${m.slug}.html">${String(m.n).padStart(2, '0')} · ${esc(m.title)}</a></li>`).join('')}</ul>
+        <ul>${modules.slice(0, 8).map((m) => `<li><a href="${up}modules/${m.slug}.html">${String(m.n).padStart(2, '0')} · ${esc(m.title)}</a></li>`).join('')}</ul>
       </div>
       <div>
         <p class="foot__h">&nbsp;</p>
-        <ul>${modules.slice(7).map((m) => `<li><a href="${up}modules/${m.slug}.html">${String(m.n).padStart(2, '0')} · ${esc(m.title)}</a></li>`).join('')}</ul>
+        <ul>${modules.slice(8).map((m) => `<li><a href="${up}modules/${m.slug}.html">${String(m.n).padStart(2, '0')} · ${esc(m.title)}</a></li>`).join('')}</ul>
       </div>
       <div>
         <p class="foot__h">REFERENCE</p>
@@ -448,7 +448,7 @@ function indexPage(modules) {
         <li><a class="level" href="reference/glossary.html">
           <span class="level__num">A–Z</span>
           <span><span class="level__title">GLOSSARY</span>
-          <span class="level__tag">Every term defined across all fifteen levels, in one place.</span></span>
+          <span class="level__tag">Every term defined across all sixteen levels, in one place.</span></span>
           <span class="level__meta">reference</span></a></li>
       </ol>
     </section>
@@ -462,7 +462,7 @@ ${footer('', modules)}
   return layout({
     title: `${SITE.title} — ${SITE.subtitle}`,
     description:
-      'A self-paced set of chapters on how LLM inference works and why it is hard. Fourteen levels, from the transformer forward pass to distributed serving, the architecture zoo, inside vLLM itself, and down to the silicon, organized around one idea: decoding is memory-bound.',
+      'A self-paced set of chapters on how LLM inference works and why it is hard. Sixteen levels, from the transformer forward pass to distributed serving, the architecture zoo, inside vLLM itself, down to the silicon, and cross-model KV cache transfer, organized around one idea: decoding is memory-bound.',
     body,
   });
 }
@@ -518,7 +518,7 @@ function glossaryPage(modules) {
   </section>`;
   return refPage({
     slug: 'glossary', title: 'GLOSSARY', eyebrow: 'REFERENCE',
-    lede: `${sorted.length} terms from across all fifteen levels, each linked back to where it is explained.`,
+    lede: `${sorted.length} terms from across all sixteen levels, each linked back to where it is explained.`,
     bodyHtml: html,
   }, modules);
 }
